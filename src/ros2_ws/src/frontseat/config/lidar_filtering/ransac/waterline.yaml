@@ -10,12 +10,13 @@ markers_topic: /waterline_ransac/debug_markers
 
 fit_frame: base_link
 up_axis: [0.0, 0.0, 1.0]
-max_radius: 4.0              # XY meters from base_link origin; <=0 disables
+max_radius: 1.5              # XY meters from radius center; <=0 disables
+radius_center_xy: [-0.27655, -0.02]  # rslidar x,y in fit_frame
 
 ransac:
   num_planes: 3              # 1 = water only; each extra plane uses leftovers
   z_min: -2.0                # candidate band in fit_frame
-  z_max: 0.35
+  z_max: 1.35
   random_seed: -1            # <0 = nondeterministic
   first:                     # water plane
     distance_threshold: 0.22   # meters; loosen for chop

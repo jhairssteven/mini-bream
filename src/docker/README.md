@@ -65,6 +65,18 @@ All stacks mount the host `/etc/localtime` and pass `TZ` so container clocks mat
 (ROS images default to UTC; without this, logs and LiDAR stamps can look like epoch/1970).
 `mini_bream_env.sh` auto-exports `TZ` from the host; set `TZ` in `.env` for manual compose.
 
+**Host wall clock** still matters: Pi GPS/odom and Jetson LiDAR stamp with each host’s time.
+Before field stacks, push GS time to both robots:
+
+```bash
+cd src/docker
+./sync_field_time.sh
+```
+
+`start pi|jetson|autonomy` runs `preflight_host_clock.sh` and aborts if the host
+looks like Unix epoch / before 2024. Override with `SKIP_CLOCK_PREFLIGHT=1` only if
+intentional.
+
 ## Motor command priority
 
 `pwm_daemon` chooses one source:
@@ -127,17 +139,24 @@ rviz2 -d /workspace/docker/config/molo_autonomy.rviz --ros-args -p use_sim_time:
 ros2 launch mission_planner molo_autonomy.launch.py platform:=blueboat controller:=ilos use_sim_time:=false
 ```
 
-Legacy standalone controller tuning (no Nav2):
+Standalone H0 / ILOS controllers (no Nav2), from inside `mini_bream_autonomy`:
 
 ```bash
-cd ../ros2_ws/src/molo_wpt_follower/ilos_boat
+cd /workspace/ros2_ws/src/molo_wpt_follower/h0_boat
+./run_real_boat.sh --platform sim
+./run_real_boat.sh --platform real
+
+cd /workspace/ros2_ws/src/molo_wpt_follower/ilos_boat
 ./run_real_boat.sh --platform sim
 ./run_real_boat.sh --platform real
 ```
 
+Each launcher waits for GPS/IMU on the ROS graph (and `motor_controller` on real).
+
 Controllers publish thrust directly to `/pwm/*_thrust_cmd` over DDS; `motor_controller` on the Pi forwards to `pwm_daemon`.
 
-DDS overrides for autonomy live in `src/docker/.env` (see `.env.example`). Production Jetson uses `cyclonedds.jetson.xml` by default; on a dev laptop uncomment `AUTONOMY_CYCLONEDDS_URI=file:///etc/cyclonedds.xml` or `AUTONOMY_CYCLONEDDS_URI=` for local sim.
+DDS overrides for autonomy live in `src/docker/.env` (see `.env.example`). Production Jetson uses `cyclonedds.jetson.xml` by default; laptop conected to robot LAN `AUTONOMY_CYCLONEDDS_URI=file:///etc/cyclonedds.xml` or `AUTONOMY_CYCLONEDDS_URI=` for local sim.
+
 
 Verify DDS from autonomy (should list Pi GPS + Jetson perception topics):
 

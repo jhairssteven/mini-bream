@@ -1,5 +1,9 @@
 #! /usr/bin/python3
-"""ROS bridge: /pwm/*_thrust_cmd → PWM daemon (does NOT touch GPIO)."""
+"""ROS bridge: /pwm/*_thrust_cmd → PWM daemon (does NOT touch GPIO).
+
+Commands in [-1, 1] are passed through. Boat-wide ESC ceiling is applied once
+in pwm_daemon (device profile max_thrust).
+"""
 
 import os
 
@@ -20,8 +24,6 @@ from protocol import SOURCE_ROS  # noqa: E402
 class MotorControllerNode(Node):
     def __init__(self, node_name: str = "motor_controller"):
         super().__init__(node_name)
-        self.right_max_thrust_pgt = 0.4
-        self.left_max_thrust_pgt = 0.4
         self.left_thrust = 0.0
         self.right_thrust = 0.0
         self.seq = 0
@@ -29,7 +31,7 @@ class MotorControllerNode(Node):
         host = os.environ.get("PWM_DAEMON_HOST", "127.0.0.1")
         port = int(os.environ.get("PWM_DAEMON_PORT", "5600"))
         self.client = PwmDaemonClient(host=host, port=port)
-        self.get_logger().info(f"PWM daemon at udp://{host}:{port}")
+        self.get_logger().info(f"PWM daemon at udp://{host}:{port} (pass-through ±1)")
 
         self.create_subscription(
             Float32, "/pwm/right_thrust_cmd", self.__right_thrust_cbk, reliable_volatile_qos
@@ -41,10 +43,10 @@ class MotorControllerNode(Node):
         self.create_timer(0.05, self.__publish_to_daemon)
 
     def __left_thrust_cbk(self, msg: Float32):
-        self.left_thrust = float(msg.data) * self.left_max_thrust_pgt
+        self.left_thrust = max(-1.0, min(1.0, float(msg.data)))
 
     def __right_thrust_cbk(self, msg: Float32):
-        self.right_thrust = float(msg.data) * self.right_max_thrust_pgt
+        self.right_thrust = max(-1.0, min(1.0, float(msg.data)))
 
     def __publish_to_daemon(self):
         self.seq = (self.seq + 1) & 0xFFFFFFFF

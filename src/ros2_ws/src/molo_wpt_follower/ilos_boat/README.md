@@ -4,14 +4,16 @@ Closed-loop lemniscate tracking with **ILOS path guidance + PID heading control 
 
 Same experiment pipeline as `h0_boat` (config overlays, scoring, artifacts, field-test launcher). Compare against H0 (`baseline_ilos_velocity`), which uses the same ILOS/PID guidance but feeds a velocity MPC for thrust allocation.
 
-| Platform | Prerequisite | Launcher |
-|----------|--------------|----------|
-| **sim** | `blueboat_sim` (Gazebo) | `./run_real_boat.sh --platform sim` |
-| **real** | `frontseat` on Pi | `./run_real_boat.sh` |
-| **bench** | `frontseat`, motors idle | `./run_real_boat.sh --bench` |
+Run all experiments from inside `mini_bream_autonomy`. The launcher waits for the required sensor topics (and `motor_controller` on the real boat) before starting.
+
+| Platform | Prerequisite (ROS graph) | Launcher |
+|----------|--------------------------|----------|
+| **sim** | `/blueboat/sensors/gps/gps/fix`, IMU, GT odometry | `./run_real_boat.sh --platform sim` |
+| **real** | `/wamv/sensors/gps/gps/fix`, IMU, `motor_controller` | `./run_real_boat.sh` |
+| **bench** | GPS + IMU only (thrust to sink topics) | `./run_real_boat.sh --bench` |
 
 **Results (sim):** `ilos_boat/results/<timestamp>/`  
-**Results (field):** `src/field_tests/ilos_boat/<timestamp>/` (mounted at `/workspace/field_tests/ilos_boat` in containers)
+**Results (field):** `/workspace/field_tests/ilos_boat/<timestamp>/` (host: `src/field_tests/ilos_boat/`)
 
 ---
 
@@ -72,46 +74,64 @@ cd src/docker
 ./mini_bream_env.sh start sim
 ```
 
-2. (Optional) RViz in another terminal:
+2. Start autonomy (if not already running):
+
+```bash
+cd src/docker
+./mini_bream_env.sh start autonomy
+```
+
+3. (Optional) RViz in another terminal:
 
 ```bash
 cd src/docker
 ./mini_bream_env.sh start gs --h0-boat --sim-viz
 ```
 
-3. Run the experiment:
+4. Inside the autonomy container:
 
 ```bash
-cd src/ros2_ws/src/molo_wpt_follower/ilos_boat
+docker exec -it mini_bream_autonomy bash
+cd /workspace/ros2_ws/src/molo_wpt_follower/ilos_boat
 ./run_real_boat.sh --platform sim           # full run
 ./run_real_boat.sh --platform sim --smoke   # shortened evaluate window
 ./run_real_boat.sh --platform sim --dry-run # config + ref_path only
 ./run_stack.sh --platform sim               # controller only (Ctrl+C to stop; good for RViz)
 ```
 
-Sim writes to `ilos_boat/results/<timestamp>/`. Uses ground-truth odometry and publishes thrust directly to `/blueboat/thrusters/*`.
+The launcher waits for GPS, IMU, and ground-truth odometry, then runs the experiment. Sim writes to `ilos_boat/results/<timestamp>/`. Thrust goes to `/blueboat/thrusters/*`.
 
 ---
 
 ## Real boat (field test)
 
-1. Start the Pi stack:
+1. Start the Pi stack so GPS/IMU and `motor_controller` are on the domain:
 
 ```bash
 cd src/docker
 ./mini_bream_env.sh start pi
 ```
 
-2. Release radio deadman (`arm=false`).
-
-3. Run from the ground-station laptop:
+2. Start autonomy on Jetson/dev:
 
 ```bash
-cd src/ros2_ws/src/molo_wpt_follower/ilos_boat
+cd src/docker
+./mini_bream_env.sh start autonomy
+```
+
+3. Release radio deadman (`arm=false`).
+
+4. Inside the autonomy container:
+
+```bash
+docker exec -it mini_bream_autonomy bash
+cd /workspace/ros2_ws/src/molo_wpt_follower/ilos_boat
 ./run_real_boat.sh                    # full run (default: --platform real)
 ./run_real_boat.sh --bench            # GPS/IMU live, thrust to sink topics (no motors)
 ./run_real_boat.sh --smoke            # shortened evaluate window
 ```
+
+The launcher waits for GPS and IMU messages. `--platform real` also requires the `motor_controller` node.
 
 **Thrust path:** ILOS → `/pwm/*_thrust_cmd` → `motor_controller` → `pwm_daemon`.
 
@@ -130,12 +150,10 @@ No `--sim-viz` on the real boat. Fixed frame: `world`.
 
 Tunes ILOS / PID / surge-yaw mix parameters (14-dim; no MPC weights). Uses scikit-optimize (`gp_minimize`, EI), same methodology as `h0_boat/tune_h0.py`.
 
-**Simulation:**
+**Simulation** (inside autonomy, with sim topics already up):
 
 ```bash
-cd src/docker && ./mini_bream_env.sh start sim
-
-cd src/ros2_ws/src/molo_wpt_follower/ilos_boat
+cd /workspace/ros2_ws/src/molo_wpt_follower/ilos_boat
 ./run_real_boat.sh --platform sim --tune --install    # 28 trials → config/ilos_tuned_overlay.yaml
 ./run_real_boat.sh --platform sim --tune --quick      # 8 trials (smoke)
 ```
@@ -169,6 +187,8 @@ ilos_base.yaml          # algorithm + lemniscate mission
 | `config/ilos_boat_overlay.yaml` | Real boat (`frontseat`) |
 | `config/ilos_bench_overlay.yaml` | Real boat, thrust to sink topics (no motors) |
 | `config/ilos_tuned_overlay.yaml` | BO best params (optional) |
+
+See `docs/OVERLAY.md` for merge order and examples.
 
 ---
 

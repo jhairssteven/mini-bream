@@ -6,30 +6,96 @@ import json
 import math
 import signal
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import List, Optional, Tuple
-
-import yaml
 
 PKG_DIR = Path(__file__).resolve().parent
 MOLO_DIR = PKG_DIR.parent
 MPC_DIR = MOLO_DIR / "mpc"
 EXP_DIR = MPC_DIR / "experiments"
 
-import sys
-
 for path in (str(PKG_DIR), str(MPC_DIR), str(EXP_DIR)):
     if path not in sys.path:
         sys.path.insert(0, path)
 
-from config import bridge_topics, prepare_run_config  # noqa: E402
+from config import prepare_run_config  # noqa: E402
+
+# How often to refresh progress (TTY uses \r; non-TTY prints a new line).
+_PROGRESS_INTERVAL_S = 5.0
+_PROGRESS_TAG = "[h0]"
 
 
 def _mpc_imports():
     from mpc import build_mission_path
 
     return build_mission_path
+
+
+def _progress_line(phase: str, elapsed_s: float, total_s: float) -> str:
+    total_s = max(total_s, 1e-6)
+    elapsed_s = max(0.0, min(elapsed_s, total_s))
+    pct = 100.0 * elapsed_s / total_s
+    left = max(0.0, total_s - elapsed_s)
+    return f"{_PROGRESS_TAG} {phase:<12} {elapsed_s:5.1f}/{total_s:.0f}s  ({pct:3.0f}%)  ~{left:.0f}s left"
+
+
+def _emit_progress(phase: str, elapsed_s: float, total_s: float, *, final: bool = False) -> None:
+    msg = _progress_line(phase, elapsed_s, total_s)
+    if final:
+        msg = f"{msg}  done"
+    if sys.stdout.isatty():
+        end = "\n" if final else ""
+        print(f"\r{msg:<88}", end=end, flush=True)
+    else:
+        print(msg, flush=True)
+
+
+def sleep_with_progress(phase: str, duration_s: float, interval_s: float = _PROGRESS_INTERVAL_S) -> None:
+    """Sleep while printing sparse percent / time-left updates."""
+    if duration_s <= 0:
+        return
+    t0 = time.monotonic()
+    next_print = 0.0
+    while True:
+        elapsed = time.monotonic() - t0
+        if elapsed >= duration_s:
+            break
+        if elapsed >= next_print:
+            _emit_progress(phase, elapsed, duration_s)
+            next_print = elapsed + interval_s
+        time.sleep(min(0.25, duration_s - elapsed))
+    _emit_progress(phase, duration_s, duration_s, final=True)
+
+
+def wait_subprocess_with_progress(
+    phase: str,
+    proc: subprocess.Popen,
+    expected_s: float,
+    hard_timeout_s: float,
+    interval_s: float = _PROGRESS_INTERVAL_S,
+) -> int:
+    """Poll a subprocess; show progress against expected_s (cap display at 100%)."""
+    t0 = time.monotonic()
+    next_print = 0.0
+    display_total = max(expected_s, 1e-6)
+    while proc.poll() is None:
+        elapsed = time.monotonic() - t0
+        if elapsed >= hard_timeout_s:
+            proc.kill()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                pass
+            _emit_progress(phase, display_total, display_total, final=True)
+            return proc.returncode if proc.returncode is not None else 1
+        if elapsed >= next_print:
+            _emit_progress(phase, min(elapsed, display_total), display_total)
+            next_print = elapsed + interval_s
+        time.sleep(0.25)
+    _emit_progress(phase, display_total, display_total, final=True)
+    return int(proc.returncode or 0)
 
 
 def ros_env(cfg: Optional[dict] = None) -> str:
@@ -45,6 +111,7 @@ def ros_env(cfg: Optional[dict] = None) -> str:
         parts.append(f"source {local_ws}")
     if cfg and cfg.get("use_sim_time"):
         parts.append("export ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}")
+        parts.append("export USE_SIM_TIME=1")
     return " && ".join(parts)
 
 
@@ -71,10 +138,18 @@ def save_ref_path(cfg: dict, path: Path, origin_xy: tuple[float, float] = (0.0, 
 
 def wait_for_xte(timeout_s: float, cfg: Optional[dict] = None) -> bool:
     cmd = (
-        f"timeout {timeout_s} bash -c "
+        "bash -c "
         "'until ros2 topic echo /molo_mpc/cross_track_error --once 2>/dev/null | grep -q data; do sleep 0.5; done'"
     )
-    return subprocess.run(bash_cmd(cmd, cfg), capture_output=True).returncode == 0
+    proc = subprocess.Popen(
+        bash_cmd(cmd, cfg),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    rc = wait_subprocess_with_progress(
+        "wait_xte", proc, expected_s=timeout_s, hard_timeout_s=timeout_s + 2.0
+    )
+    return rc == 0
 
 
 def wait_for_gps(
@@ -83,12 +158,19 @@ def wait_for_gps(
     cfg: Optional[dict] = None,
 ) -> Optional[Tuple[float, float]]:
     cmd = (
-        f"timeout {timeout_s} bash -c "
+        "bash -c "
         f"'until ros2 topic echo {gps_topic} --once 2>/dev/null "
         "| grep -q latitude; do sleep 0.5; done'"
     )
-    proc = subprocess.run(bash_cmd(cmd, cfg), capture_output=True, text=True)
-    if proc.returncode != 0:
+    proc = subprocess.Popen(
+        bash_cmd(cmd, cfg),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    rc = wait_subprocess_with_progress(
+        "wait_gps", proc, expected_s=timeout_s, hard_timeout_s=timeout_s + 2.0
+    )
+    if rc != 0:
         return None
 
     read_cmd = f"ros2 topic echo {gps_topic} --once"
@@ -109,13 +191,24 @@ def wait_for_gps(
 
 def run_evaluate(duration: float, skip_initial: float, cfg: Optional[dict] = None) -> float:
     cmd = f"cd {MPC_DIR} && python3 evaluate_mpc.py --duration {duration} --skip-initial {skip_initial}"
-    proc = subprocess.run(
+    proc = subprocess.Popen(
         bash_cmd(cmd, cfg),
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True,
-        timeout=duration + 90,
     )
-    for line in proc.stdout.splitlines():
+    wait_subprocess_with_progress(
+        "evaluate",
+        proc,
+        expected_s=duration,
+        hard_timeout_s=duration + 90.0,
+    )
+    try:
+        stdout, _stderr = proc.communicate(timeout=5)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        stdout, _stderr = proc.communicate()
+    for line in (stdout or "").splitlines():
         if line.startswith("SCORE "):
             return float(line.split()[1])
     return float("inf")
@@ -178,11 +271,21 @@ def run_boat_trial(
     origin = cfg.get("origin", {})
     origin_lat = origin.get("lat")
     origin_lon = origin.get("lon")
+    need_gps = origin_lat is None or origin_lon is None
 
-    if origin_lat is None or origin_lon is None:
+    print(
+        f"{_PROGRESS_TAG} trial plan: "
+        f"{'wait_gps≤' + str(int(wait_gps_timeout_s)) + 's + ' if need_gps else ''}"
+        f"warmup={warmup_s:.0f}s + wait_xte≤{wait_xte_timeout_s:.0f}s + "
+        f"evaluate={evaluate_s:.0f}s (skip_initial={skip_initial_s:.0f}s)",
+        flush=True,
+    )
+
+    if need_gps:
         gps_topic = cfg.get("topics", {}).get("gps", "/wamv/sensors/gps/gps/fix")
         fix = wait_for_gps(wait_gps_timeout_s, gps_topic, cfg)
         if fix is None:
+            print(f"{_PROGRESS_TAG} wait_gps failed", flush=True)
             return float("inf")
         origin_lat, origin_lon = fix
         cfg = dict(cfg)
@@ -195,7 +298,7 @@ def run_boat_trial(
     proc = start_process(stack_cmd, cfg=cfg, stderr_path=run_dir / "stack_stderr.log")
 
     try:
-        time.sleep(warmup_s)
+        sleep_with_progress("warmup", warmup_s)
 
         origin_file = run_dir / "origin.json"
         origin_xy = (0.0, 0.0)
@@ -206,6 +309,10 @@ def run_boat_trial(
         save_ref_path(cfg, run_dir / "ref_path.csv", origin_xy)
 
         if not wait_for_xte(wait_xte_timeout_s, cfg):
+            print(
+                f"{_PROGRESS_TAG} wait_xte timed out — scoring from log if available",
+                flush=True,
+            )
             rmse = rmse_from_log(run_dir / "log.csv", skip_initial_s)
             return rmse if rmse is not None else float("inf")
 

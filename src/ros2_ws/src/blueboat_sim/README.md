@@ -34,20 +34,11 @@ Use the same H0 experiment harness as the real boat — only the platform prereq
 # Terminal 1: simulation (Docker)
 cd src/docker && ./mini_bream_env.sh start sim
 
-# Terminal 2: H0 lemniscate experiment
-cd src/ros2_ws/src/molo_wpt_follower/h0_boat
+# Terminal 2: autonomy + H0 lemniscate experiment
+cd src/docker && ./mini_bream_env.sh start autonomy
+docker exec -it mini_bream_autonomy bash
+cd /workspace/ros2_ws/src/molo_wpt_follower/h0_boat
 ./run_real_boat.sh --platform sim
-```
-
-Or locally without Docker:
-
-```bash
-# Terminal 1
-ros2 launch blueboat_sim open_water.launch.py headless:=True
-
-# Terminal 2
-cd src/ros2_ws/src/molo_wpt_follower/h0_boat
-./run_h0_boat.sh --platform sim --out /tmp/h0_sim_run
 ```
 
 Platform overlay: `molo_wpt_follower/h0_boat/config/h0_sim_hal_overlay.yaml` (topics under `/blueboat/...`).

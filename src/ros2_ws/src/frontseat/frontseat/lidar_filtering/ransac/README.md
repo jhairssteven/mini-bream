@@ -13,8 +13,9 @@ Each cloud is processed as:
 
 1. Transform points into `fit_frame`.
 2. Keep candidates with `z_min <= z <= z_max` and XY range `<= max_radius`
-   from the `base_link` origin. Points outside that cylinder never enter RANSAC
-   and stay orange on the colored cloud.
+   from `radius_center_xy` in `fit_frame` (default matches `rslidar` extrinsics
+   in `config/tf/blueboat_extrinsics.yaml`). Points outside that cylinder never
+   enter RANSAC and stay orange on the colored cloud.
 3. **Pass 1** — fit plane 1 (water) with `ransac.first` on the candidate cloud.
 4. **Pass k** — fit plane *k* with `ransac.second` / `ransac.third` / … on the
    **leftover** candidates: the previous pass's inliers are removed, then RANSAC
@@ -88,7 +89,8 @@ Shared candidate gate:
 |-----|---------|
 | `fit_frame` | Frame used for RANSAC (`base_link`) |
 | `up_axis` | Gravity / “up”; tilt is measured from this |
-| `max_radius` | XY cylinder around `base_link`; `<=0` disables |
+| `max_radius` | XY cylinder around `radius_center_xy`; `<=0` disables |
+| `radius_center_xy` | `[x, y]` circle center in `fit_frame` (default: rslidar extrinsics) |
 | `ransac.num_planes` | How many sequential leftover passes |
 | `ransac.z_min` / `z_max` | Height band in `fit_frame` |
 | `ransac.random_seed` | `<0` is nondeterministic |

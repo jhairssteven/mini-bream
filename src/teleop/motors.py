@@ -9,8 +9,8 @@ logger = logging.getLogger("teleop.motors")
 
 # BlueRobotics T200 / Basic ESC style mapping (matches frontseat BlueRoboticsT200)
 PWM_FREQ_HZ = 340
-SENSITIVITY = 0.7
-# Ignore tiny commands from any source (joystick residual, radio noise, etc.)
+# Ignore tiny commands from any source (joystick residual, radio noise, etc.).
+# Boat-wide authority ceiling lives in pwm_daemon max_thrust — not here.
 COMMAND_DEADBAND = 0.09
 
 
@@ -21,7 +21,7 @@ def apply_command_deadband(thrust: float, deadband: float = COMMAND_DEADBAND) ->
 
 
 def thrust_to_pulse_us(thrust: float) -> float:
-    """Map thrust in [-1, 1] to pulse width µs with deadband around neutral."""
+    """Map thrust in [-1, 1] to pulse width µs with ESC deadband around neutral."""
     thrust = max(-1.0, min(1.0, float(thrust)))
     if thrust < 0.0:
         # [-1, 0) → [1000, 1440]
@@ -37,13 +37,13 @@ def pulse_us_to_duty_percent(pulse_us: float, freq_hz: float = PWM_FREQ_HZ) -> f
     return (pulse_us / period_us) * 100.0
 
 
-def thrust_to_duty_percent(thrust: float, sensibility: float = SENSITIVITY) -> float:
-    return pulse_us_to_duty_percent(thrust_to_pulse_us(thrust * sensibility))
+def thrust_to_duty_percent(thrust: float) -> float:
+    return pulse_us_to_duty_percent(thrust_to_pulse_us(thrust))
 
 
-def thrust_to_servo_pulse_us(thrust: float, sensibility: float = SENSITIVITY) -> int:
+def thrust_to_servo_pulse_us(thrust: float) -> int:
     """Exact ESC pulse width in microseconds (for logging / diagnostics)."""
-    return int(round(thrust_to_pulse_us(apply_command_deadband(thrust) * sensibility)))
+    return int(round(thrust_to_pulse_us(apply_command_deadband(thrust))))
 
 
 class MotorPair(Protocol):

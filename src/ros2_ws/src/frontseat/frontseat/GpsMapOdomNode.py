@@ -17,7 +17,7 @@ from visualization_msgs.msg import Marker
 from frontseat.heading.angles import yaw_from_quaternion
 from frontseat.heading.geo import latlon_to_local_enu
 from frontseat.heading.ros_msgs import yaw_to_quaternion
-from frontseat.qos_profiles import best_effort_volatile_qos, reliable_volatile_qos
+from frontseat.qos_profiles import best_effort_volatile_qos
 
 
 class GpsMapOdomNode(Node):

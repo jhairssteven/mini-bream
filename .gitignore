@@ -17,3 +17,4 @@ src/ros2_ws/src/mission_planner/mission_planner/moloplanner/assets
 src/ros2_ws/src/molo_wpt_follower/mpc/experiments/results/
 src/ros2_ws/src/molo_wpt_follower/h0_boat/results/*
 src/ros2_ws/src/molo_wpt_follower/ilos_boat/results/*
+skills/

@@ -28,8 +28,8 @@ services:
       - TZ=${TZ:-}
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-      # Same robot-LAN DDS profile as perception (override on dev laptop via .env).
-      - CYCLONEDDS_URI=${AUTONOMY_CYCLONEDDS_URI:-file:///etc/cyclonedds.jetson.xml}
+      # Jetson default when AUTONOMY_CYCLONEDDS_URI is omitted; empty value = no pin (local sim).
+      - CYCLONEDDS_URI=${AUTONOMY_CYCLONEDDS_URI-file:///etc/cyclonedds.jetson.xml}
     volumes:
       - ${LOCALTIME_PATH:-/etc/localtime}:/etc/localtime:ro
       - ../ros2_ws:/workspace/ros2_ws

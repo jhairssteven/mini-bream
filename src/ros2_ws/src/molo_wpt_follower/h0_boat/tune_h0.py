@@ -222,8 +222,8 @@ def ensure_gazebo(launch: str = OPEN_WATER_LAUNCH) -> bool:
     return False
 
 
-def base_config(platform: str) -> dict:
-    cfg = build_h0_boat_config(platform=platform)
+def base_config(platform: str, overlay_path: Path | str | None = None) -> dict:
+    cfg = build_h0_boat_config(platform=platform, overlay_path=overlay_path)
     ref_block = reference_path_block(REF_CONFIG if REF_CONFIG.is_file() else None)
     cfg = apply_reference_path(cfg, ref_block)
     cfg.setdefault("control", {})["approach"] = "baseline_ilos_velocity"
@@ -238,6 +238,7 @@ def run_tuning(
     restart_sim: bool,
     install_overlay: bool,
     refine_from: Path | None = None,
+    overlay_path: Path | str | None = None,
 ) -> Dict[str, Any]:
     try:
         from skopt import gp_minimize
@@ -247,7 +248,7 @@ def run_tuning(
     timing = TIMING.get(platform, TIMING["sim"])
     val_timing = VALIDATION_TIMING.get(platform, VALIDATION_TIMING["sim"])
 
-    cfg_base = base_config(platform)
+    cfg_base = base_config(platform, overlay_path=overlay_path)
     if refine_from is not None and refine_from.is_file():
         with open(refine_from, encoding="utf-8") as f:
             prev = json.load(f)
@@ -413,6 +414,7 @@ def main() -> None:
         default=None,
         help="Path to tune_result.json for local refinement around prior best",
     )
+    parser.add_argument("--overlay", default=None, help="Optional extra YAML overlay")
     args = parser.parse_args()
 
     n_calls = 8 if args.quick else args.n_calls
@@ -432,6 +434,7 @@ def main() -> None:
         restart_sim=not args.no_restart,
         install_overlay=args.install,
         refine_from=Path(args.refine) if args.refine else None,
+        overlay_path=args.overlay,
     )
 
 

@@ -43,7 +43,6 @@ setup(
             'rel_pos_heading = frontseat.RelPosHeadingNode:main',
             'heading_ekf = frontseat.HeadingEkfNode:main',
             'gps_map_odom = frontseat.GpsMapOdomNode:main',
-            'odom_tf_broadcaster = frontseat.OdomTfBroadcasterNode:main',
             'static_tf_broadcaster = frontseat.StaticTfBroadcasterNode:main',
             'self_filter = frontseat.lidar_filtering.self_filter.SelfFilterNode:main',
             'waterline_ransac = frontseat.lidar_filtering.ransac.WaterlineRansacNode:main',
