@@ -1,0 +1,13 @@
+<launch>
+    <!-- Rviz Visualization setup -->
+    <group ns="visualization">
+        <node pkg="rviz" type="rviz" name="rviz" args="-d $(find visualization_tools)/visualizers_config/rviz_config/trajectory.rviz" />
+    </group>
+
+    <!-- Load parameters and run RvizVisualsAdapter -->
+    <group ns="rvizvisualsadapter">
+        <arg name="vehicle" default="mini_bream"/>
+        <rosparam file="$(find backseat)/src/params/$(arg vehicle).yaml"/>
+        <node name="rviz_visuals_adapter" pkg="visualization_tools" type="RvizVisualsAdapter.py" output="screen" />
+    </group>
+</launch>

@@ -1,0 +1,7 @@
+build/
+devel/
+vrx/
+__pycache__/
+log/
+.catkin_workspace
+src/autonomous_catamaran_ws/src/CMakeLists.txt

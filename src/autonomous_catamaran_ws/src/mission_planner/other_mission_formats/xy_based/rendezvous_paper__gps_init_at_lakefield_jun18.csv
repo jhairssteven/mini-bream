@@ -1,0 +1,6 @@
+docking station,loop,timed,loop time,dubins path,Catamaran
+FALSE,TRUE,TRUE,10800,FALSE,FALSE
+lat,long,action,time to point,hold-radius,docking traj
+40.44759555506976,-86.86836078788454,move,1000
+40.447820513261256,-86.86812449855603,move,1000
+40.44764011626974,-86.86793617131653,move,1000

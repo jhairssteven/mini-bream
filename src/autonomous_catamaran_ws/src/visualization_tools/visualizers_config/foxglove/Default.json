@@ -1,0 +1,37 @@
+{
+  "configById": {
+    "Plot!svoacr": {
+      "paths": [
+        {
+          "timestampMethod": "receiveTime",
+          "value": "/heading/value/ilos.data",
+          "enabled": true
+        },
+        {
+          "timestampMethod": "receiveTime",
+          "value": "/pid/rotational/error.data",
+          "enabled": true
+        },
+        {
+          "timestampMethod": "receiveTime",
+          "value": "/pid/rotational/response.data",
+          "enabled": true
+        }
+      ],
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showLegend": true,
+      "legendDisplay": "floating",
+      "showPlotValuesInLegend": false,
+      "isSynced": true,
+      "xAxisVal": "timestamp",
+      "sidebarDimension": 240
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "playbackConfig": {
+    "speed": 1
+  },
+  "layout": "Plot!svoacr"
+}

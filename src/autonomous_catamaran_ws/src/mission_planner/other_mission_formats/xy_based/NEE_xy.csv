@@ -1,0 +1,9 @@
+docking station?,loop?,timed?,loop time,dubins path?,Catamaran
+FALSE,TRUE,TRUE,10800,FALSE,FALSE
+x,y,action,time to point,hold-radius,docking traj
+1.0,1.0,move,"1000"
+6.14,6.6,move,"1000"
+15.34,6.6,move,"1000"
+24.2,3.21,move,"1000"
+15.34,0,move,"1000"
+6.14,0,move,"1000"

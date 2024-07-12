@@ -1,0 +1,25 @@
+version: "3.3"
+name: mini-bream # project name
+
+services:
+  pi_desktop_client:
+    container_name: dev
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile
+    network_mode: host # set docker network same as computer
+    init: true
+    privileged: true
+
+    environment: 
+      - DISPLAY
+      - QT_X11_NO_MITSHM=1
+    volumes:
+      - ../:/workspace			              # code development
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw  # Enable GUI environments
+      - /lib/modules:/lib/modules         # Enable kernel modules (v4l2loopback)
+      - /dev:/dev                         # Enable creating/reading inside docker new devices
+    working_dir: /workspace/autonomous_catamaran_ws
+    # Prevent container from shutting down (for interactive sessions).
+    stdin_open: true
+    tty: true
