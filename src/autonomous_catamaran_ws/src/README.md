@@ -27,4 +27,4 @@ roslaunch visualization_tools visuals.launch vehicle:=<file_name>
 roslaunch backseat mission.launch name:=<mission_file_name> vehicle:=<file_name>
 ```
 
-- If you want to create a new mission, follow the directory structure and file names of the sample missions. No code changes need to be made.
+- If you want to create a new mission, follow the directory structure and file names of the sample missions. No code changes need to be made. See [usage](mission_planner/README.md)

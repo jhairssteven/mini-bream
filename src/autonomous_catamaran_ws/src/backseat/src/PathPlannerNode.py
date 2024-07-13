@@ -89,14 +89,14 @@ class PathPlannerNode:
         wps = []
         for p in mission:
             # Convert from quaternion to euler angles to extract the desired heading(yaw)
-            quaternion = (p.pose.orientation.x,
-                          p.pose.orientation.y,
-                          p.pose.orientation.z,
-                          p.pose.orientation.w)
+            quaternion = (p.orientation.x,
+                          p.orientation.y,
+                          p.orientation.z,
+                          p.orientation.w)
             _,_,head = euler_from_quaternion(quaternion)
             # Create the waypoint in the required format
-            wp = {'lat':p.pose.position.latitude,
-                  'lon':p.pose.position.longitude,
+            wp = {'lat':p.position.latitude,
+                  'lon':p.position.longitude,
                   'depth':0.0,
                   'head':head,
                   'dive_mode':NavigationTools.DiveStyle['NONE'],
@@ -397,6 +397,17 @@ class PathPlannerNode:
         market_prot.header.stamp = rospy.Time.now()
         market_prot.pose = p
         self.working_waypoint_pub.publish(market_prot)
+    
+    def actionServerMissionTypeHandler(self, goal):
+        """ Handles mission creation whether it is specified from a csv file or directly
+         as a GeoPoseStamped list. """
+        if goal.filename != '':
+            self.mission = NavigationTools.Mission(filename=goal.filename)
+            self.path_follower = PathFollower(mission=self.mission, path_creator=DubinsPath)
+        elif goal.mission is not None:
+            self.__load_mission(goal.mission)
+        else:
+            raise ValueError(''' You need to provide at least one way to initialize the mission. Either specifying a filename or a list of GeoPoseStamped messages. ''')
 
     def __run(self, goal):
         """Main execution loop of the action server. The logic is implemented on the update_follower method,
@@ -406,8 +417,10 @@ class PathPlannerNode:
         """
         rospy.loginfo('')
         rospy.loginfo('-'*20)
-        rospy.loginfo(f'Executing new mission...')
-        self.__load_mission(goal.mission)
+        rospy.loginfo(f'[{goal.id}] Executing new mission...')
+        rospy.loginfo("goal.action received:")
+        rospy.loginfo(goal)
+        self.actionServerMissionTypeHandler(goal)
 
         while not self.mission_complete:
             
@@ -419,16 +432,13 @@ class PathPlannerNode:
 
             # Call the main function of the path follower
             self.__update_follower()
-            
-            # Publish the feedback
-            self._feedback.xt_error = 0.0
-            self._feedback.mission_completion_perc = 0.0
-            self._as.publish_feedback(self._feedback)
-
             self.rate.sleep() 
-        
+
+            # Publish the feedback
+            self._feedback.xt_error = abs(self.path_follower.ye)
+            self._as.publish_feedback(self._feedback)
+            
         if self.mission_complete:
-            # Set the correct responses whenever the mission is completed
             self.mission_complete = False
             self._result.mission_complete = True
             self._as.set_succeeded(self._result)
@@ -441,15 +451,11 @@ class PathPlannerNode:
 
         rospy.loginfo('Creating Mission')
         self.mission = NavigationTools.Mission(filename=rospy.get_param("mission"))
-        rospy.loginfo('Creating Follower Object')
         self.path_follower = PathFollower(mission=self.mission, path_creator=DubinsPath)
         rate = rospy.Rate(10)
-        import time as ti
         while not rospy.is_shutdown():
             try:
-                #s = ti.time()
                 self.__update_follower()
-                #print("took: ", round((s-ti.time())*1000, 2), "ms")
                 rate.sleep()
             except rospy.ROSInterruptException as ROSe:
                 rospy.logwarn(ROSe)

@@ -45,4 +45,7 @@ pip install pandas==1.2 utm scipy # TODO: This should be on the dockerfile descr
 
 
 ## To-dos
-The format of the mission should be a list of Waypoints, when loading a new mission, we don't need to process and adjust each incoming format on the PathPlannerNode. The PathPlannerNode should accept only one format. Each client should then be responsible of formatting its data so that the PathPlanner node can understand it. For example, if loading from a csv file, or from neptus or sending a custom point from Rviz. Those could be three different clients and no changes should be made to account for this compatibility on the PathPlannerNode.
+- The format of the mission should be a list of Waypoints, when loading a new mission, we don't need to process and adjust each incoming format on the PathPlannerNode. The PathPlannerNode should accept only one format. Each client should then be responsible of formatting its data so that the PathPlanner node can understand it. For example, if loading from a csv file, or from neptus or sending a custom point from Rviz. Those could be three different clients and no changes should be made to account for this compatibility on the PathPlannerNode.
+
+## Issues
+- When setting a new goal for the action server, sometimes the server doesn't process it, but still returns a result and the result_cbk on the actionClient gets executed..

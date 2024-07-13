@@ -1,5 +1,7 @@
 # goal
-geographic_msgs/GeoPoseStamped[] mission
+geographic_msgs/GeoPose[] mission
+string filename
+int32 id
 ---
 # result
 bool mission_complete
