@@ -1,0 +1,9 @@
+# goal
+geographic_msgs/GeoPoseStamped[] mission
+---
+# result
+bool mission_complete
+# feedback
+---
+float32 xt_error
+float32 mission_completion_perc

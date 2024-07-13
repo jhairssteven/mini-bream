@@ -9,7 +9,8 @@ import copy
 #from scipy.misc import derivative
 from backseat.msg import locg
 import rospy
-#import actionlib
+import actionlib
+from backseat.msg import DoMissionAction, DoMissionGoal, DoMissionResult, DoMissionFeedback
 from nav_msgs.msg import Path
 try:
     import tf
@@ -26,21 +27,11 @@ from geometry_msgs.msg import Pose
 from visualization_msgs.msg import Marker
 import tf.transformations as tf
 
-#
+
 from NavigationTools import *
 from PathFollower import *
 from DataLogger import *
-#from mpc_control.msg import DoMissionResult, DoMissionFeedback, DoMissionGoal, DoMissionAction
-#
-# from mpc_control.msg import loc, head, telem
-#from wamv_comms.msg import states, gpsImu, thruster
 
-# try:
-#     from robot_control.msg import radio
-# except:
-#     print('-'*30)
-#     print('Error importing radio message')
-#     print('-'*30)
 
 
 class PathPlannerNode:
@@ -83,17 +74,17 @@ class PathPlannerNode:
         self.rate = 0
         self._as = 0
         # create messages that are used to publish feedback/result
-        #self._feedback = DoMissionFeedback()
-        #self._result = DoMissionResult()
+        self._feedback = DoMissionFeedback()
+        self._result = DoMissionResult()
         # Configuration parameters
         self.sim_enable = rospy.get_param("sim_enable")
         self.data_logger = DataLogger(data_description='field_test_jun_07/Rendezvouz_paper', headers=['head_err', 'tgt_heading', 'speed', 'wind_dir', 'wind_speed'])
     
     def __load_mission(self, mission):
-        """! Loads the external mission into a list of waypoints that can be 
-        undestood by the path follower.
-        @param  mission The list of GeoPoseStamped waypoints provided by the high level mission planner.
-        @return None.
+        """! Formats GeoPoseStamped waypoints as a dictionary, creates a Mission
+          out of it and loads it into a PathFollower.
+
+        @param mission: List of GeoPoseStamped waypoints.
         """
         wps = []
         for p in mission:
@@ -109,19 +100,12 @@ class PathPlannerNode:
                   'depth':0.0,
                   'head':head,
                   'dive_mode':NavigationTools.DiveStyle['NONE'],
-                  'wp_mode':NavigationTools.WayPointMode[p.header.frame_id]}
+                  'wp_mode':NavigationTools.WayPointMode.REGULAR}
             # Create a list of dictionaries making sure to avoid overwriting 
             wps.append(copy.deepcopy(wp))
 
-        rospy.loginfo('Creating Mission')
         self.mission = NavigationTools.Mission(waypoints=wps)
-        rospy.loginfo('Creating Follower Object')
-        path_type = rospy.get_param("path_type")
-        if path_type == 'dubins':
-            self.path_follower = PathFollower(mission=self.mission, path_creator=DubinsPath)
-        elif path_type == 'reeds_shepp':
-            self.path_follower = PathFollower(mission=self.mission, path_creator=ReedsSheppPath)
-        rospy.loginfo('Mission Loaded')
+        self.path_follower = PathFollower(mission=self.mission, path_creator=DubinsPath)
         
     def init_app(self):
         """! Action server initializer.
@@ -129,7 +113,6 @@ class PathPlannerNode:
         @return None.
         """
         # ROS node initilization
-        print("Init app")
         rospy.init_node(self.node_name, anonymous=False)
         self.rate = rospy.Rate(10)
         # Subscribers
@@ -156,13 +139,15 @@ class PathPlannerNode:
         # Visuals
         self.wk_path_pub = rospy.Publisher("/working_path",Path,queue_size=1)
         self.orig_path_pub = rospy.Publisher("/original_path",Path,queue_size=1)
-        self.__main()
-        """ # Start action server
-        self._as = actionlib.SimpleActionServer(self.node_name, 
+        
+        # Start action server
+        self._as_name = self.node_name  + "_action_server"
+        self._as = actionlib.SimpleActionServer(self._as_name, 
                                                 DoMissionAction, 
                                                 execute_cb=self.__run, 
                                                 auto_start = False)
-        self._as.start() """
+        self._as.start()
+        rospy.loginfo(f'Server initialized. Waiting for new mission...')
 
 
     def __speeddir2diffdrive(self, speed, dir, k = 0.1):
@@ -414,37 +399,42 @@ class PathPlannerNode:
         self.working_waypoint_pub.publish(market_prot)
 
     def __run(self, goal):
-        """! Main execution loop of the action server. The logic is implemented on the update_follower method,
+        """Main execution loop of the action server. The logic is implemented on the update_follower method,
          in that way, if this node is implemented NOT as an action server, it can be easily modified by
          changing only this loop.
-        @param goal The list of waypoints for the vehicle to follow.
-        @return _feedback,_result   The feedback and the final action result.
+        @param goal: A DoMissionAction goal
         """
+        rospy.loginfo('')
+        rospy.loginfo('-'*20)
+        rospy.loginfo(f'Executing new mission...')
         self.__load_mission(goal.mission)
-        
+
         while not self.mission_complete:
             
-            # Check that preempt has not been requested by the client
+            # If preempt has been requested then stop updating the follower.
             if self._as.is_preempt_requested():
-                rospy.loginfo('%s: Preempted' % self.node_name)
                 self._as.set_preempted()
                 self._result.mission_complete = False
                 break
 
             # Call the main function of the path follower
             self.__update_follower()
-            self._feedback.xt_error = 0.0
-            self._feedback.mission_completion_perc = 0.0
             
             # Publish the feedback
+            self._feedback.xt_error = 0.0
+            self._feedback.mission_completion_perc = 0.0
             self._as.publish_feedback(self._feedback)
+
             self.rate.sleep() 
-        # Set the correct responses whenever the mission is completed
+        
         if self.mission_complete:
+            # Set the correct responses whenever the mission is completed
             self.mission_complete = False
             self._result.mission_complete = True
-            rospy.loginfo('%s: Succeeded' % self.node_name)
             self._as.set_succeeded(self._result)
+            rospy.loginfo('Mission completed')
+            rospy.loginfo('-'*20)
+            rospy.loginfo('')
 
     def __main(self):
         """ Non action server implementation of the PathFollower """
@@ -467,6 +457,4 @@ class PathPlannerNode:
 
 if __name__ == "__main__":
     pp = PathPlannerNode(node_name='PathPlanner')
-    print("start PP")
     pp.init_app()
-    #rospy.spin()
