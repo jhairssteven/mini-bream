@@ -13,3 +13,10 @@ lat,lon,depth,head,dive_mode,wp_mode
 - The `nav_goal_to_waypoint.py` file is a sample implementation of the actionClient. It shows how to launch a mission from a csv file taken from a rosparam (see [action_client.launch](launch/action_client.launch)) and also how to send 1-waypoint navigation goals to the PathPlanner for realtime single-waypoint following.
 
 - The files on the `converters` folder are scripts used to convert from (x,y)-defined trajectories, to a GPS trajectory (and viceversa)
+
+- If you want to test the `radomGoal.py` follow all steps on the [Running a sample mission](../README.md#running-a-sample-mission) section. After that, run the script with
+
+```shell
+cd /workspace/autonomous_catamaran_ws/src/mission_planner/src
+python3 randomGoal.py
+```

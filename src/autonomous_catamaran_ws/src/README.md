@@ -22,9 +22,15 @@ roslaunch frontseat all.launch sim:=true
 ```shell
 roslaunch visualization_tools visuals.launch vehicle:=<file_name>
 ```
-- Launch path planner with custom mission. Replace `<mission_file_name>` with one from the `mission_planner/missions` directory.
+- Launch path planner.
 ```shell
-roslaunch backseat mission.launch name:=<mission_file_name> vehicle:=<file_name>
+roslaunch backseat mission.launch vehicle:=<file_name>
 ```
+
+- Launch the mission planner with custom mission. Replace `<mission_file_name>` with one from the `mission_planner/missions` directory.
+```shell
+roslaunch mission_planner action_client.launch name:=<mission_file_name> vehicle:=<file_name>
+```
+> **Note: If `Mission_complete=False` appears on the log just (or the mission trajectory doesn't show up on RViz) try running again the launch file. This behaviour is a known issue (see [issues](../../../README.md#issues)).**
 
 - If you want to create a new mission, follow the directory structure and file names of the sample missions. No code changes need to be made. See [usage](mission_planner/README.md)
