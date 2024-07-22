@@ -61,9 +61,9 @@ RUN apt-get update && apt-get install -y \
     ros-${ROS_DISTRO}-rqt \
     ros-${ROS_DISTRO}-rqt-common-plugins
 
-# foxglove
-RUN wget https://get.foxglove.dev/desktop/latest/foxglove-studio-2.6.1-linux-amd64.deb -O ./foxglove2.6.1.deb \
-     && apt install -y ./foxglove2.6.1.deb 
+# When building the image if there is a "403 Forbidden" error running below command, then go to https://foxglove.dev/download and update the download link
+RUN wget https://get.foxglove.dev/desktop/latest/foxglove-studio-2.9.0-linux-amd64.deb -O ./foxglove2.9.0.deb \
+     && apt install -y ./foxglove2.9.0.deb 
 
 # Load ROS environments    
 RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> ~/.bashrc
@@ -71,7 +71,7 @@ RUN echo "source /workspace/autonomous_catamaran_ws/devel/setup.bash" >> ~/.bash
 
 # As this docker container would be used as a client to see the pi's ros topics, them the master is set to the pi's IP address.
 RUN echo "#ROS_MASTER_URI=http://pi-desktop:11311" >> ~/.bashrc
-RUN echo "ROS_MASTER_URI=http://laptop:11311" >> ~/.bashrc
+RUN echo "ROS_MASTER_URI=http://localhost:11311" >> ~/.bashrc
 # Custom colored prompt
 RUN echo "PS1='\\[\\033[01;34m\\] (Docker)\\[\\033[0m\\] \${debian_chroot:+(\$debian_chroot)}\\u@\\h:\\[\\033[38;5;172m\\]\\w\\[\\033[0m\\] \\$ '"  >> ~/.bashrc
 # Switch back to dialog for any ad-hoc use of apt-get

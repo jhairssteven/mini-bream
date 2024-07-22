@@ -17,6 +17,12 @@ roslaunch frontseat all.launch sim:=true
 ```
 
 > _**For the commands below that use param `vehicle`, if simulating, replace `<file_name>` with `vrx` (default). Otherwise, use one of the availables in `backseat/src/params` directory.**_
+> _**If you run into "cannot launch node of type ..." error then execute below command and try again.***_
+```shell
+cd /workspace
+chmod -R u+x /workspace
+# this is a temporary fix, actual solution may something to do with USERIDs or group membership mismatch between the container and the localhost.
+```
 
 - Launches tools to visualize current pose and trajectory on Rviz.
 ```shell

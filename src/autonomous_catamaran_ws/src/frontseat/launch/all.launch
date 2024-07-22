@@ -6,7 +6,7 @@
         <!-- Launch simulation nodes -->
         <include file="$(find vrx_gazebo)/launch/vrx.launch">
             <arg name="verbose" value="false" />
-            <arg name="gui" value="false" />
+            <arg name="gui" value="true" />
         </include>
 
     </group>

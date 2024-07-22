@@ -13,6 +13,8 @@ This is the documentation and source code to deploy the Dubins path planner on t
 cd src/docker
 docker compose up -d --build
 ```
+> Note: When building the image if a "403 Forbidden" error raises, then go to https://foxglove.dev/download and update the download link.
+
 2. Log into the container with
 ```shell
 xhost +local:docker # this allows the graphics
@@ -26,6 +28,7 @@ Once you execute the command you should be logged on the container at path `/wor
 3. Download VRX simulator
 ```shell
 cd /workspace/autonomous_catamaran_ws/src
+# If below command gives issues, then clone not from within the docker container but from your computer (on the autonomous_catamara_ws/src folder)
 git clone -b gazebo_classic git@github.com:osrf/vrx.git
 ```
 

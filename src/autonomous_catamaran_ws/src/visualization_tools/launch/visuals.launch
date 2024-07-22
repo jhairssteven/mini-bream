@@ -6,7 +6,7 @@
 
     <!-- Load parameters and run RvizVisualsAdapter -->
     <group ns="rvizvisualsadapter">
-        <arg name="vehicle" default="mini_bream"/>
+        <arg name="vehicle" default="vrx"/>
         <rosparam file="$(find backseat)/src/params/$(arg vehicle).yaml"/>
         <node name="rviz_visuals_adapter" pkg="visualization_tools" type="RvizVisualsAdapter.py" output="screen" />
     </group>

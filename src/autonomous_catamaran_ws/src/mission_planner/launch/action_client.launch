@@ -4,7 +4,7 @@
     
     <!-- Vehicle-specific parameters to load -->
     <!-- Options are: mini_bream, bream, ground_vehicle -->
-    <arg name="vehicle" default="mini_bream"/>
+    <arg name="vehicle" default="vrx"/>
 
     <param name="mission" value="$(find mission_planner)/missions/$(arg name)/mission.csv" />
     <rosparam file="$(find backseat)/src/params/$(arg vehicle).yaml"/>
