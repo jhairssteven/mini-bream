@@ -1,10 +1,32 @@
 ## Mini-bream
-This is the documentation and source code to deploy the Dubins path planner on the Mini-BREAM ASV platform. It uses ROS1 noetic and development is done using docker under linux.
+This is the documentation and source code to deploy the Dubins path planner on the Mini-BREAM ASV platform. It uses ROS1 noetic and development is done using docker under linux. 
 
 ### System requirements
 - Ubuntu +22.04
 - Docker compose +v2.24.2
 - Docker engine +25
+
+## Project Directory Structure
+
+Here is a structure overview of the directories in this repository:
+
+```
+MINI_BREAM
+├── docs
+├── src
+│   ├── autonomous_catamaran_ws
+│   └── docker
+├── .gitignore
+├── README.md
+└── sync_ws.sh
+```
+
+- **docs**: Directory containing documentation for the project.
+- **src**: Source code directory.
+  - **autonomous_catamaran_ws**: ROS1 Workspace for the autonomous catamaran project.
+  - **docker**: Docker configuration and related files.
+- **sync_ws.sh**: Shell script for synchronizing the workspace to the mini_bream RPi when developing and testing with sensors.
+
 
 ### Build the docker image and run the container
 
@@ -40,8 +62,8 @@ cd /workspace/docker
 
 pip install pandas==1.2 utm scipy # TODO: This should be on the dockerfile description or the pkg dependencies
 ```
-
-**Reference to the [Getting started](src/autonomous_catamaran_ws/src/README.md) guide for usage**
+## Next steps
+**Reference to the [Getting started](src/autonomous_catamaran_ws/src/README.md) guide for usage**.
 
 
 ## To-dos
