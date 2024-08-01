@@ -1,18 +1,19 @@
 ## Getting started
-This will show you how to run a sample mission using the VRX simulator. For steps on how to deploy on real vehicle look at [deployment](#) documentation.
+This will show you how to run a sample mission using the VRX simulator. For steps on how to deploy on real vehicle look at [deployment](../../../docs/deployment.md) documentation.
 
 ### Running a sample mission
 > _**You will need four terminals opened in the root of your ROS workspace**_
 
 - It is recomended to have a roscore run in a separate terminal, instead of letting roslaunch initiating it. Because some nodes normally need frequent rebooting, having a separate roscore prevents having to also reboot the visualizers such as Rviz or Foxglove.
 ```shell
-cd /workspace/autonomous_catamaran_ws/
+#cd to workspace root
 source devel/setup.bash
 roscore
 ```
 
 - This launched all nodes to give sensor data. Use `sim:=true` to get from simulation, otherwise to get directly from sensors drivers.
 ```shell
+# if running on the actual vehicle put sim:=false
 roslaunch frontseat all.launch sim:=true
 ```
 

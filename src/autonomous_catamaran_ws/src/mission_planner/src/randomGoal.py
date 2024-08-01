@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """ Every 2s publish a PoseStamped with random x,y in the range -10,10. 
     This is primarily used for testing the real-time online waypoint goal setting performance
     of the actionServer of the PathPlanner. 

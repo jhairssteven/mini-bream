@@ -8,6 +8,7 @@
     Codename:	focal
     pi@raspberrypi:~$ 
 
+## Connecting to the RPi
 ### Credentials
 - Power-on the mini-bream computing box
 - Wi-Fi
@@ -26,7 +27,12 @@ If this doesn't work then connect to `naslab` WiFi and ssh RPi with
     ssh pi@192.168.1.124
     passW: 1
 ```
-### Setup
+
+If you need to change WiFi run below command and change wifi connecton under "activate connection"
+```shell
+sudo nmtui
+```
+## Setup
 #### Prerequisites
 - Ensure python3 is installed
 - Also install pip3
@@ -39,14 +45,14 @@ sudo apt install python3-pip
 - Get the code (frontseat, backseat, Missions) folders
 
 ### Dependencies
-- gps
+- GPS
 ```shell
 #sudo apt-get install ros-noetic-rtcm-msgs
-cd /autonomous_catamaran_ws/src
+cd /mini_bream_ws/src
 git clone https://github.com/KumarRobotics/ublox.git/
 cd ..
 ```
--IMU HMC
+- IMU HMC
 ```shell
 sudo apt-get install -y i2c-tools
 pip install quick2wire-api
@@ -66,11 +72,8 @@ sudo make install
 ```shell
 sudo rosdep init
 rosdep update
-cd /workspace/autonomous_catamaran_ws
+# cd to workspace root
 rosdep install --from-paths src --ignore-src -r -y
-
-#as single command
-sudo rosdep init; rosdep update; cd /workspace/autonomous_catamaran_ws; rosdep install --from-paths src --ignore-src -r -y
 ```
 - build workspace
 ```shell
@@ -78,3 +81,5 @@ sudo rosdep init; rosdep update; cd /workspace/autonomous_catamaran_ws; rosdep i
 catkin_make 
 source devel/setup.bash
 ```
+## Next steps: Running a mission
+Check [here](deployment.md) for steps on **how to run a new mission**.

@@ -2,6 +2,7 @@
 Ground station refers to the computer where you can view the realtime status of the boat while on field tests. This guide shows how to do the setup.
 
 ### Requirements
+- Both the RPi and the computer should be connected to the same network.
 - At least the all.launch frontseat package should be running on the vehicle.
 
 ### Setup
