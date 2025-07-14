@@ -14,7 +14,9 @@ lat,lon,depth,head,dive_mode,wp_mode
 
 - The files on the `converters` folder are scripts used to convert from (x,y)-defined trajectories, to a GPS trajectory (and viceversa)
 
-- If you want to test the `radomGoal.py` follow all steps on the [Running a sample mission](../README.md#running-a-sample-mission) section. After that, run the script with
+
+## Using as an API
+- If you want to send waypoints with code to interface with other systems, see the structure of the `radomGoal.py` for sample usage. It generates a random waypoint and triggers the action server to follow it. To run, follow all steps on the [Running a sample mission](../README.md#running-a-sample-mission) section. After that, run the script with
 
 ```shell
 cd /workspace/autonomous_catamaran_ws/src/mission_planner/src
