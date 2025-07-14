@@ -7,3 +7,4 @@ log/
 src/autonomous_catamaran_ws/src/CMakeLists.txt
 dqn_ws/
 logs/
+.vscode/
