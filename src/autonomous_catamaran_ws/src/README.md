@@ -36,7 +36,7 @@ roslaunch backseat mission.launch vehicle:=<file_name>
 
 - Launch the mission planner with custom mission. Replace `<mission_file_name>` with one from the `mission_planner/missions` directory.
 ```shell
-roslaunch mission_planner action_client.launch name:=<mission_file_name> vehicle:=<file_name>
+roslaunch mission_planner action_client.launch client_type:=FILE name:=<mission_file_name> vehicle:=<file_name>
 ```
 > **Note: If `Mission_complete=False` appears on the log just (or the mission trajectory doesn't show up on RViz) try running again the launch file. This behaviour is a known issue (see [issues](../../../README.md#issues)).**
 

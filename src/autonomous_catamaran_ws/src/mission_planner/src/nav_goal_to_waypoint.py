@@ -138,9 +138,10 @@ if __name__ == '__main__':
         rospy.init_node('nav_goal_to_waypoint', anonymous=True)
         _asc = ActionServerClient()
 
-        goal = DoMissionGoal()
-        goal.filename = rospy.get_param('mission') if rospy.has_param('mission') else None
-        _asc.send_goal(goal)
+        if rospy.has_param('mission'):
+            goal = DoMissionGoal()
+            goal.filename = rospy.get_param('mission')
+            _asc.send_goal(goal)
 
         mission_planner = NavGoalToWaypoint(_asc)
 

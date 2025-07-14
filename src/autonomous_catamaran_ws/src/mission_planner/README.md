@@ -16,9 +16,8 @@ lat,lon,depth,head,dive_mode,wp_mode
 
 
 ## Using as an API
-- If you want to send waypoints with code to interface with other systems, see the structure of the `radomGoal.py` for sample usage. It generates a random waypoint and triggers the action server to follow it. To run, follow all steps on the [Running a sample mission](../README.md#running-a-sample-mission) section. After that, run the script with
-
+To run, follow all steps on the [Running a sample mission](../README.md#running-a-sample-mission) section. But launch the action client in API mode by using client_type:=API (API is default)
 ```shell
-cd /workspace/autonomous_catamaran_ws/src/mission_planner/src
-python3 randomGoal.py
+roslaunch mission_planner action_client.launch client_type:=API
 ```
+your custom package or script should publish your desired goal to the `/move_base_simple/goal` topic. See [radomGoal.py](/src/autonomous_catamaran_ws/src/mission_planner/src/randomGoal.py) for a sample.
