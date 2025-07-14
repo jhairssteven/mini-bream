@@ -21,3 +21,5 @@ To run, follow all steps on the [Running a sample mission](../README.md#running-
 roslaunch mission_planner action_client.launch client_type:=API
 ```
 your custom package or script should publish your desired goal to the `/move_base_simple/goal` topic. See [radomGoal.py](/src/autonomous_catamaran_ws/src/mission_planner/src/randomGoal.py) for a sample.
+
+Note: `/move_base_simple/goal` is also the topic to with RViz button 2D Nav goal publishes to, so you can send navigation goals through RViz too.
