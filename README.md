@@ -1,8 +1,8 @@
 ## Mini-bream
-This is the documentation and source code to deploy the Dubins path planner on the Mini-BREAM ASV platform. It uses ROS1 noetic and development is done using docker under linux. 
+This is the documentation and source code to deploy the Dubins path planner on the Mini-BREAM ASV platform. It uses ROS2 humble and development is done using docker under linux. 
 
 ### System requirements
-- Ubuntu +22.04
+- Ubuntu +20.04
 - Docker compose +v2.24.2
 - Docker engine +25
 
@@ -28,6 +28,13 @@ MINI_BREAM
 - **sync_ws.sh**: Shell script for synchronizing the workspace to the mini_bream RPi when developing and testing with sensors.
 
 
+### Clone the repo 
+```shell
+git clone git@github.com:jhairssteven/mini-bream.git
+cd mini-bream/
+git submodule update --init --recursive
+```
+
 ### Build the docker image and run the container
 
 1. Build the docker image with
@@ -35,36 +42,28 @@ MINI_BREAM
 cd src/docker
 docker compose up -d --build
 ```
-> Note: When building the image if a "403 Forbidden" error raises, then go to https://foxglove.dev/download and update the download link.
 
 2. Log into the container with
 ```shell
 xhost +local:docker # this allows the graphics
-docker exec -it dev /bin/bash
+docker exec -it dubins_planner /bin/bash
 ```
 
-Once you execute the command you should be logged on the container at path `/workspace/autonomous_catamaran_ws`. The `/workspace` folder is a direct link to the folder `mini_bream/src` of your local host, any changes made to files on this folder within the container would be reflected on your machine (and viceversa).
+Once you execute the command you should be logged on the container at path the `/workspace` folder, which is a direct link to the folder `mini_bream/src` of your local host, any changes made to files on this folder within the container would be reflected on your machine (and viceversa).
 
 <!-- > **Note: Every command below should be executed inside the docker container** -->
 
-3. Download VRX simulator
-```shell
-cd /workspace/autonomous_catamaran_ws/src
-# If below command gives issues, then clone not from within the docker container but from your computer (on the autonomous_catamara_ws/src folder)
-git clone -b gazebo_classic git@github.com:osrf/vrx.git
-```
-
 4. Build the workspace with
 ```shell
-cd /workspace/autonomous_catamaran_ws
-catkin_make
-source devel/setup.bash
-# Install workspace dependencies
-cd /workspace/docker
-./rosdeps.sh
+cd /workspace/vrx_ws
+colcon build --merge-install
+source install/setup.bash
 
-pip install pandas==1.2 utm scipy # TODO: This should be on the dockerfile description or the pkg dependencies
+cd /workspace/ros2_ws
+colcon build --symlink-install
+source install/setup.bash
 ```
+
 ## Next steps
 **Reference to the [Getting started](Getting%20Started.md) guide for usage**.
 

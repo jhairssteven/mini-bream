@@ -2,7 +2,6 @@ build/
 devel/
 install/
 log/
-vrx/
 __pycache__/
 dqn_ws/
 logs/

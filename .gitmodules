@@ -1,0 +1,3 @@
+[submodule "src/vrx_ws/src"]
+	path = src/vrx_ws/src
+	url = git@github.com:lijianwen1997/linc-sim.git
