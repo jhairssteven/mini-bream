@@ -1,2 +1,2 @@
 xhost +local:docker
-docker exec -it dev /bin/bash
+docker exec -it mini_bream_ros2_humble /bin/bash

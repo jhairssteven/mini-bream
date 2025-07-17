@@ -1,25 +1,32 @@
-version: "3.3"
-name: mini-bream # project name
+name: mini-bream
 
 services:
-  pi_desktop_client:
-    container_name: dev
+  dubins_planner:
+    container_name: mini_bream_ros2_humble
     build:
       context: ../
       dockerfile: docker/Dockerfile
-    network_mode: host # set docker network same as computer
+    network_mode: host
     init: true
     privileged: true
 
     environment: 
-      - DISPLAY
+      - DISPLAY=$DISPLAY
       - QT_X11_NO_MITSHM=1
+      - UDEV=1
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - NVIDIA_VISIBLE_DEVICES=all
     volumes:
       - ../:/workspace			              # code development
+
+      - /var/run/docker.sock:/var/run/docker.sock
       - /tmp/.X11-unix:/tmp/.X11-unix:rw  # Enable GUI environments
       - /lib/modules:/lib/modules         # Enable kernel modules (v4l2loopback)
       - /dev:/dev                         # Enable creating/reading inside docker new devices
+      - /run/dbus/system_bus_socket:/host/run/dbus/system_bus_socket
+    
     working_dir: /workspace/autonomous_catamaran_ws
-    # Prevent container from shutting down (for interactive sessions).
     stdin_open: true
     tty: true
+    runtime: nvidia
+    command: "/bin/bash"

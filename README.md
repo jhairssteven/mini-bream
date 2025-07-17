@@ -66,7 +66,7 @@ cd /workspace/docker
 pip install pandas==1.2 utm scipy # TODO: This should be on the dockerfile description or the pkg dependencies
 ```
 ## Next steps
-**Reference to the [Getting started](src/autonomous_catamaran_ws/src/README.md) guide for usage**.
+**Reference to the [Getting started](Getting%20Started.md) guide for usage**.
 
 
 ## To-dos

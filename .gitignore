@@ -1,10 +1,9 @@
 build/
 devel/
+install/
+log/
 vrx/
 __pycache__/
-log/
-.catkin_workspace
-src/autonomous_catamaran_ws/src/CMakeLists.txt
 dqn_ws/
 logs/
 .vscode/

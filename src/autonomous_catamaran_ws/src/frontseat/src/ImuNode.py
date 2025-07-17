@@ -2,8 +2,6 @@
 import rospy
 from std_msgs.msg import Float32
 
-#import drivers.BN055_I2C as IMUDriver_BNO055_I2C
-from drivers.HMC6343 import HMC6343_handler
 import argparse
 
 class ImuNode:
@@ -29,24 +27,11 @@ class ImuNode:
           self.rate.sleep()
       except rospy.ROSInterruptException:
         break
-""" 
-
-if __name__ == '__main__':
-  #import drivers.BN055_I2C as IMUDriver_BNO055_I2C
-  from drivers.HMC6343 import HMC6343_handler
-  
-  #_BNO055_I2C = IMUDriver_BNO055_I2C()
-  _HMC6343_handler = HMC6343_handler(calibrate=False)
-  
-  imuNode = ImuNode(_IMUDriver=_HMC6343_handler)
-  imuNode.run()
-  
- """
 
 def main(calibrate):
-    _HMC6343_handler = HMC6343_handler(calibrate=calibrate)
-    
-    imuNode = ImuNode(_IMUDriver=_HMC6343_handler)
+    from drivers.HMC6343 import HMC6343_handler
+
+    imuNode = ImuNode(_IMUDriver=HMC6343_handler(calibrate=calibrate))
     imuNode.run()
 
 if __name__ == '__main__':
