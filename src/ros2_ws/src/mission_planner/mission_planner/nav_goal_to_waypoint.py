@@ -15,7 +15,7 @@ import utm
 class ActionServerClient:
     def __init__(self, node: Node):
         self.node = node
-        self._client = ActionClient(node, DoMission, 'PathPlanner_action_server')
+        self._client = ActionClient(node, DoMission, 'path_planner_action')
         self.goal_ctr = 0
         self._goal_handle = None
 
@@ -113,12 +113,13 @@ class NavGoalToWaypoint:
             self.node.get_logger().warn("Current marker not yet received.")
             return
 
-        origin_lat = self.node.get_parameter("goal_lat").get_parameter_value().double_value
-        origin_lon = self.node.get_parameter("goal_lon").get_parameter_value().double_value
+        origin_lat = self.node.get_parameter("goal_lat").value
+        origin_lon = self.node.get_parameter("goal_lon").value
         origin_pose = Pose(gps_lat=origin_lat, gps_lon=origin_lon)
         origin_pose.convert_to_utm()
 
         def local_to_geo(pose):
+            self.node.get_logger().info(f"{origin_pose.utm_x} + {pose.position.x} /n: {origin_pose.utm_y} + {pose.position.y}")
             x_utm = origin_pose.utm_x + pose.position.x
             y_utm = origin_pose.utm_y + pose.position.y
             geo = Pose(utm_x=x_utm, utm_y=y_utm, utm_zone=origin_pose.utm_zone)
@@ -143,8 +144,8 @@ class NavGoalToWaypoint:
 class MainNode(Node):
     def __init__(self):
         super().__init__('nav_goal_to_waypoint')
-        self.declare_parameter("goal_lat", 0.0)
-        self.declare_parameter("goal_lon", 0.0)
+        self.declare_parameter("goal_lat", 40.44707869787295)
+        self.declare_parameter("goal_lon", -86.86853024869774)
 
         self._action_client = ActionServerClient(self)
 

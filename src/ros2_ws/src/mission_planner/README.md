@@ -1,25 +1,43 @@
-## Mission planer pkg
-This package purpose is to host all mission handling and creation for the Dubins PathPlanner of the ASVs.
+## Getting started
+This will show you how to run a sample mission using the VRX simulator. For steps on how to deploy on real vehicle look at [deployment](../../../docs/deployment.md) documentation.
 
-A description of what each file does is provided on inside each file as a comment.
+### Running a sample mission
+> _**You will need four terminals opened in the root of your ROS workspace**_
 
-### The missions directory
-The missions directory is where all .csv based missions are stored. Each subdirectory stores a single `mission.csv` file. And the subdirectory's name is the mission name used across the package as an identifier when launching it. The structure of the .csv file at its most basic is `lat`, `long` and `head` (in E 0rad, N pi/2 rad). The other parameters, need to be on the file's header definition, but there is no need to specify them on the actual data. An example mission with 2 waypoints is shown below.
-
-```
-lat,lon,depth,head,dive_mode,wp_mode
--33.72276582978362,150.6739871096942,0,0
-```
-- The `nav_goal_to_waypoint.py` file is a sample implementation of the actionClient. It shows how to launch a mission from a csv file taken from a rosparam (see [action_client.launch](launch/action_client.launch)) and also how to send 1-waypoint navigation goals to the PathPlanner for realtime single-waypoint following.
-
-- The files on the `converters` folder are scripts used to convert from (x,y)-defined trajectories, to a GPS trajectory (and viceversa)
-
-
-## Using as an API
-To run, follow all steps on the [Running a sample mission](../README.md#running-a-sample-mission) section. But launch the action client in API mode by using client_type:=API (API is default)
+- It is recomended to have a roscore run in a separate terminal, instead of letting roslaunch initiating it. Because some nodes normally need frequent rebooting, having a separate roscore prevents having to also reboot the visualizers such as Rviz or Foxglove.
 ```shell
-roslaunch mission_planner action_client.launch client_type:=API
+#cd to workspace root
+source devel/setup.bash
+roscore
 ```
-your custom package or script should publish your desired goal to the `/move_base_simple/goal` topic. See [radomGoal.py](/src/autonomous_catamaran_ws/src/mission_planner/src/randomGoal.py) for a sample.
 
-Note: `/move_base_simple/goal` is also the topic to with RViz button 2D Nav goal publishes to, so you can send navigation goals through RViz too.
+- This launched all nodes to give sensor data. Use `sim:=true` to get from simulation, otherwise to get directly from sensors drivers.
+```shell
+# if running on the actual vehicle put sim:=false
+roslaunch frontseat all.launch sim:=true
+```
+
+> _**For the commands below that use param `vehicle`, if simulating, replace `<file_name>` with `vrx` (default). Otherwise, use one of the availables in `backseat/src/params` directory.**_
+> _**If you run into "cannot launch node of type ..." error then execute below command and try again.***_
+```shell
+cd /workspace
+chmod -R u+x /workspace
+# this is a temporary fix, actual solution may something to do with USERIDs or group membership mismatch between the container and the localhost.
+```
+
+- Launches tools to visualize current pose and trajectory on Rviz.
+```shell
+roslaunch visualization_tools visuals.launch vehicle:=<file_name>
+```
+- Launch path planner.
+```shell
+roslaunch backseat mission.launch vehicle:=<file_name>
+```
+
+- Launch the mission planner with custom mission. Replace `<mission_file_name>` with one from the `mission_planner/missions` directory.
+```shell
+roslaunch mission_planner action_client.launch client_type:=FILE name:=<mission_file_name> vehicle:=<file_name>
+```
+> **Note: If `Mission_complete=False` appears on the log just (or the mission trajectory doesn't show up on RViz) try running again the launch file. This behaviour is a known issue (see [issues](../../../README.md#issues)).**
+
+- If you want to create a new mission, follow the directory structure and file names of the sample missions. No code changes need to be made. See [usage](mission_planner/README.md)

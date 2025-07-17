@@ -127,17 +127,20 @@ class DubinsPath:
         self.turning_radius = turn_radius
         self.step_size = step_size
 
-        self.node.get_logger().debug(f"Dubins radius {self.turning_radius}, step {self.step_size}")
+        self.node.get_logger().info(f"Dubins radius {self.turning_radius}, step {self.step_size}")
         
         self.gps_calc = NavigationTools.GpsCalculations()
         self.path = []
         path = []
         main_wp_idxs = [0]
+        
         for idx,wp in enumerate(mission):
             x = wp.ToUTM().pose.utm_x
             y = wp.ToUTM().pose.utm_y
             angle = wp.pose.head            # ENU Frame angle (East = 0 deg, North = 90 deg)
+            self.node.get_logger().info(f"{x}, {y}, {angle}")
             q1 = (x, y, angle)
+
             if idx > 0:
                 if self.__get_dist(q0, q1) > 2*self.step_size:
                     tmp_path = dubins.shortest_path(q0, q1, self.turning_radius)
@@ -149,6 +152,7 @@ class DubinsPath:
                 path.extend(configurations)
             q0 = q1
         cnt = 0
+        self.node.get_logger().info(f"Number of points generated in the path, {len(path)}")
         for i,p in enumerate(path):
             zone = mission[0].ToUTM().pose.utm_zone
             if main_wp_idxs[cnt] != i:
@@ -160,6 +164,7 @@ class DubinsPath:
                 wp.pose.head = wp.pose.head # ENU Frame angle (East = 0 deg, North = 90 deg)
                 self.path.append(wp)
                 cnt += 1
+        
         wp = copy.deepcopy(mission[cnt])
         wp.pose.head = wp.pose.head         # ENU Frame angle (East = 0 deg, North = 90 deg)
         self.path.append(wp)
@@ -239,10 +244,10 @@ class PathFollower:
         self.mission = mission
         self.path_hdlr = self.path_creator = path_creator(self.node, mission)
         self.original_path = self.path_hdlr.path
-        print('-'*20)
-        print('start: {}'.format(self.path_hdlr.path[0]))
-        print('end  : {}'.format(self.path_hdlr.path[-1]))
-        print('-'*20)
+        self.node.get_logger().info('-'*20)
+        self.node.get_logger().info('start: {}'.format(self.path_hdlr.path[0]))
+        self.node.get_logger().info('end  : {}'.format(self.path_hdlr.path[-1]))
+        self.node.get_logger().info('-'*20)
         self.working_path = self.original_path.copy()
         # Initialize path follower parameters
         self.mission_complete = False
@@ -462,8 +467,8 @@ class PathFollower:
                                                   veh_speed = speed,
                                                   delta=self.look_ahead)
             
-            if self.node.has_param("tgt_ilos_deg"):
-                self.head = self.node.get_parameter("tgt_ilos_deg").value*np.pi/180
+            """ if self.node.has_param("tgt_ilos_deg"):
+                self.head = self.node.get_parameter("tgt_ilos_deg").value*np.pi/180 """
         return self.mission_complete, self.head, self.ye, self.original_path[self.orig_index]
 
 if __name__ == "__main__":

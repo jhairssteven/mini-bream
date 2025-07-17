@@ -61,7 +61,7 @@ def pose_from_waypoint(xy_wp, is_yaw_in_rads=True):
         yaw *= m.pi / 180
     quat = tf.quaternion_from_euler(0, 0, yaw)
     p = Pose()
-    p.position.x = x; p.position.y = y; p.position.z = 0
+    p.position.x = float(x); p.position.y = float(y); p.position.z = 0.0
     p.orientation.x, p.orientation.y, p.orientation.z, p.orientation.w = quat
     return p
 
@@ -73,10 +73,16 @@ def getPoseStampedfromXYWaypoint(xy_wp):
     return ps
 
 class RvizPath(Node):
+    def __declare_parameters(self):
+        self.declare_parameter("goal_lat", 40.44707869787295)
+        self.declare_parameter("goal_lon", -86.86853024869774)
+        self.declare_parameter("sim_enable", False)
+
     def __init__(self):
         super().__init__('rviz_path')
-        init_lat = self.declare_parameter("goal_lat", 0.0).value
-        init_lon = self.declare_parameter("goal_lon", 0.0).value
+        self.__declare_parameters()
+        init_lat = self.get_parameter("goal_lat").value
+        init_lon = self.get_parameter("goal_lon").value
         self.ref_trajectory_pub = self.create_publisher(Path, '/ref_path', 1)
         self.waypts_pub = self.create_publisher(Marker, '/mission_waypts', 1)
         self.init_UTM_x, self.init_UTM_y, _ = gps_to_utm(init_lat, init_lon)
@@ -118,10 +124,17 @@ class RvizPath(Node):
         threading.Thread(target=self.pub_ref_trajectory, args=(utm_waypts,), daemon=True).start()
 
 class RvizPos(Node):
+    def __declare_parameters(self):
+        self.declare_parameter("goal_lat", 40.44707869787295)
+        self.declare_parameter("goal_lon", -86.86853024869774)
+        self.declare_parameter("sim_enable", True)
+        self.declare_parameter("rst_trav_path", False)
+        
     def __init__(self):
         super().__init__('rviz_pos')
-        init_lat = self.declare_parameter("goal_lat", 0.0).value
-        init_lon = self.declare_parameter("goal_lon", 0.0).value
+        self.__declare_parameters()
+        init_lon = self.get_parameter("goal_lon").value
+        init_lat = self.get_parameter("goal_lat").value
         self.curr_lat = init_lat; self.curr_long = init_lon
         self.init_UTM_x, self.init_UTM_y, _ = gps_to_utm(init_lat, init_lon)
         self.past_poses = []
@@ -129,8 +142,9 @@ class RvizPos(Node):
         self.ref_path.header.frame_id = 'world'
         self.heading_rad = 0; self.ilosHeading_rad = 0
 
-        sim = self.declare_parameter("sim_enable", False).value
+        sim = self.get_parameter("sim_enable").value
         topic_gps = '/wamv/sensors/gps/gps/fix' if sim else '/ublox_gps/fix'
+        self.get_logger().info(f'topic_gps, {topic_gps}')
         self.create_subscription(NavSatFix, topic_gps, self.gps_callback, 1)
         self.create_subscription(Float32, '/compass_bearing_deg', self.heading_callback, 1)
         self.create_subscription(Telem, '/telemetry', self.telem_callback, 1)
@@ -149,6 +163,7 @@ class RvizPos(Node):
         self.ilosHeadingMarker = getMarker([0.5,1.0,0.25,1.0], Marker.ARROW, [25,0.2,0.2])
         self.pidrOutputMarker = getMarker([0.9,0.8,0.2,1.0], Marker.ARROW)
         self.goalPoseMarker = getMarker([0.0,0.0,1.0,1.0], Marker.ARROW)
+        self.get_logger().info("'rviz_pose' node initialized...")
 
     def ref_path_callback(self, msg: Path):
         # optionally set origin from first pose
@@ -172,7 +187,7 @@ class RvizPos(Node):
             cy = u[1] - self.init_UTM_y
         else:
             cx = cy = 0.0
-
+        
         cpm = getMarker([0.0,0.0,0.0,1.0], Marker.ARROW)
         self.currPoseMarker = markerFromWypt([cx, cy, self.heading_rad], cpm)
         self.currPoseMarkerPub.publish(self.currPoseMarker)
@@ -180,11 +195,13 @@ class RvizPos(Node):
         p = PoseStamped()
         p.header.stamp = rclpy.clock.Clock().now().to_msg()
         p.header.frame_id = "world"
-        p.pose.position.x = cx; p.pose.position.y = cy; p.pose.position.z = 0
+        p.pose.position.x = float(cx)
+        p.pose.position.y = float(cy)
+        p.pose.position.z = 0.0
         p.pose.orientation.w = 1.0
         self.ref_path.poses.append(p)
 
-        rst = self.get_parameter_or('rst_trav_path', False).value
+        rst = self.get_parameter('rst_trav_path').value
         if rst:
             self.ref_path.poses = self.ref_path.poses[-1:]
             self.set_parameters([rclpy.parameter.Parameter('rst_trav_path', rclpy.Parameter.Type.BOOL, False)])

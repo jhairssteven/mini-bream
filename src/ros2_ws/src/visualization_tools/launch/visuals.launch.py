@@ -46,7 +46,7 @@ def generate_launch_description():
             executable='rviz_visuals_adapter',  # This must match your entry_point in setup.py
             namespace='rvizvisualsadapter',
             name='rviz_visuals_adapter',
-            parameters=[param_file_path],
+            parameters=[param_file_path], # TODO: parameters are not actually loaded (the node uses the defaults defined)
             output='screen'
         )
     ])

@@ -29,8 +29,8 @@ class PathPlannerNode(Node):
         self.declare_parameter('max_speed', 1.0)
         self.declare_parameter('min_speed', 0.2)
         self.declare_parameter('sim_enable', True)
-        self.declare_parameter('goal_lat', 0.0)
-        self.declare_parameter('goal_lon', 0.0)
+        self.declare_parameter('goal_lat', 40.44707869787295)
+        self.declare_parameter('goal_lon', -86.86853024869774)
         
         self.declare_parameter('kp', 3.6)
         self.declare_parameter('ki', 2.553)
@@ -65,8 +65,8 @@ class PathPlannerNode(Node):
                                       headers=['head_err', 'tgt_heading', 'speed', 'wind_dir', 'wind_speed'])
 
         qos = QoSProfile(depth=10)
-        self.left_pub = self.create_publisher(Float32, '/wamv/thrusters/left_thrust_cmd', qos)
-        self.right_pub = self.create_publisher(Float32, '/wamv/thrusters/right_thrust_cmd', qos)
+        self.left_pub = self.create_publisher(Float64, '/wamv/thrusters/left/thrust', qos)
+        self.right_pub = self.create_publisher(Float64, '/wamv/thrusters/right/thrust', qos)
         self.working_waypoint_pub = self.create_publisher(Marker, '/goal_marker', qos)
         self.xtrac_err_pub = self.create_publisher(Float32, '/xtrac_err_abs', qos)
         self.head_err_pub = self.create_publisher(Float32, '/head_err_deg', qos)
@@ -139,12 +139,11 @@ class PathPlannerNode(Node):
         left = np.clip(left,-1,1)
         right = np.clip(right,-1,1)
 
-        self.left_pub.publish(Float32(data=float(left)))
-        self.right_pub.publish(Float32(data=float(right)))
+        self.left_pub.publish(Float64(data=float(1000*left)))
+        self.right_pub.publish(Float64(data=float(1000*right)))
 
     def __publish_veh_output(self):
         """ Function to outuput the resulting controlled variables to the actuators."""
-
         head_err = NavigationTools().GpsCalculations().angdiff(self.tgt_heading, self.current_wp.pose.head)
         #rclpy.loginfo(f'tgt_heading: {self.tgt_heading*180/np.pi}, {self.current_wp.pose.head*180/np.pi}, {head_err*180/np.pi}')
         self.head_err_pub.publish(Float32(data=float(head_err*180/np.pi)))
@@ -245,6 +244,7 @@ class PathPlannerNode(Node):
                   'head': head,
                   'dive_mode': NavigationTools.DiveStyle['NONE'],
                   'wp_mode': NavigationTools.WayPointMode.REGULAR}
+            
             wps.append(copy.deepcopy(wp))
         return NavigationTools.Mission(waypoints=wps)
 
