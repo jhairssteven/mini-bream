@@ -16,8 +16,8 @@ path_planner:
     min_speed         : 0.1
     # fw_speed: 0
 
-    goal_lat          : -33.722765834294044
-    goal_lon          : 150.67398711024646
+    goal_lat          : 40.44707869787295
+    goal_lon          : -86.86853024869774
     goal_head         : 1.5
 
     # Rotational PID gains
