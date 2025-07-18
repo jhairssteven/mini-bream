@@ -12,7 +12,8 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', glob('launch/*.launch.py')),
-        ('share/' + package_name + '/params', glob('params/*'))
+        ('share/' + package_name + '/params', glob('params/*')),
+        ('share/' + package_name + '/visualizers_config/rviz_config/', glob('visualizers_config/rviz_config/*'))
     ],
     install_requires=['setuptools'],
     zip_safe=True,

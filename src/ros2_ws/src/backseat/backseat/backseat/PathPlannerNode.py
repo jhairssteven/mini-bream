@@ -198,6 +198,7 @@ class PathPlannerNode(Node):
         
         for i,wp in enumerate(wk_path):
             pose = PoseStamped()
+            pose.header.frame_id = 'world'
             pose.pose.position.x = wp.pose.utm_x - x_ref
             pose.pose.position.y = wp.pose.utm_y - y_ref
             pose.pose.position.z = 0.0
@@ -208,6 +209,7 @@ class PathPlannerNode(Node):
             wk_path_ros.poses.append(pose)
         for i,wp in enumerate(orig_path):
             pose = PoseStamped()
+            pose.header.frame_id = 'world'
             pose.pose.position.x = wp.pose.utm_x - x_ref
             pose.pose.position.y = wp.pose.utm_y - y_ref
             pose.pose.position.z = 0.0
