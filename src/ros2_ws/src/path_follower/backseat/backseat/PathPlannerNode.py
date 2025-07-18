@@ -254,6 +254,7 @@ class PathPlannerNode(Node):
         self.get_logger().info(f'Executing new mission: {goal_handle.request}')
 
         if goal_handle.request.filename:
+            self.get_logger().info(f'The filename is: {goal_handle.request.filename}')
             self.mission = NavigationTools.Mission(filename=goal_handle.request.filename)
         elif goal_handle.request.mission:
             self.mission = self.__load_mission(goal_handle.request.mission)

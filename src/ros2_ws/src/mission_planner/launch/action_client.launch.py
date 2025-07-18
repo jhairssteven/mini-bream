@@ -13,10 +13,10 @@ def generate_launch_description():
         description='Vehicle configuration (e.g., mini_bream, bream, ground_vehicle)'
     )
 
-    client_type_arg = DeclareLaunchArgument(
-        'client_type',
-        default_value='API',
-        description='Client mode: API (interactive) or FILE (autonomous mission)'
+    load_mission_from_file_arg = DeclareLaunchArgument(
+        'load_mission_from_file',
+        default_value='true',
+        description='If True, loads mission waypoints from a CSV file. If False, runs in online/interactive mode.'
     )
 
     mission_name_arg = DeclareLaunchArgument(
@@ -36,38 +36,26 @@ def generate_launch_description():
     mission_csv_path = PathJoinSubstitution([
         FindPackageShare('mission_planner'),
         'missions',
-        LaunchConfiguration('mission_name'),
-        'mission.csv'
+        [LaunchConfiguration('mission_name'), '.csv']
     ])
 
-    # Group for FILE-based mission loading
-    file_mode_group = GroupAction([
-        Node(
-            package='mission_planner',
-            executable='nav_goal_to_waypoint',
-            name='action_client',
-            output='screen',
-            parameters=[
-                {'mission': mission_csv_path}
-            ]
-        )
-    ], condition=IfCondition(PythonExpression(["'", LaunchConfiguration('client_type'), "' == 'FILE'"])))
-
-    # Default node launch
-    default_node = Node(
+    action_client = Node(
         package='mission_planner',
         executable='nav_goal_to_waypoint',
         name='action_client',
         output='screen',
-        parameters=[vehicle_param_file]
+        parameters=[
+            {
+                'mission': mission_csv_path,
+                'load_mission_from_file': LaunchConfiguration('load_mission_from_file')
+            },
+            vehicle_param_file,
+        ]
     )
 
     return LaunchDescription([
         vehicle_arg,
-        client_type_arg,
+        load_mission_from_file_arg,
         mission_name_arg,
-        # The vehicle-specific parameter file (passed to node in both cases)
-        default_node,
-        # Conditional mission parameter if FILE mode is used
-        file_mode_group,
+        action_client,
     ])

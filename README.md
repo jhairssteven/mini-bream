@@ -16,6 +16,8 @@ MINI_BREAM
 ├── src
 │   ├── autonomous_catamaran_ws
 │   └── docker
+│   └── ros2_ws
+│   └── vrx_ws
 ├── .gitignore
 ├── README.md
 └── sync_ws.sh
@@ -23,8 +25,10 @@ MINI_BREAM
 
 - **docs**: Directory containing documentation for the project.
 - **src**: Source code directory.
-  - **autonomous_catamaran_ws**: ROS1 Workspace for the autonomous catamaran project.
+  - **autonomous_catamaran_ws**: ROS1 Workspace for the autonomous catamaran project (legacy)
   - **docker**: Docker configuration and related files.
+  - **ros2_ws**: Hosts the Dubins path planner and mission generation code (core)
+  - **vrx_ws**: Hosts the vrx Gazebo-based simulator packages.
 - **sync_ws.sh**: Shell script for synchronizing the workspace to the mini_bream RPi when developing and testing with sensors.
 
 
@@ -65,7 +69,8 @@ source install/setup.bash
 ```
 
 ## Next steps
-**Reference to the [Getting started](Getting%20Started.md) guide for usage**.
+### - [Running a mission](Running%20a%20mission.md)
+### - [Deployment on a real vehicle](docs/deployment.md)
 
 
 ## To-dos

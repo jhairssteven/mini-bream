@@ -115,20 +115,7 @@ class DubinsPath:
         if not self.node.has_parameter("dubins_radius"): self.node.declare_parameter("dubins_radius", 8)
         if not self.node.has_parameter("dubins_step_size"): self.node.declare_parameter("dubins_step_size", 1)
 
-    def __init__(self, node, mission, turn_radius=None, step_size=None, log=True):
-        self.node = node
-        self.declare_parameters()
-
-        if not turn_radius:
-            turn_radius = self.node.get_parameter("dubins_radius").value
-        if not step_size:
-            step_size = self.node.get_parameter("dubins_step_size").value
-        
-        self.turning_radius = turn_radius
-        self.step_size = step_size
-
-        self.node.get_logger().info(f"Dubins radius {self.turning_radius}, step {self.step_size}")
-        
+    def generate_path(self, mission, log=False):
         self.gps_calc = NavigationTools.GpsCalculations()
         self.path = []
         path = []
@@ -172,6 +159,23 @@ class DubinsPath:
             pass
             #self.__log_path()
             #self.plot()
+        return self.path
+
+    def __init__(self, node, mission, turn_radius=None, step_size=None, log=True):
+        self.node = node
+        self.declare_parameters()
+
+        if not turn_radius:
+            turn_radius = self.node.get_parameter("dubins_radius").value
+        if not step_size:
+            step_size = self.node.get_parameter("dubins_step_size").value
+        
+        self.turning_radius = turn_radius
+        self.step_size = step_size
+
+        self.node.get_logger().info(f"Dubins radius {self.turning_radius}, step {self.step_size}")
+        self.generate_path(mission, log)
+        
     
     def __get_dist(self,q0,q1):
         q0 = np.array(q0)
@@ -374,7 +378,7 @@ class PathFollower:
         start = vehicle_wp
         end = copy.deepcopy(original_path[target_idx])
         mission = NavigationTools.Mission(waypoints=[start,end])
-        recovery_path = self.path_creator(mission).path
+        recovery_path = self.path_creator.generate_path(mission)
         recovery_path.extend(copy.deepcopy(original_path[target_idx:]))
         return recovery_path
 

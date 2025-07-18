@@ -146,14 +146,19 @@ class MainNode(Node):
         super().__init__('nav_goal_to_waypoint')
         self.declare_parameter("goal_lat", 40.44707869787295)
         self.declare_parameter("goal_lon", -86.86853024869774)
-
+        self.declare_parameter("load_mission_from_file", False)
+        self.declare_parameter("mission", '')
         self._action_client = ActionServerClient(self)
 
-        # Optional: preload a mission from parameter
-        if self.has_parameter("mission"):
-            goal = DoMission.Goal()
-            goal.filename = self.get_parameter("mission").get_parameter_value().string_value
-            self._action_client.send_goal(goal)
+
+        if self.get_parameter('load_mission_from_file').get_parameter_value().bool_value:
+            filename = self.get_parameter("mission").get_parameter_value().string_value
+            if filename:
+                self.get_logger().info(f'Loading mission from file {filename}')
+
+                goal = DoMission.Goal()
+                goal.filename = filename
+                self._action_client.send_goal(goal)
 
         self._mission_interface = NavGoalToWaypoint(self, self._action_client)
 
