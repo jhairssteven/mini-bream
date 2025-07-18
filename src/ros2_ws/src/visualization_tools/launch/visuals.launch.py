@@ -53,6 +53,6 @@ def generate_launch_description():
 
     return LaunchDescription([
         vehicle_arg,
-        visualization_group,
+        #visualization_group,
         rviz_visuals_adapter_group,
     ])
