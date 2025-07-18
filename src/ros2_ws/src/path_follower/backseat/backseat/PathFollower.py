@@ -112,8 +112,8 @@ class ReedsSheppPath:
     
 class DubinsPath:
     def declare_parameters(self):
-        self.node.declare_parameter("dubins_radius", 8)
-        self.node.declare_parameter("dubins_step_size", 1)
+        if not self.node.has_parameter("dubins_radius"): self.node.declare_parameter("dubins_radius", 8)
+        if not self.node.has_parameter("dubins_step_size"): self.node.declare_parameter("dubins_step_size", 1)
 
     def __init__(self, node, mission, turn_radius=None, step_size=None, log=True):
         self.node = node
@@ -218,14 +218,14 @@ class DubinsPath:
 
 class PathFollower:
     def declare_parameters(self):
-        self.node.declare_parameter("handover_offs", 1)
-        self.node.declare_parameter('lookahead_min', 10) # Meters
-        self.node.declare_parameter('lookahead_max', 25) # Meters
-        self.node.declare_parameter('conv_rate', 8.0)    # >0 constant
-        self.node.declare_parameter('lookahead', 20.0)     # Meters (25m works)
-        self.node.declare_parameter("replan_dist", 10)   # Meters 300 for ILOS only
-        self.node.declare_parameter("no_of_laps", 2)     # Number of times to repeat the initial mission
-        self.node.declare_parameter("tgt_ilos_deg", 90)
+        if not self.node.has_parameter("handover_offs"): self.node.declare_parameter("handover_offs", 1)
+        if not self.node.has_parameter('lookahead_min'): self.node.declare_parameter('lookahead_min', 10) # Meters
+        if not self.node.has_parameter('lookahead_max'): self.node.declare_parameter('lookahead_max', 25) # Meters
+        if not self.node.has_parameter('conv_rate'): self.node.declare_parameter('conv_rate', 8.0)    # >0 constant
+        if not self.node.has_parameter('lookahead'): self.node.declare_parameter('lookahead', 20.0)     # Meters (25m works)
+        if not self.node.has_parameter("replan_dist"): self.node.declare_parameter("replan_dist", 10)   # Meters 300 for ILOS only
+        if not self.node.has_parameter("no_of_laps"): self.node.declare_parameter("no_of_laps", 2)     # Number of times to repeat the initial mission
+        if not self.node.has_parameter("tgt_ilos_deg"): self.node.declare_parameter("tgt_ilos_deg", 90)
 
     def __init__(self, node, mission, path_creator, log_data=True, handover_offs=None):
         self.node = node

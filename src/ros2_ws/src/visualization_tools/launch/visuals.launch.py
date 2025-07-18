@@ -19,15 +19,15 @@ def generate_launch_description():
             executable='rviz2',
             namespace='visualization',
             name='rviz',
-            arguments=[
-                '-d',
-                PathJoinSubstitution([
-                    FindPackageShare('visualization_tools'),
-                    'visualizers_config',
-                    'rviz_config',
-                    'trajectory.rviz'
-                ])
-            ],
+            #arguments=[
+            #    '-d',
+            #    PathJoinSubstitution([
+            #        FindPackageShare('visualization_tools'),
+            #        'visualizers_config',
+            #        'rviz_config',
+            #        'trajectory.rviz'
+            #    ])
+            #],
             output='screen'
         )
     ])
@@ -53,6 +53,6 @@ def generate_launch_description():
 
     return LaunchDescription([
         vehicle_arg,
-        #visualization_group,
+        visualization_group,
         rviz_visuals_adapter_group,
     ])

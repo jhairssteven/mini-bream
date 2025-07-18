@@ -260,21 +260,21 @@ class PathPlannerNode(Node):
         else:
             goal_handle.abort()
             self.get_logger().error('No valid mission source provided.')
-            return DoMissionResult(mission_complete=False)
+            return DoMission.Result(mission_complete=False)
 
         self.path_follower = PathFollower(self, mission=self.mission, path_creator=DubinsPath)
 
         while not self.mission_complete:
             if goal_handle.is_cancel_requested:
                 goal_handle.canceled()
-                return DoMissionResult(mission_complete=False)
+                return DoMission.Result(mission_complete=False)
 
             self.__update_follower()
             self._feedback.xt_error = float(abs(self.path_follower.ye))
             goal_handle.publish_feedback(self._feedback)
             rclpy.spin_once(self, timeout_sec=0.1)
 
-        result = DoMissionResult()
+        result = DoMission.Result()
         result.mission_complete = True
         goal_handle.succeed()
         self.get_logger().info('Mission completed')
