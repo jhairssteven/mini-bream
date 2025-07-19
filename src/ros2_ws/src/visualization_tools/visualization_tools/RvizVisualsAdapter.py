@@ -8,7 +8,7 @@ import tf_transformations as tf
 import utm
 import math as m
 
-from sensor_msgs.msg import NavSatFix
+from sensor_msgs.msg import NavSatFix, Imu
 from backseat_msgs.msg import Telem, Locg
 from visualization_msgs.msg import Marker
 
@@ -145,6 +145,7 @@ class RvizPos(Node):
         sim = self.get_parameter("sim_enable").value
         topic_gps = '/wamv/sensors/gps/gps/fix' if sim else '/ublox_gps/fix'
         self.get_logger().info(f'topic_gps, {topic_gps}')
+        self.create_subscription(Imu, '/wamv/sensors/imu/imu/data', self.imu_callback, 10)
         self.create_subscription(NavSatFix, topic_gps, self.gps_callback, 1)
         self.create_subscription(Float32, '/compass_bearing_deg', self.heading_callback, 1)
         self.create_subscription(Telem, '/telemetry', self.telem_callback, 1)
@@ -175,6 +176,9 @@ class RvizPos(Node):
         ang = m.atan2(x, y)
         self.heading_rad = ang + (2*m.pi if ang < 0 else 0)
 
+    def imu_callback(self, msg: Imu):
+        self.current_orientation = msg.orientation
+
     def gps_callback(self, msg: NavSatFix):
         self.curr_lat = msg.latitude
         self.curr_long = msg.longitude
@@ -189,6 +193,11 @@ class RvizPos(Node):
             cx = cy = 0.0
         
         cpm = getMarker([0.0,0.0,0.0,1.0], Marker.ARROW)
+
+        p = Pose()
+        p.position.x = float(cx); p.position.y = float(cy); p.position.z = 0.0
+        p.orientation = self.current_orientation
+
         self.currPoseMarker = markerFromWypt([cx, cy, self.heading_rad], cpm)
         self.currPoseMarkerPub.publish(self.currPoseMarker)
 

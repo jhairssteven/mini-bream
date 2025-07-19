@@ -4,7 +4,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
 from geometry_msgs.msg import PoseStamped
-from visualization_msgs.msg import Marker
+from sensor_msgs.msg import NavSatFix, Imu
 from geographic_msgs.msg import GeoPose
 
 from backseat_msgs.action import DoMission
@@ -103,36 +103,47 @@ class NavGoalToWaypoint:
         self.current_marker = None
 
         self.goal_sub = node.create_subscription(PoseStamped, '/goal_pose', self.goal_callback, 10)
-        self.marker_sub = node.create_subscription(Marker, '/curr_marker', self.marker_callback, 10)
+        self.gps_sub = node.create_subscription(NavSatFix, '/wamv/sensors/gps/gps/fix', self.gps_callback, 10)
+        self.imu_sub = node.create_subscription(Imu, '/wamv/sensors/imu/imu/data', self.imu_callback, 10)
 
-    def marker_callback(self, msg: Marker):
-        self.current_marker = msg
-
-    def goal_callback(self, msg: PoseStamped):
-        if self.current_marker is None:
-            self.node.get_logger().warn("Current marker not yet received.")
-            return
-
+        self.curr_lat = self.curr_long = None
         origin_lat = self.node.get_parameter("goal_lat").value
         origin_lon = self.node.get_parameter("goal_lon").value
-        origin_pose = Pose(gps_lat=origin_lat, gps_lon=origin_lon)
-        origin_pose.convert_to_utm()
+        self.origin_pose = Pose(gps_lat=origin_lat, gps_lon=origin_lon)
+        self.origin_pose.convert_to_utm()
 
-        def local_to_geo(pose):
-            self.node.get_logger().info(f"{origin_pose.utm_x} + {pose.position.x} /n: {origin_pose.utm_y} + {pose.position.y}")
-            x_utm = origin_pose.utm_x + pose.position.x
-            y_utm = origin_pose.utm_y + pose.position.y
-            geo = Pose(utm_x=x_utm, utm_y=y_utm, utm_zone=origin_pose.utm_zone)
-            geo.convert_to_gps()
-            geo_pose = GeoPose()
-            geo_pose.position.latitude = geo.gps_lat
-            geo_pose.position.longitude = geo.gps_lon
-            geo_pose.position.altitude = 0.0
-            geo_pose.orientation = pose.orientation
-            return geo_pose
+    def imu_callback(self, msg: Imu):
+        self.current_orientation = msg.orientation
 
-        current_geo = local_to_geo(self.current_marker.pose)
-        goal_geo = local_to_geo(msg.pose)
+    def gps_callback(self, msg: NavSatFix):
+        self.curr_lat = msg.latitude
+        self.curr_long = msg.longitude
+
+    def buildGeoPose(self, latitude, longitude, orientation):
+        gp = GeoPose()
+        gp.position.latitude = latitude
+        gp.position.longitude = longitude
+        gp.position.altitude = 0.0
+        gp.orientation = orientation
+        return gp
+
+    def __local_to_geo(self, pose):
+        self.node.get_logger().info(f"{self.origin_pose.utm_x} + {pose.position.x} /n: {self.origin_pose.utm_y} + {pose.position.y}")
+        x_utm = self.origin_pose.utm_x + pose.position.x
+        y_utm = self.origin_pose.utm_y + pose.position.y
+        
+        geo = Pose(utm_x=x_utm, utm_y=y_utm, utm_zone=self.origin_pose.utm_zone)
+        geo.convert_to_gps()
+        geo_pose = self.buildGeoPose(geo.gps_lat, geo.gps_lon, pose.orientation)
+        return geo_pose
+
+    def goal_callback(self, msg: PoseStamped):
+        if self.curr_lat is None or self.curr_long is None:
+            self.node.get_logger().warn("Current lat, long not yet received.")
+            return
+
+        current_geo = self.buildGeoPose(self.curr_lat, self.curr_long, self.current_orientation)
+        goal_geo = self.__local_to_geo(msg.pose)
 
         goal_msg = DoMission.Goal()
         goal_msg.mission = [current_geo, goal_geo]
