@@ -24,8 +24,8 @@ class JoystickController(Node):
         # Publishers
         self.linear_vel_publisher = self.create_publisher(Float64, '/wamv/linear_velocity', qos)
         self.angular_vel_publisher = self.create_publisher(Float64, '/wamv/angular_velocity', qos)
-        self.left_thruster_publisher = self.create_publisher(Float64, '/wamv/thrusters/left/thrust', qos)
-        self.right_thruster_publisher = self.create_publisher(Float64, '/wamv/thrusters/right/thrust', qos)
+        self.left_thruster_publisher = self.create_publisher(Float64, '/wamv/thrusters/left/thrust', QoSProfile(depth=10))
+        self.right_thruster_publisher = self.create_publisher(Float64, '/wamv/thrusters/right/thrust', QoSProfile(depth=10))
         self.left_rudder_publisher = self.create_publisher(Float64, '/wamv/thrusters/left/pos', qos)
         self.right_rudder_publisher = self.create_publisher(Float64, '/wamv/thrusters/right/pos', qos)
         self.joystick_takingover_publisher = self.create_publisher(Bool, 'joystick_takingover', qos)
@@ -121,6 +121,7 @@ class JoystickController(Node):
                 self.get_logger().warn('Joystick inactive, deadman switch is not pulled, publishing no commands ...',
                                        throttle_duration_sec=5)
             self.make_global(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+            self.enable_thrust = False
 
             return
         else:
@@ -145,11 +146,9 @@ class JoystickController(Node):
         elif msg.buttons[4] :  # or msg.buttons[-7]
             self.linc_mode = 0
             self.enable_rudder = 0
-        if msg.buttons[0]:
-            self.enable_thrust = True
-        else:
-            self.enable_thrust = False
         
+        self.enable_thrust: bool = msg.buttons[0]
+
         # RLS Enable Logic
         if rls_enable == True:
             self.rls_enable = not self.rls_enable
@@ -197,10 +196,10 @@ class JoystickController(Node):
             left_pos = 0.0
             right_pos = 0.0
 
-        self.get_logger().info(f'Linear: {linear_velocity:.1f}, Angular: {angular_velocity:.1f}, '
+        """ self.get_logger().info(f'Linear: {linear_velocity:.1f}, Angular: {angular_velocity:.1f}, '
                                f'Thrust L: {left_thrust:.1f}, Thrust R: {right_thrust:.1f}, '
                                f'Rudder L: {left_pos:.1f}, Rudder R: {right_pos:.1f}',
-                               throttle_duration_sec=1 / self.log_output_freq)
+                               throttle_duration_sec=1 / self.log_output_freq) """
 
         self.make_global(left_thrust, right_thrust, left_pos, right_pos, max_velocity * linear_velocity, max_angular_vel * angular_velocity)
     
@@ -211,7 +210,7 @@ class JoystickController(Node):
         self.right_pos = right_pos
         self.linear_velocity =  linear_velocity
         self.angular_velocity = angular_velocity
-        self.get_logger().info(f'self.linear_velocity,{self.linear_velocity}')
+        #self.get_logger().info(f'self.linear_velocity,{self.linear_velocity}')
 
 def main(args=None):
     rclpy.init(args=args)
