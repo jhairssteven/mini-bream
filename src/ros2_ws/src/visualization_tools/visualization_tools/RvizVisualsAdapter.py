@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import PoseStamped, Pose, Point
+from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
 from nav_msgs.msg import Path
 from std_msgs.msg import Float32
 import tf_transformations as tf
@@ -136,17 +136,16 @@ class RvizPos(Node):
         init_lon = self.get_parameter("goal_lon").value
         init_lat = self.get_parameter("goal_lat").value
         self.curr_lat = init_lat; self.curr_long = init_lon
+        self.current_orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
+
         self.init_UTM_x, self.init_UTM_y, _ = gps_to_utm(init_lat, init_lon)
         self.past_poses = []
         self.ref_path = Path()
         self.ref_path.header.frame_id = 'world'
         self.heading_rad = 0; self.ilosHeading_rad = 0
 
-        sim = self.get_parameter("sim_enable").value
-        topic_gps = '/wamv/sensors/gps/gps/fix' if sim else '/ublox_gps/fix'
-        self.get_logger().info(f'topic_gps, {topic_gps}')
         self.create_subscription(Imu, '/wamv/sensors/imu/imu/data', self.imu_callback, 10)
-        self.create_subscription(NavSatFix, topic_gps, self.gps_callback, 1)
+        self.create_subscription(NavSatFix, '/wamv/sensors/gps/gps/fix', self.gps_callback, 1)
         self.create_subscription(Float32, '/compass_bearing_deg', self.heading_callback, 1)
         self.create_subscription(Telem, '/telemetry', self.telem_callback, 1)
         self.create_subscription(Locg, '/way_gps', self.way_gps_callback, 1)
@@ -185,35 +184,24 @@ class RvizPos(Node):
         self.current_pose_pub()
 
     def current_pose_pub(self):
-        if self.curr_lat is not None:
-            u = utm.from_latlon(self.curr_lat, self.curr_long)
-            cx = u[0] - self.init_UTM_x
-            cy = u[1] - self.init_UTM_y
-        else:
-            cx = cy = 0.0
+        u = utm.from_latlon(self.curr_lat, self.curr_long)
+        cx = u[0] - self.init_UTM_x
+        cy = u[1] - self.init_UTM_y
         
-        cpm = getMarker([0.0,0.0,0.0,1.0], Marker.ARROW)
+        current_marker = getMarker([0.0,0.0,0.0,1.0], Marker.ARROW)
+        current_pose = Pose(position=Point(x=cx, y=cy, z=0.0), orientation=self.current_orientation)
+        current_marker.pose = current_pose
+        self.currPoseMarkerPub.publish(current_marker)
 
-        p = Pose()
-        p.position.x = float(cx); p.position.y = float(cy); p.position.z = 0.0
-        p.orientation = self.current_orientation
-
-        self.currPoseMarker = markerFromWypt([cx, cy, self.heading_rad], cpm)
-        self.currPoseMarkerPub.publish(self.currPoseMarker)
-
-        p = PoseStamped()
-        p.header.stamp = rclpy.clock.Clock().now().to_msg()
-        p.header.frame_id = "world"
-        p.pose.position.x = float(cx)
-        p.pose.position.y = float(cy)
-        p.pose.position.z = 0.0
-        p.pose.orientation.w = 1.0
-        self.ref_path.poses.append(p)
-
-        rst = self.get_parameter('rst_trav_path').value
-        if rst:
+        if self.get_parameter('rst_trav_path').value:
             self.ref_path.poses = self.ref_path.poses[-1:]
             self.set_parameters([rclpy.parameter.Parameter('rst_trav_path', rclpy.Parameter.Type.BOOL, False)])
+
+        current_pose_stamped = PoseStamped()
+        current_pose_stamped.header.stamp = self.get_clock().now().to_msg()
+        current_pose_stamped.header.frame_id = "world"
+        current_pose_stamped.pose = current_pose
+        self.ref_path.poses.append(current_pose_stamped)
         self.traversedPathPub.publish(self.ref_path)
 
     def getCurrentXY(self):
@@ -222,8 +210,8 @@ class RvizPos(Node):
 
     def way_gps_callback(self, msg: Locg):
         self.ilosHeading_rad = msg.dbear
-        cu = self.getCurrentXY()
-        self.ilosHeadingMarker = markerFromWypt([*cu, self.ilosHeading_rad], self.ilosHeadingMarker)
+        cu_x, cu_y = self.getCurrentXY()
+        self.ilosHeadingMarker = markerFromWypt([cu_x, cu_y, self.ilosHeading_rad], self.ilosHeadingMarker)
         self.ilosHeadingMarkerPub.publish(self.ilosHeadingMarker)
         self.ilosHeadingPub.publish(Float32(data=self.ilosHeading_rad * 180 / m.pi))
 
