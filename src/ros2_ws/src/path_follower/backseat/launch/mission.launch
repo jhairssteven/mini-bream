@@ -1,6 +1,0 @@
-<launch>
-    <!-- Vehicle-specific parameters to load -->
-    <arg name="vehicle" default="vrx"/>
-    <rosparam file="$(find backseat)/src/params/$(arg vehicle).yaml"/>
-    <node name="path_planner" pkg="backseat" type="PathPlannerNode.py" output="screen"/>
-</launch>
