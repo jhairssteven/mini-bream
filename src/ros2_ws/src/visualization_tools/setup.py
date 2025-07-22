@@ -24,7 +24,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'rviz_visuals_adapter = visualization_tools.RvizVisualsAdapter:main'
+            'rviz_visuals_adapter = visualization_tools.RvizVisualsAdapter:main',
+            'interactive_path = visualization_tools.interactive_path_node:main'
         ],
     },
 )

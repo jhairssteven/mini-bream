@@ -2,8 +2,8 @@ path_planner:
   ros__parameters:
     # Dubins
     dubins_radius: 8
-    dubins_step_size: 1
-    replan_dist: 10
+    dubins_step_size: 1.0
+    replan_dist: 10.0
     no_of_laps: 3 
 
     # Are these used?

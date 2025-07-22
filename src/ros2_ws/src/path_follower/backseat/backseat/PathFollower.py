@@ -112,8 +112,8 @@ class ReedsSheppPath:
     
 class DubinsPath:
     def declare_parameters(self):
-        if not self.node.has_parameter("dubins_radius"): self.node.declare_parameter("dubins_radius", 8)
-        if not self.node.has_parameter("dubins_step_size"): self.node.declare_parameter("dubins_step_size", 1)
+        if not self.node.has_parameter("dubins_radius"): self.node.declare_parameter("dubins_radius", 8.0)
+        if not self.node.has_parameter("dubins_step_size"): self.node.declare_parameter("dubins_step_size", 1.0)
 
     def generate_path(self, mission, log=False):
         self.gps_calc = NavigationTools.GpsCalculations()
@@ -226,8 +226,8 @@ class PathFollower:
         if not self.node.has_parameter('lookahead_min'): self.node.declare_parameter('lookahead_min', 10) # Meters
         if not self.node.has_parameter('lookahead_max'): self.node.declare_parameter('lookahead_max', 25) # Meters
         if not self.node.has_parameter('conv_rate'): self.node.declare_parameter('conv_rate', 8.0)    # >0 constant
-        if not self.node.has_parameter('lookahead'): self.node.declare_parameter('lookahead', 20.0)     # Meters (25m works)
-        if not self.node.has_parameter("replan_dist"): self.node.declare_parameter("replan_dist", 10)   # Meters 300 for ILOS only
+        if not self.node.has_parameter('replan_lookahead'): self.node.declare_parameter('replan_lookahead', 20.0)     # Meters (25m works)
+        if not self.node.has_parameter("replan_dist"): self.node.declare_parameter("replan_dist", 10.0)   # Meters 300 for ILOS only
         if not self.node.has_parameter("no_of_laps"): self.node.declare_parameter("no_of_laps", 2)     # Number of times to repeat the initial mission
         if not self.node.has_parameter("tgt_ilos_deg"): self.node.declare_parameter("tgt_ilos_deg", 90)
 
@@ -266,10 +266,11 @@ class PathFollower:
         self.ye = 0                 # meters
         self.target_speed = 1       # m/s
         self.beta_hat = 0      
+        self.look_ahead = self.node.get_parameter('lookahead_min').value
         self.look_ahead_min = self.node.get_parameter('lookahead_min').value   # Meters
         self.look_ahead_max = self.node.get_parameter('lookahead_max').value   # Meters
         self.conv_rate = self.node.get_parameter('conv_rate').value            # >0 constant
-        self.look_ahead = self.node.get_parameter('lookahead').value           # Meters (25m works)
+        self.replan_look_ahead = self.node.get_parameter('replan_lookahead').value           # Meters (25m works)
         self.MIN_ALIGN_DIST = 25    # Meters
         self.MAX_DEV_FROM_PATH = self.node.get_parameter("replan_dist").value  # Meters 300 for ILOS only
         self.NO_OF_LAPS = self.node.get_parameter("no_of_laps").value          # Number of times to repeat the initial mission
@@ -366,7 +367,7 @@ class PathFollower:
             Output:
                 expanded_path   : path containing the new route to get on track, plus the remaining path containing the original mission
         '''
-        target_idx = int(min(current_wp_idx + np.floor(self.look_ahead/self.path_hdlr.step_size), len(original_path)-np.floor(self.MIN_ALIGN_DIST/self.path_hdlr.step_size)))
+        target_idx = int(min(current_wp_idx + np.floor(self.replan_look_ahead/self.path_hdlr.step_size), len(original_path)-np.floor(self.MIN_ALIGN_DIST/self.path_hdlr.step_size)))
         #target_idx = int(min(current_wp_idx + np.floor(self.look_ahead/self.path_hdlr.step_size), len(original_path)-1))
         '''
         The start point of the new mission is the current vehicle's position. The target position, which will be the other wp of the mission is a 
@@ -453,7 +454,6 @@ class PathFollower:
                     self.node.get_logger().debug(f'Lap {self.lap_ctr} Completed')
             # Replan logic in case the current position is further than 3m to the closest point on the path
             #print('head:{:6f}, proj_head:{:6f}, ye:{:6f}, widx:{:4d}, idx:{:4d}, wpthlen:{:4d}'.format(self.head,self.proj_head,self.ye,self.work_index,self.orig_index,len(self.working_path)))
-            self.look_ahead = self.get_look_ahead(self.ye)
             if np.abs(self.ye) > self.MAX_DEV_FROM_PATH:
                 self.node.get_logger().error('Replan triggered')
                 self.working_path = self.replan(vehicle_wp = self.current_wp, 
@@ -462,7 +462,7 @@ class PathFollower:
                 self.work_index = 0             # Make sure to start from the first element of the augmented path
 
             # node.logdebug("Working path len is %d, current idx is %d", len(self.working_path), self.work_index)
-
+            self.look_ahead = self.get_look_ahead(self.ye)
             # Update controller 
             # node.logwarn(f"ye: {self.ye}")
             self.head, self.beta_hat  = self.ILOS(ye = self.ye,

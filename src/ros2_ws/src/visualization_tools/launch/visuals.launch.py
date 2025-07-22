@@ -46,13 +46,22 @@ def generate_launch_description():
             executable='rviz_visuals_adapter',  # This must match your entry_point in setup.py
             namespace='rvizvisualsadapter',
             name='rviz_visuals_adapter',
-            parameters=[param_file_path], # TODO: parameters are not actually loaded (the node uses the defaults defined)
+            parameters=[param_file_path],
             output='screen'
         )
     ])
 
+    interactive_path_node = Node(
+        package='visualization_tools',
+        executable='interactive_path',  # This must match your entry_point in setup.py
+        namespace='rvizvisualsadapter',
+        name='interactive_path',
+        output='screen'
+    )
+    
     return LaunchDescription([
         vehicle_arg,
         visualization_group,
         rviz_visuals_adapter_group,
+        interactive_path_node
     ])

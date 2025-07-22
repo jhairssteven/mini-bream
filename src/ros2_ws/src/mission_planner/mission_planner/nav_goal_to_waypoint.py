@@ -3,10 +3,11 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Point
 from sensor_msgs.msg import NavSatFix, Imu
 from geographic_msgs.msg import GeoPose
-
+from nav_msgs.msg import Path
+from std_srvs.srv import Trigger
 from backseat_msgs.action import DoMission
 
 import utm
@@ -106,6 +107,8 @@ class NavGoalToWaypoint:
         self.gps_sub = node.create_subscription(NavSatFix, '/wamv/sensors/gps/gps/fix', self.gps_callback, 10)
         self.imu_sub = node.create_subscription(Imu, '/wamv/sensors/imu/imu/data', self.imu_callback, 10)
 
+        self.send_mission_sub = node.create_subscription(Path, '/rviz_path', self.buildMissionFromPoseArray, 10)
+
         self.curr_lat = self.curr_long = None
         origin_lat = self.node.get_parameter("goal_lat").value
         origin_lon = self.node.get_parameter("goal_lon").value
@@ -137,20 +140,46 @@ class NavGoalToWaypoint:
         geo_pose = self.buildGeoPose(geo.gps_lat, geo.gps_lon, pose.orientation)
         return geo_pose
 
-    def goal_callback(self, msg: PoseStamped):
+    def getCurrentGeoPosition(self):
         if self.curr_lat is None or self.curr_long is None:
             self.node.get_logger().warn("Current lat, long not yet received.")
-            return
+            return None
 
-        current_geo = self.buildGeoPose(self.curr_lat, self.curr_long, self.current_orientation)
+        return self.buildGeoPose(self.curr_lat, self.curr_long, self.current_orientation)
+    
+    def goal_callback(self, msg: PoseStamped):
+        current_geo = self.getCurrentGeoPosition()
+        if not current_geo: return
         goal_geo = self.__local_to_geo(msg.pose)
 
-        goal_msg = DoMission.Goal()
-        goal_msg.mission = [current_geo, goal_geo]
-
         self.node.get_logger().info(f"New goal lat/lon: {goal_geo.position.latitude}, {goal_geo.position.longitude}")
+        self.sendMissionToClient([current_geo, goal_geo])
+
+    def sendMissionToClient(self, mission):
+        """ mission: A list of geo waypoints (output of __local_to_geo()) """
+        goal_msg = DoMission.Goal()
+        goal_msg.mission = mission
         self._action_client.send_goal(goal_msg)
 
+    def buildMissionFromPoseArray(self, msg: Path):
+        """ Build a mission from a given list of Poses, appending (and starting from) the current position."""
+        current_geo = self.getCurrentGeoPosition()
+        if not current_geo: return
+
+        mission = []
+        mission.append(current_geo)
+
+        for poseStamped in msg.poses:
+            """ x = float(round(poseStamped.pose.position.x, 0))
+            y = float(round(poseStamped.pose.position.y, 0))
+            z = float(round(poseStamped.pose.position.z, 0))
+
+            # Update the pose with the rounded position
+            poseStamped.pose.position = Point(x=x, y=y, z=z) """
+
+            mission.append(self.__local_to_geo(poseStamped.pose))
+        
+        self.sendMissionToClient(mission)
 
 class MainNode(Node):
     def __init__(self):
