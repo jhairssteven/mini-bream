@@ -15,7 +15,7 @@ def generate_launch_description():
 
     load_mission_from_file_arg = DeclareLaunchArgument(
         'load_mission_from_file',
-        default_value='true',
+        default_value='false',
         description='If True, loads mission waypoints from a CSV file. If False, runs in online/interactive mode.'
     )
 
