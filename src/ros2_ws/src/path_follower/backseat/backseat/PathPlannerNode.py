@@ -64,7 +64,16 @@ class PathPlannerNode(Node):
         self.data_logger = DataLogger(data_description='field_test_jun_07/Rendezvouz_paper',
                                       headers=['head_err', 'tgt_heading', 'speed', 'wind_dir', 'wind_speed'])
 
+        from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSDurabilityPolicy
         qos = QoSProfile(depth=10)
+        qos_other = QoSProfile(
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,
+            durability=QoSDurabilityPolicy.VOLATILE,
+            depth=1
+        )
+        self.linear_velocity_pct_pub = self.create_publisher(Float64, '/wamv/linear_velocity', qos_other)
+        self.angular_velocity_pct_pub = self.create_publisher(Float64, '/wamv/angular_velocity', qos_other)
+
         self.left_pub = self.create_publisher(Float64, '/wamv/thrusters/left/thrust', qos)
         self.right_pub = self.create_publisher(Float64, '/wamv/thrusters/right/thrust', qos)
         self.working_waypoint_pub = self.create_publisher(Marker, '/goal_marker', qos)
@@ -139,8 +148,13 @@ class PathPlannerNode(Node):
         left = np.clip(left,-1,1)
         right = np.clip(right,-1,1)
 
-        self.left_pub.publish(Float64(data=float(1000*left)))
-        self.right_pub.publish(Float64(data=float(1000*right)))
+        #self.left_pub.publish(Float64(data=float(1000*left)))
+        #self.right_pub.publish(Float64(data=float(1000*right)))
+
+        angular_velocity = turn
+        linear_velocity = np.clip(speed, -1, 1)
+        self.linear_velocity_pct_pub.publish(Float64(data=linear_velocity))
+        self.angular_velocity_pct_pub.publish(Float64(data=angular_velocity))
 
     def __publish_veh_output(self):
         """ Function to outuput the resulting controlled variables to the actuators."""

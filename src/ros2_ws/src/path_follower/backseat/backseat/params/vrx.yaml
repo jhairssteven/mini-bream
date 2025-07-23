@@ -10,8 +10,8 @@
     handover_offs: 1 # Meters before the end of the path to handover control of the vehicle
     
     # Linear speed limits
-    max_speed         : 0.1
-    min_speed         : -0.3
+    max_speed         : 1.0 #0.1
+    min_speed         : -1.0 #-0.3
     # fw_speed: 0
 
     goal_lat          : 40.44707869787295
