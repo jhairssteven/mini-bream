@@ -151,10 +151,12 @@ class PathPlannerNode(Node):
         #self.left_pub.publish(Float64(data=float(1000*left)))
         #self.right_pub.publish(Float64(data=float(1000*right)))
 
-        angular_velocity = turn
-        linear_velocity = np.clip(speed, -1, 1)
-        self.linear_velocity_pct_pub.publish(Float64(data=linear_velocity))
-        self.angular_velocity_pct_pub.publish(Float64(data=angular_velocity))
+        angular_velocity_pct = turn
+        linear_velocity_pct = np.clip(speed, -1, 1)
+        self.max_linear_vel = 3.0
+        self.max_angular_vel = 0.5
+        self.linear_velocity_pct_pub.publish(Float64(data=self.max_linear_vel*linear_velocity_pct))
+        self.angular_velocity_pct_pub.publish(Float64(data=self.max_angular_vel*angular_velocity_pct))
 
     def __publish_veh_output(self):
         """ Function to outuput the resulting controlled variables to the actuators."""
