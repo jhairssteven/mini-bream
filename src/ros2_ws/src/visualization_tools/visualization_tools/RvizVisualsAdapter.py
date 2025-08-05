@@ -74,8 +74,8 @@ def getPoseStampedfromXYWaypoint(xy_wp):
 
 class RvizPath(Node):
     def __declare_parameters(self):
-        self.declare_parameter("goal_lat", 40.44707869787295)
-        self.declare_parameter("goal_lon", -86.86853024869774)
+        self.declare_parameter("goal_lat", 40.448417)
+        self.declare_parameter("goal_lon", -86.867750)
         self.declare_parameter("sim_enable", False)
 
     def __init__(self):
@@ -125,8 +125,8 @@ class RvizPath(Node):
 
 class RvizPos(Node):
     def __declare_parameters(self):
-        self.declare_parameter("goal_lat", 40.44707869787295)
-        self.declare_parameter("goal_lon", -86.86853024869774)
+        self.declare_parameter("goal_lat", 40.448417)
+        self.declare_parameter("goal_lon", -86.867750)
         self.declare_parameter("sim_enable", True)
         self.declare_parameter("rst_trav_path", False)
         

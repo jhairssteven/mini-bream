@@ -14,8 +14,8 @@
     min_speed         : -1.0 #-0.3
     # fw_speed: 0
 
-    goal_lat          : 40.44707869787295
-    goal_lon          : -86.86853024869774
+    goal_lat          : 40.448417
+    goal_lon          : -86.867750
     goal_head         : 1.5
 
     # Rotational PID gains

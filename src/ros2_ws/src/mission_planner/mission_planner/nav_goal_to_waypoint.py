@@ -184,8 +184,8 @@ class NavGoalToWaypoint:
 class MainNode(Node):
     def __init__(self):
         super().__init__('nav_goal_to_waypoint')
-        self.declare_parameter("goal_lat", 40.44707869787295)
-        self.declare_parameter("goal_lon", -86.86853024869774)
+        self.declare_parameter("goal_lat", 40.448417)
+        self.declare_parameter("goal_lon", -86.867750)
         self.declare_parameter("load_mission_from_file", False)
         self.declare_parameter("mission", '')
         self._action_client = ActionServerClient(self)

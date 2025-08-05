@@ -29,8 +29,8 @@ class PathPlannerNode(Node):
         self.declare_parameter('max_speed', 1.0)
         self.declare_parameter('min_speed', 0.2)
         self.declare_parameter('sim_enable', True)
-        self.declare_parameter('goal_lat', 40.44707869787295)
-        self.declare_parameter('goal_lon', -86.86853024869774)
+        self.declare_parameter('goal_lat', 40.448417)
+        self.declare_parameter('goal_lon', -86.867750)
         
         self.declare_parameter('kp', 3.6)
         self.declare_parameter('ki', 2.553)
