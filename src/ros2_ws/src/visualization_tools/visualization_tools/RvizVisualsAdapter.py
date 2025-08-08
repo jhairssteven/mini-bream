@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSDurabilityPolicy
+
+# standard messages
 from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
 from nav_msgs.msg import Path
 from std_msgs.msg import Float32
+from sensor_msgs.msg import NavSatFix, Imu
+
+# Non ROS libraries
 import tf_transformations as tf
 import utm
 import math as m
 
-from sensor_msgs.msg import NavSatFix, Imu
+# Custom messages
 from backseat_msgs.msg import Telem, Locg
 from visualization_msgs.msg import Marker
 
@@ -144,13 +150,21 @@ class RvizPos(Node):
         self.ref_path.header.frame_id = 'world'
         self.heading_rad = 0; self.ilosHeading_rad = 0
 
-        self.create_subscription(Imu, '/wamv/sensors/imu/imu/data', self.imu_callback, 10)
-        self.create_subscription(NavSatFix, '/wamv/sensors/gps/gps/fix', self.gps_callback, 1)
+        qos_best_effort_volatile = QoSProfile(
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,
+            durability=QoSDurabilityPolicy.VOLATILE,
+            depth=1
+        )
+
+        # Subscribers
+        self.create_subscription(Imu, '/wamv/sensors/imu/imu/data', self.imu_callback, qos_best_effort_volatile)
+        self.create_subscription(NavSatFix, '/wamv/sensors/gps/gps/fix', self.gps_callback, qos_best_effort_volatile)
         self.create_subscription(Float32, '/compass_bearing_deg', self.heading_callback, 1)
         self.create_subscription(Telem, '/telemetry', self.telem_callback, 1)
         self.create_subscription(Locg, '/way_gps', self.way_gps_callback, 1)
         self.create_subscription(Path, '/ref_path', self.ref_path_callback, 1)
 
+        # Publishers
         self.ilosHeadingMarkerPub = self.create_publisher(Marker, "/heading/marker/ilos", 2)
         self.pidrOutputMarkerPub = self.create_publisher(Marker, "/heading/marker/pidr_output", 2)
         self.currPoseMarkerPub = self.create_publisher(Marker, "/curr_marker", 2)

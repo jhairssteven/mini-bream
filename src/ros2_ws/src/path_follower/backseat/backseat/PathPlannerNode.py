@@ -5,11 +5,10 @@ import numpy as np
 import copy
 import rclpy
 import tf_transformations as tf
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSDurabilityPolicy
 
 from rclpy.node import Node
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
-from rclpy.qos import QoSProfile
-
 from backseat_msgs.msg import Locg
 from backseat_msgs.action import DoMission
 from visualization_msgs.msg import Marker
@@ -64,15 +63,15 @@ class PathPlannerNode(Node):
         self.data_logger = DataLogger(data_description='field_test_jun_07/Rendezvouz_paper',
                                       headers=['head_err', 'tgt_heading', 'speed', 'wind_dir', 'wind_speed'])
 
-        from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSDurabilityPolicy
         qos = QoSProfile(depth=10)
-        qos_other = QoSProfile(
+        
+        qos_best_effort_volatile = QoSProfile(
             reliability=QoSReliabilityPolicy.BEST_EFFORT,
             durability=QoSDurabilityPolicy.VOLATILE,
             depth=1
         )
-        self.linear_velocity_pct_pub = self.create_publisher(Float64, '/wamv/linear_velocity', qos_other)
-        self.angular_velocity_pct_pub = self.create_publisher(Float64, '/wamv/angular_velocity', qos_other)
+        self.linear_velocity_pct_pub = self.create_publisher(Float64, '/wamv/linear_velocity', qos_best_effort_volatile)
+        self.angular_velocity_pct_pub = self.create_publisher(Float64, '/wamv/angular_velocity', qos_best_effort_volatile)
 
         self.left_pub = self.create_publisher(Float64, '/wamv/thrusters/left/thrust', qos)
         self.right_pub = self.create_publisher(Float64, '/wamv/thrusters/right/thrust', qos)
@@ -85,9 +84,9 @@ class PathPlannerNode(Node):
         self.orig_path_pub = self.create_publisher(Path, '/original_path', qos)
 
         if self.sim_enable:
-            self.create_subscription(NavSatFix, '/wamv/sensors/gps/gps/fix', self.__read_position_cbk, qos)
-            self.create_subscription(Vector3Stamped, '/wamv/sensors/gps/gps/fix_velocity', self.__read_speed_cbk, qos)
-            self.create_subscription(Imu, '/wamv/sensors/imu/imu/data', self.__read_imu_cbk, qos)
+            self.create_subscription(NavSatFix, '/wamv/sensors/gps/gps/fix', self.__read_position_cbk, qos_best_effort_volatile)
+            self.create_subscription(Vector3Stamped, '/wamv/sensors/gps/gps/fix_velocity', self.__read_speed_cbk, qos_best_effort_volatile)
+            self.create_subscription(Imu, '/wamv/sensors/imu/imu/data', self.__read_imu_cbk, qos_best_effort_volatile)
             self.create_subscription(Float64, '/vrx/debug/wind/direction', self.__get_wind_dir_cbk, qos)
             self.create_subscription(Float64, '/vrx/debug/wind/speed', self.__get_wind_speed_cbk, qos)
         else:

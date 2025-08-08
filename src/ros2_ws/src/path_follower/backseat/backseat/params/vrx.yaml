@@ -13,7 +13,8 @@
     max_speed         : 1.0 #0.1
     min_speed         : -1.0 #-0.3
     # fw_speed: 0
-
+    #origin_gps: [40.40229852, -86.84558228] # kepner
+    #origin_gps: [40.448417, -86.867750]     # harner
     goal_lat          : 40.448417
     goal_lon          : -86.867750
     goal_head         : 1.5

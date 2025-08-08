@@ -3,13 +3,12 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
-from geometry_msgs.msg import PoseStamped, Point
+from geometry_msgs.msg import PoseStamped
 from sensor_msgs.msg import NavSatFix, Imu
 from geographic_msgs.msg import GeoPose
 from nav_msgs.msg import Path
-from std_srvs.srv import Trigger
 from backseat_msgs.action import DoMission
-
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSDurabilityPolicy
 import utm
 
 
@@ -99,16 +98,21 @@ class Pose:
 
 class NavGoalToWaypoint:
     def __init__(self, node: Node, action_client: ActionServerClient):
+        linc_qos = QoSProfile(
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,
+            durability=QoSDurabilityPolicy.VOLATILE,
+            depth=1
+        )
+        
+        # Subscribers
+        self.goal_sub = node.create_subscription(PoseStamped, '/goal_pose', self.goal_callback, 10)
+        self.gps_sub = node.create_subscription(NavSatFix, '/wamv/sensors/gps/gps/fix', self.gps_callback, linc_qos)
+        self.imu_sub = node.create_subscription(Imu, '/wamv/sensors/imu/imu/data', self.imu_callback, linc_qos)
+        self.send_mission_sub = node.create_subscription(Path, '/rviz_path', self.buildMissionFromPoseArray, linc_qos)
+
         self.node = node
         self._action_client = action_client
         self.current_marker = None
-
-        self.goal_sub = node.create_subscription(PoseStamped, '/goal_pose', self.goal_callback, 10)
-        self.gps_sub = node.create_subscription(NavSatFix, '/wamv/sensors/gps/gps/fix', self.gps_callback, 10)
-        self.imu_sub = node.create_subscription(Imu, '/wamv/sensors/imu/imu/data', self.imu_callback, 10)
-
-        self.send_mission_sub = node.create_subscription(Path, '/rviz_path', self.buildMissionFromPoseArray, 10)
-
         self.curr_lat = self.curr_long = None
         origin_lat = self.node.get_parameter("goal_lat").value
         origin_lon = self.node.get_parameter("goal_lon").value
