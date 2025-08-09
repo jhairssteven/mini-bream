@@ -3,14 +3,13 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Joy
 from std_msgs.msg import Float64, Bool, Int64
-from rclpy.qos import QoSProfile
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSDurabilityPolicy
 
 # System packages
 import numpy as np
 
 # Local packages
 from joystick_control.qos_profiles import qos
-
 
 class JoystickController(Node):
     def __init__(self):
@@ -19,13 +18,27 @@ class JoystickController(Node):
         """
         super().__init__('joystick_controller')
 
+        # Define a reliable and volatile QoS profile with a small depth, for critical command data
+        qos_reliable_volatile = QoSProfile(
+            reliability=QoSReliabilityPolicy.RELIABLE,
+            durability=QoSDurabilityPolicy.VOLATILE,
+            depth=5
+        )
+        
+        # For high-rate, non-critical sensor data
+        qos_best_effort_volatile = QoSProfile(
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,   # Send ony once without retry
+            durability=QoSDurabilityPolicy.VOLATILE,        # Do not store old messages
+            depth=1
+        )
+
         # Subscribers
         self.subscription = self.create_subscription(Joy, '/joy', self.joy_callback, qos)
         # Publishers
         self.linear_vel_publisher = self.create_publisher(Float64, '/wamv/linear_velocity', qos)
         self.angular_vel_publisher = self.create_publisher(Float64, '/wamv/angular_velocity', qos)
-        self.left_thruster_publisher = self.create_publisher(Float64, '/wamv/thrusters/left/thrust', QoSProfile(depth=10))
-        self.right_thruster_publisher = self.create_publisher(Float64, '/wamv/thrusters/right/thrust', QoSProfile(depth=10))
+        self.left_thruster_publisher = self.create_publisher(Float64, '/wamv/thrusters/left/thrust', qos_reliable_volatile)
+        self.right_thruster_publisher = self.create_publisher(Float64, '/wamv/thrusters/right/thrust', qos_reliable_volatile)
         self.left_rudder_publisher = self.create_publisher(Float64, '/wamv/thrusters/left/pos', qos)
         self.right_rudder_publisher = self.create_publisher(Float64, '/wamv/thrusters/right/pos', qos)
         self.joystick_takingover_publisher = self.create_publisher(Bool, 'joystick_takingover', qos)

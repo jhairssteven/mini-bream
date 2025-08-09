@@ -65,16 +65,24 @@ class PathPlannerNode(Node):
 
         qos = QoSProfile(depth=10)
         
+        # For high-rate, non-critical sensor data
         qos_best_effort_volatile = QoSProfile(
-            reliability=QoSReliabilityPolicy.BEST_EFFORT,
-            durability=QoSDurabilityPolicy.VOLATILE,
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,   # Send ony once without retry
+            durability=QoSDurabilityPolicy.VOLATILE,        # Do not store old messages
             depth=1
         )
+        # For critical real-time commands, reliable but no stored history
+        qos_reliable_volatile = QoSProfile(
+            reliability=QoSReliabilityPolicy.RELIABLE,  # Rety until success
+            durability=QoSDurabilityPolicy.VOLATILE,    # Do not store old messages
+            depth=5
+        )
+        
         self.linear_velocity_pct_pub = self.create_publisher(Float64, '/wamv/linear_velocity', qos_best_effort_volatile)
         self.angular_velocity_pct_pub = self.create_publisher(Float64, '/wamv/angular_velocity', qos_best_effort_volatile)
 
-        self.left_pub = self.create_publisher(Float64, '/wamv/thrusters/left/thrust', qos)
-        self.right_pub = self.create_publisher(Float64, '/wamv/thrusters/right/thrust', qos)
+        self.left_pub = self.create_publisher(Float64, '/wamv/thrusters/left/thrust', qos_reliable_volatile)
+        self.right_pub = self.create_publisher(Float64, '/wamv/thrusters/right/thrust', qos_reliable_volatile)
         self.working_waypoint_pub = self.create_publisher(Marker, '/goal_marker', qos)
         self.xtrac_err_pub = self.create_publisher(Float32, '/xtrac_err_abs', qos)
         self.head_err_pub = self.create_publisher(Float32, '/head_err_deg', qos)
