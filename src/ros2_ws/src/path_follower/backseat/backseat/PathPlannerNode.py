@@ -65,11 +65,19 @@ class PathPlannerNode(Node):
 
         qos = QoSProfile(depth=10)
         
+        # For high-rate, non-critical sensor data
         qos_best_effort_volatile = QoSProfile(
-            reliability=QoSReliabilityPolicy.BEST_EFFORT,
-            durability=QoSDurabilityPolicy.VOLATILE,
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,   # Send ony once without retry
+            durability=QoSDurabilityPolicy.VOLATILE,        # Do not store old messages
             depth=1
         )
+        # For critical real-time commands, reliable but no stored history
+        qos_reliable_volatile = QoSProfile(
+            reliability=QoSReliabilityPolicy.RELIABLE,  # Rety until success
+            durability=QoSDurabilityPolicy.VOLATILE,    # Do not store old messages
+            depth=5
+        )
+        
         self.linear_velocity_pct_pub = self.create_publisher(Float64, '/wamv/linear_velocity', qos_best_effort_volatile)
         self.angular_velocity_pct_pub = self.create_publisher(Float64, '/wamv/angular_velocity', qos_best_effort_volatile)
 
