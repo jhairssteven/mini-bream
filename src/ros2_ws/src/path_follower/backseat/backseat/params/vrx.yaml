@@ -1,17 +1,17 @@
 /**:
   ros__parameters:
     # Dubins
-    dubins_radius: 6.0
+    dubins_radius: 10.0
     dubins_step_size: 0.5
     replan_dist: 26.0
-    no_of_laps: 1
+    no_of_laps: 2
 
     # Are these used?
     handover_offs: 1 # Meters before the end of the path to handover control of the vehicle
     
     # Linear speed limits
-    max_speed         : 1.0 #0.1
-    min_speed         : -1.0 #-0.3
+    max_speed         : 0.5 #0.1
+    min_speed         : 0.0 #-0.3
     # fw_speed: 0
     #origin_gps: [40.40229852, -86.84558228] # kepner
     #origin_gps: [40.448417, -86.867750]     # harner
@@ -26,9 +26,9 @@
 
     # ILOS
     replan_lookahead: 8.0  # Distance to look ahead to select next target waypoint when in need to replan. It is not replan_lookahead of ILOS.
-    lookahead_min : 5
-    lookahead_max : 5
+    lookahead_min : 10
+    lookahead_max : 20
     conv_rate     : 8.0
-    gamma         : 0.015 # Integral gain
+    gamma         : 0 #0.015 # Integral gain
 
     sim_enable: true

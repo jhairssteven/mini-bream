@@ -6,7 +6,7 @@ import copy
 import rclpy
 import tf_transformations as tf
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSDurabilityPolicy
-
+from linc_msgs.msg import TorqeedoCmdStamped
 from rclpy.node import Node
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from backseat_msgs.msg import Locg
@@ -75,6 +75,36 @@ class PathPlannerNode(Node):
 
         self.left_pub = self.create_publisher(Float64, '/wamv/thrusters/left/thrust', qos)
         self.right_pub = self.create_publisher(Float64, '/wamv/thrusters/right/thrust', qos)
+        
+        # Publishers to control thrusters directly
+            
+        # For high-rate, non-critical sensor data
+        best_effort_volatile_qos = QoSProfile(
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,   # Send ony once without retry
+            durability=QoSDurabilityPolicy.VOLATILE,        # Do not store old messages
+            depth=1
+        )
+
+        # For critical real-time commands, reliable but no stored history
+        reliable_volatile_qos = QoSProfile(
+            reliability=QoSReliabilityPolicy.RELIABLE,  # Rety until success
+            durability=QoSDurabilityPolicy.VOLATILE,    # Do not store old messages
+            depth=5
+        )
+
+        linc_qos = best_effort_volatile_qos
+        
+        """ if self.sim:
+            msg_type_thrusters = Float64
+            qos_thrusters = reliable_volatile_qos
+        else: """
+        msg_type_thrusters = TorqeedoCmdStamped
+        qos_thrusters = linc_qos
+
+        self.left_thruster_publisher = self.create_publisher(msg_type_thrusters, '/wamv/thrusters/left/thrust/actual', qos_thrusters)
+        self.right_thruster_publisher = self.create_publisher(msg_type_thrusters, '/wamv/thrusters/right/thrust/actual', qos_thrusters)
+        
+        
         self.working_waypoint_pub = self.create_publisher(Marker, '/goal_marker', qos)
         self.xtrac_err_pub = self.create_publisher(Float32, '/xtrac_err_abs', qos)
         self.head_err_pub = self.create_publisher(Float32, '/head_err_deg', qos)
@@ -133,6 +163,16 @@ class PathPlannerNode(Node):
             self.current_wp.pose.head = head
         self.current_wp.depth = 0.0
     
+    def build_thruster_msg(self, thrust, clk_stamp):
+        """ if self.sim:
+            msg = Float64()
+            msg.data = thrust
+        else: """
+        msg = TorqeedoCmdStamped()
+        msg.header.stamp = clk_stamp
+        msg.cmd = thrust
+        return msg
+    
     def __speeddir2diffdrive(self, speed, dir, k = 0.1):
         """! Internal call to transfor a speed and direction command to a
          differential drive command for the ASV.
@@ -147,12 +187,15 @@ class PathPlannerNode(Node):
         left = np.clip(left,-1,1)
         right = np.clip(right,-1,1)
 
-        #self.left_pub.publish(Float64(data=float(1000*left)))
-        #self.right_pub.publish(Float64(data=float(1000*right)))
+        clk_stamp = self.get_clock().now().to_msg()
+        left_thrust_msg = self.build_thruster_msg(1000*left, clk_stamp)
+        right_thrust_msg = self.build_thruster_msg(1000*right, clk_stamp)
+        #self.left_thruster_publisher.publish(left_thrust_msg)
+        #self.right_thruster_publisher.publish(right_thrust_msg)
 
         angular_velocity_pct = turn
         linear_velocity_pct = np.clip(speed, -1, 1)
-        self.max_linear_vel = 3.0
+        self.max_linear_vel = 2.0
         self.max_angular_vel = 0.5
         self.linear_velocity_pct_pub.publish(Float64(data=self.max_linear_vel*linear_velocity_pct))
         self.angular_velocity_pct_pub.publish(Float64(data=self.max_angular_vel*angular_velocity_pct))
@@ -178,6 +221,7 @@ class PathPlannerNode(Node):
         KD = self.get_parameter("kd").value
         self.head_u = KP*head_err + KI*self.head_i + KD*derivative
         self.head_prev_error = head_err
+        self.get_logger().info(f'desired head: {self.head_u}, head_error: {self.head_prev_error}')
         up = self.get_parameter("max_speed").value
         low = self.get_parameter("min_speed").value
         x_up = 0.15
