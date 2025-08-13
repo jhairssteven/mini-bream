@@ -25,8 +25,10 @@ class PathPlannerNode(Node):
     def __init__(self):
         super().__init__('path_planner_node')
 
-        self.declare_parameter('max_speed', 1.0)
-        self.declare_parameter('min_speed', 0.2)
+        self.declare_parameter('max_linear_velocity', 3.0)
+        self.declare_parameter('max_angular_velocity', 0.5)
+        self.declare_parameter('max_speed', 3.0)
+        self.declare_parameter('min_speed', 0.)
         self.declare_parameter('sim_enable', True)
         self.declare_parameter('goal_lat', 40.448417)
         self.declare_parameter('goal_lon', -86.867750)
@@ -39,6 +41,8 @@ class PathPlannerNode(Node):
         self.max_speed = self.get_parameter('max_speed').value
         self.min_speed = self.get_parameter('min_speed').value
         self.sim_enable = self.get_parameter('sim_enable').value
+        self.max_linear_velocity = self.get_parameter('max_linear_velocity').value
+        self.max_angular_velocity = self.get_parameter('max_angular_velocity').value
 
 
         self.mission = None
@@ -181,7 +185,7 @@ class PathPlannerNode(Node):
         msg.cmd = thrust
         return msg
     
-    def __speeddir2diffdrive(self, speed, dir, k = 0.1):
+    def __speeddir2diffdrive(self, speed, dir, k = 0.1, diff_drive=False):
         """! Internal call to transfor a speed and direction command to a
          differential drive command for the ASV.
         @param  speed   init_appForward speed of the vehicle.
@@ -189,24 +193,28 @@ class PathPlannerNode(Node):
         @param  k       Proportional coefficient to modulate how sharp to turn.
         @return None.
         """
-        turn = np.clip(dir,-1,1)
-        left =  speed - k*turn
-        right = speed + k*turn
-        left = np.clip(left,-1,1)
-        right = np.clip(right,-1,1)
-
-        clk_stamp = self.get_clock().now().to_msg()
-        left_thrust_msg = self.build_thruster_msg(1000*left, clk_stamp)
-        right_thrust_msg = self.build_thruster_msg(1000*right, clk_stamp)
-        #self.left_thruster_publisher.publish(left_thrust_msg)
-        #self.right_thruster_publisher.publish(right_thrust_msg)
-
-        angular_velocity_pct = turn
         linear_velocity_pct = np.clip(speed, -1, 1)
-        self.max_linear_vel = 2.0
-        self.max_angular_vel = 0.5
+        angular_velocity_pct = np.clip(dir,-1,1)
+
+        if (diff_drive):
+            # left_thrust = self.max_linear_vel*linear_velocity_pct - self.max_angular_vel*angular_velocity_pct
+            # right_thrust = self.max_linear_vel*linear_velocity_pct + self.max_angular_vel*angular_velocity_pct
+            left =  speed - k*angular_velocity_pct
+            right = speed + k*angular_velocity_pct
+            left = np.clip(left,-1,1)
+            right = np.clip(right,-1,1)
+            clk_stamp = self.get_clock().now().to_msg()
+            left_thrust_msg = self.build_thruster_msg(1000*left, clk_stamp)
+            right_thrust_msg = self.build_thruster_msg(1000*right, clk_stamp)
+            self.left_thruster_publisher.publish(left_thrust_msg)
+            self.right_thruster_publisher.publish(right_thrust_msg)
+            return
+
+        self.max_linear_vel = self.get_parameter('max_linear_velocity').value
+        self.max_angular_vel = self.get_parameter('max_angular_velocity').value
         self.linear_velocity_pct_pub.publish(Float64(data=self.max_linear_vel*linear_velocity_pct))
         self.angular_velocity_pct_pub.publish(Float64(data=self.max_angular_vel*angular_velocity_pct))
+        
 
     def __publish_veh_output(self):
         """ Function to outuput the resulting controlled variables to the actuators."""
@@ -230,17 +238,18 @@ class PathPlannerNode(Node):
         self.head_u = KP*head_err + KI*self.head_i + KD*derivative
         self.head_prev_error = head_err
         self.get_logger().info(f'desired head: {self.head_u}, head_error: {self.head_prev_error}')
-        up = self.get_parameter("max_speed").value
-        low = self.get_parameter("min_speed").value
-        x_up = 0.15
-        x_low = 0.4
-        m = (up-low)/(x_up-x_low)
-        b = up - m*x_up
+        
+        max_speed = self.get_parameter("max_speed").value
+        min_speed = self.get_parameter("min_speed").value
+
+        angle_threshold_fast = 0.15 # rads
+        angle_threshold_slow = 0.4  # rads
+        
+        m = (max_speed-min_speed)/(angle_threshold_fast-angle_threshold_slow)
+        b = max_speed - m*angle_threshold_fast
+
         x = np.abs(head_err)
-        speed = np.clip(m*x+b,low,up)
-        # TODO: use constant forward speed from parameter (how if .declare_parameter is mandatory?)
-        # speed = self.get_parameter("fw_speed").value if self.has_parameter("fw_speed") else c_speed
-        # ==========================
+        speed = np.clip(m*x+b,min_speed,max_speed)
 
         self.data_logger.log_data([head_err, self.tgt_heading, speed, self.wind_dir, self.wind_speed])
         self.__speeddir2diffdrive(speed, self.head_u, k=1)

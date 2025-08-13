@@ -10,8 +10,8 @@
     handover_offs: 1 # Meters before the end of the path to handover control of the vehicle
     
     # Linear speed limits
-    max_speed         : 0.5 #0.1
-    min_speed         : 0.0 #-0.3
+    max_speed         : 0.5 # m/s
+    min_speed         : 0.0 # m/s
     # fw_speed: 0
     #origin_gps: [40.40229852, -86.84558228] # kepner
     #origin_gps: [40.448417, -86.867750]     # harner
@@ -21,7 +21,7 @@
 
     # Rotational PID gains
     kp : 1.0 # kp makes it faster
-    kd : 7.0 # kd reduces overshoot
+    kd : 70.0 # kd reduces overshoot
     ki : 0.5 # ki reduces settling error
 
     # ILOS
