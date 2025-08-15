@@ -22,7 +22,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'motor_controller = frontseat.MotorControllerNode:main'
+            'motor_controller = frontseat.MotorControllerNode:main',
+            'thrust_source_selector = frontseat.ThrustSourceSelectorNode:main',
+            'joystick = frontseat.JoystickHandlerNode:main'
         ],
     },
 )

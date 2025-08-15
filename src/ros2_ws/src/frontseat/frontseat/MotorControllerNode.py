@@ -1,8 +1,8 @@
 #! /usr/bin/python3
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSDurabilityPolicy
 from std_msgs.msg import Float32, String
+from frontseat.qos_profiles import reliable_volatile_qos
 
 from frontseat.drivers.motors.BlueRoboticsT200 import BlueRoboticsT200
 
@@ -18,19 +18,12 @@ class MotorControllerNode(Node):
     
         super().__init__(self.node_name)
         
-        # For critical real-time commands, reliable but no stored history
-        reliable_volatile_qos = QoSProfile(
-            reliability=QoSReliabilityPolicy.RELIABLE,  # Rety until success
-            durability=QoSDurabilityPolicy.VOLATILE,    # Do not store old messages
-            depth=5
-        )
-        
         # Subscribers
         self.right_sub = self.create_subscription(Float32, '/pwm/right_thrust_cmd', self.__right_thrust_cbk, reliable_volatile_qos)
         self.left_sub = self.create_subscription(Float32, '/pwm/left_thrust_cmd', self.__left_thrust_cbk, reliable_volatile_qos)
 
         # Publishers
-        self.motor_techs_pub = self.create_publisher(String, '/pwm/motor_techs', 1)
+        self.motor_techs_pub = self.create_publisher(String, '/pwm/motor_techs', reliable_volatile_qos)
 
 
     def __left_thrust_cbk(self, msg):
