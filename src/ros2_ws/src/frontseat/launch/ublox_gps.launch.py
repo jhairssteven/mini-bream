@@ -1,26 +1,19 @@
+import os
 from launch import LaunchDescription
-from launch_ros.actions import Node
-from launch.actions import RegisterEventHandler, EmitEvent
-from launch.event_handlers import OnProcessExit
-from launch.events import Shutdown
-from launch.substitutions import PathJoinSubstitution
-from launch_ros.substitutions import FindPackageShare
+from launch.actions import IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
+    # Path to the other launch file
+    ublox_launch_file = os.path.join(
+        get_package_share_directory('ublox_gps'),
+        'launch',
+        'ublox_gps_node-launch.py'
+    )
 
-    gps_config_file = PathJoinSubstitution([
-        FindPackageShare('ublox_gps'),
-        'config/zed_f9p.yaml'
-    ])
-
-    ublox_gps_node = Node(package='ublox_gps', 
-                                             executable='ublox_gps_node', 
-                                             name='ublox_main_gps_node',
-                                             namespace='main_gps',
-                                             output='both',
-                                             parameters=[gps_config_file],
-                                             respawn=True)
-    
     return LaunchDescription([
-        ublox_gps_node, 
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(ublox_launch_file)
+        )
     ])
