@@ -15,6 +15,8 @@ def generate_launch_description():
 
     ublox_gps_node = Node(package='ublox_gps', 
                                              executable='ublox_gps_node', 
+                                             name='ublox_main_gps_node',
+                                             namespace='main_gps',
                                              output='both',
                                              parameters=[gps_config_file],
                                              respawn=True)
