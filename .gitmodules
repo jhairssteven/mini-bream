@@ -1,3 +1,7 @@
 [submodule "src/vrx_ws/src"]
 	path = src/vrx_ws/src
 	url = git@github.com:lijianwen1997/linc-sim.git
+[submodule "src/ros2_ws/src/ublox"]
+	path = src/ros2_ws/src/ublox
+	url = git@github.com:KumarRobotics/ublox.git
+	branch = ros2
