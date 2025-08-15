@@ -1,38 +1,21 @@
-import rospy
-import pigpio # This library uses hardware_pwm which is more efficient than software_pwm used on Rpi.GPIO library
+from frontseat.drivers.backends.PWM.jetsonGPIO import JetsonPWMBackend
 
 class PWMMotorController:
-    def __init__(self, pin=None, motor_name=None):
+    def __init__(self, pin: int = None, motor_name: str = None):
         if pin is None:
-            raise ValueError("Missing required argument: A 'GPIO_pin' number must be defined to use PWM motor controller")
-        elif motor_name is None:
-            raise ValueError("Missing required argument: A 'motor_name' name must be defined to use PWM motor controller")
+            raise ValueError("A 'pin' number must be provided")
+        if not motor_name:
+            raise ValueError("A 'motor_name' must be provided")
         
         self.pin = pin
         self.motor_name = motor_name
         self.freq = 340 # Set the default base PWM Frequency in [Hz] (based on ESC specifications)
         
-        import subprocess
-        try:
-            self.piGPIO = pigpio.pi()
-            if not self.piGPIO.connected:
-                try:
-                    # initialize pigpio daemon
-                    command = ['sudo', 'pigpiod']
-                    # Execute the command and capture output
-                    result = subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-                    rospy.loginfo("STDOUT:", result.stdout)
-                    rospy.loginfo("STDERR:", result.stderr)                
-                except subprocess.CalledProcessError as e:
-                    rospy.logerr(f"Command failed with return code {e.returncode}")
-                    rospy.logerr("Error output:", e.stderr)
-                    raise Exception
-        except Exception as e:
-            rospy.logerr("Couldn't initialize pigpio library connection")
-            #exit()
-
-        self.setThrust(0) # Must set thurst to zero before using motor (based on ESC specifications)
-
+        # Must set thurst to zero before using motor (based on ESC specifications)
+        self.zero_throttle_dc = self.getDutyCycleFromThrust(0.0)
+        self.pwm_backend = JetsonPWMBackend(self.pin, self.freq, start_duty_cycle=self.zero_throttle_dc)
+        self.motor_name = motor_name
+    
     def setDutyCycle(self, dc):
         '''Input:
                 dc: Desired motor dutycycle [0, 100]
@@ -77,6 +60,11 @@ class PWMMotorController:
         T = 1 / self.freq * 10**6 # (Signal period in us)
         return pw/T * 100.0
     
+    def getDutyCycleFromThrust(self, thrust):
+        thrust_us = self.getEquivalentPulseWidth(thrust=thrust)
+        dc = self.getDutyCyclefromPulseWidth(pw=thrust_us)
+        return dc
+    
     def setThrust(self, thrust):
         """Move motor at specified thrust.
         @param 'thrust': Must be in range [-1, 1], for fully reverse and fully forward control respectively.
@@ -85,7 +73,7 @@ class PWMMotorController:
         self.thrust = thrust*sensibility
         self.thrust_us = self.getEquivalentPulseWidth(thrust=self.thrust)
         self.dc = self.getDutyCyclefromPulseWidth(pw=self.thrust_us)
-        self.setDutyCycle(self.dc)
+        self.backend.set_duty_cycle(self.pin, self.freq, self.dc)
 
         #rospy.loginfo(self.__techs())
 
