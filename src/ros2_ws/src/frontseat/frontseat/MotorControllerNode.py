@@ -54,6 +54,8 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     finally:
+        left_motorDriver.turnOffMotor()
+        right_motorDriver.turnOffMotor()
         motor_controller_node.destroy_node()
         rclpy.shutdown()
 

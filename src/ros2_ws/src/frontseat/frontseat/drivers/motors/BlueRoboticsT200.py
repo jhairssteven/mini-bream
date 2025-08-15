@@ -61,6 +61,15 @@ class BlueRoboticsT200:
         self.dc = self.getDutyCycleFromThrust(thrust*sensibility)
         self.pwm_backend.set_duty_cycle(self.dc)
 
+    def stopMotor(self):
+        """ Set motor thrust to zero """
+        self.setThrust(0)
+    
+    def turnOffMotor(self):
+        """ This will turn off the PWM connection """
+        self.stopMotor()
+        self.pwm_backend.clean_pwm_resources()
+
     def __techs(self):
         """ Gives motor last commanded thrust with equivalent Pulse witdh and duty cycle logs """
         return '[{}] thrust:{}, pw (us): {}, dc: {}'.format(self.motor_name, self.thrust, self.thrust_us, self.dc)
