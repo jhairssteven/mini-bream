@@ -1,7 +1,7 @@
 /**:
   ros__parameters:
     # Dubins
-    dubins_radius: 10.0
+    dubins_radius: 8.0
     dubins_step_size: 0.5
     replan_dist: 26.0
     no_of_laps: 2
@@ -26,9 +26,9 @@
 
     # ILOS
     replan_lookahead: 8.0  # Distance to look ahead to select next target waypoint when in need to replan. It is not replan_lookahead of ILOS.
-    lookahead_min : 10
+    lookahead_min : 3
     lookahead_max : 20
     conv_rate     : 8.0
-    gamma         : 0 #0.015 # Integral gain
+    gamma         : 0.015 # Integral gain
 
     sim_enable: true
