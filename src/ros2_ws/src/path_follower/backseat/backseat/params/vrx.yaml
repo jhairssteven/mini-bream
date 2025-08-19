@@ -26,7 +26,7 @@
 
     # ILOS
     replan_lookahead: 8.0  # Distance to look ahead to select next target waypoint when in need to replan. It is not replan_lookahead of ILOS.
-    lookahead_min : 3
+    lookahead_min : 4
     lookahead_max : 20
     conv_rate     : 8.0
     gamma         : 0.015 # Integral gain
