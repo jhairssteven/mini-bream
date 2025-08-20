@@ -29,7 +29,12 @@ class InteractivePathNode(Node):
             [[-65.58441925048828, -146.8583984375, 0.0], [0.0, 0.0, -0.8125176429748535, 0.5829366445541382]],
             [[-67.28180694580078, -152.09947204589844, 0.0], [0.0, 0.0, -0.8039597868919373, 0.5946836471557617]],
         ]
-        default_positions = default_positions_real        
+        default_positions_slip_dock = [
+            [[20.1, 7.0, 0.0], [0.0, 0.0, -0.9198061227798462, 0.39237311482429504]],
+            [[10.0, 0.0, 0.0], [0.0, 0.0, -0.9999958872795105, 0.0027884477749466896]],
+            [[4.0, 0.0, 0.0], [0.0, 0.0, -0.9999873042106628, 0.005036592483520508]],
+        ]
+        default_positions = default_positions_sim
         self.num_markers = len(default_positions)
         for i, pos in enumerate(default_positions):
             self.create_interactive_marker(i, pos[0], pos[1])
@@ -41,7 +46,7 @@ class InteractivePathNode(Node):
         x, y, _ = pos
         q_x, q_y, q_z, q_w = quat
         int_marker = InteractiveMarker()
-        int_marker.header.frame_id = "world"
+        int_marker.header.frame_id = "world" #"slip_dock"
         int_marker.name = f"pose_{index}"
         int_marker.description = f"Pose {index}"
         int_marker.scale = 2.0
