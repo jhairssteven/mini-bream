@@ -4,7 +4,7 @@
     dubins_radius: 8.0
     dubins_step_size: 0.5
     replan_dist: 26.0
-    no_of_laps: 100
+    no_of_laps: 1
 
     # Are these used?
     handover_offs: 1 # Meters before the end of the path to handover control of the vehicle

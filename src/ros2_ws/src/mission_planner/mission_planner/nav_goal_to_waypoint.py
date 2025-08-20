@@ -9,6 +9,7 @@ from geographic_msgs.msg import GeoPose
 from nav_msgs.msg import Path
 from backseat_msgs.action import DoMission
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSDurabilityPolicy
+from typing import Callable
 import utm
 
 
@@ -18,11 +19,12 @@ class ActionServerClient:
         self._client = ActionClient(node, DoMission, 'path_planner_action')
         self.goal_ctr = 0
         self._goal_handle = None
+        self.result = DoMission.Result()
 
     def log(self, msg: str):
         self.node.get_logger().info(f"[GOAL ID: {self.goal_ctr}] {msg}")
 
-    def send_goal(self, goal_msg: DoMission.Goal):
+    def send_goal(self, goal_msg: DoMission.Goal, after_done_callback: Callable[[DoMission.Result], None]):
         # Cancel previous goal if any
         self.cancel_goal()
 
@@ -35,6 +37,7 @@ class ActionServerClient:
         self.log("Sending goal...")
         send_future = self._client.send_goal_async(goal_msg, feedback_callback=self.feedback_cb)
         send_future.add_done_callback(self.goal_response_cb)
+        self.after_done_callback = after_done_callback
 
     def cancel_goal(self):
         if self._goal_handle is not None:
@@ -62,9 +65,10 @@ class ActionServerClient:
         goal_handle.get_result_async().add_done_callback(self.done_cb)
 
     def done_cb(self, future):
-        result = future.result().result
-        self.log(f"Mission complete: {result.mission_complete}")
+        self.result = future.result().result
+        self.log(f"Mission complete: {self.result.mission_complete}")
         self._goal_handle = None  # Clear handle once result is received
+        self.after_done_callback(self.result)
 
     def feedback_cb(self, feedback_msg):
         # feedback = feedback_msg.feedback
