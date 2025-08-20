@@ -82,8 +82,8 @@ class PathPlannerNode(Node):
             depth=5
         )
         
-        self.linear_velocity_pct_pub = self.create_publisher(Float64, '/wamv/linear_velocity', qos_best_effort_volatile)
-        self.angular_velocity_pct_pub = self.create_publisher(Float64, '/wamv/angular_velocity', qos_best_effort_volatile)
+        self.linear_velocity_pct_pub = self.create_publisher(Float64, '/wamv/linear_velocity_auto', qos_best_effort_volatile)
+        self.angular_velocity_pct_pub = self.create_publisher(Float64, '/wamv/angular_velocity_auto', qos_best_effort_volatile)
 
         self.left_pub = self.create_publisher(Float64, '/wamv/thrusters/left/thrust', qos)
         self.right_pub = self.create_publisher(Float64, '/wamv/thrusters/right/thrust', qos)
@@ -145,11 +145,11 @@ class PathPlannerNode(Node):
         self.get_logger().info('Server initialized. Waiting for new mission...')
 
     def __goal_callback(self, goal_request):
-        self.get_logger().info('Received goal request')
+        #self.get_logger().info('Received goal request')
         return GoalResponse.ACCEPT
 
     def __cancel_callback(self, goal_handle):
-        self.get_logger().info('Received cancel request')
+        #self.get_logger().info('Received cancel request')
         return CancelResponse.ACCEPT
 
     def __read_position_cbk(self, msg):
@@ -237,7 +237,7 @@ class PathPlannerNode(Node):
         KD = self.get_parameter("kd").value
         self.head_u = KP*head_err + KI*self.head_i + KD*derivative
         self.head_prev_error = head_err
-        self.get_logger().info(f'desired head: {self.head_u}, head_error: {self.head_prev_error}')
+        #self.get_logger().info(f'desired head: {self.head_u}, head_error: {self.head_prev_error}')
         
         max_speed = self.get_parameter("max_speed").value
         min_speed = self.get_parameter("min_speed").value
@@ -327,7 +327,7 @@ class PathPlannerNode(Node):
         return NavigationTools.Mission(waypoints=wps)
 
     def __run(self, goal_handle):
-        self.get_logger().info(f'Executing new mission: {goal_handle.request}')
+        #self.get_logger().info(f'Executing new mission: {goal_handle.request}')
 
         if goal_handle.request.filename:
             self.get_logger().info(f'The filename is: {goal_handle.request.filename}')

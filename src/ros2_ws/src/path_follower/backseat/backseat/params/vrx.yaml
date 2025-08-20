@@ -10,7 +10,7 @@
     handover_offs: 1 # Meters before the end of the path to handover control of the vehicle
     
     # Linear speed limits
-    max_speed         : 0.5 # m/s
+    max_speed         : 0.27 # m/s
     min_speed         : 0.0 # m/s
     # fw_speed: 0
     #origin_gps: [40.40229852, -86.84558228] # kepner
@@ -26,9 +26,9 @@
 
     # ILOS
     replan_lookahead: 8.0  # Distance to look ahead to select next target waypoint when in need to replan. It is not replan_lookahead of ILOS.
-    lookahead_min : 4
+    lookahead_min : 3
     lookahead_max : 20
     conv_rate     : 8.0
-    gamma         : 0.015 # Integral gain
+    gamma         : 0.2 # Integral gain
 
     sim_enable: true
