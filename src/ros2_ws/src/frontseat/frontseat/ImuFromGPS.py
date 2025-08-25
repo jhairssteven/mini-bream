@@ -19,8 +19,13 @@ class ImuFromGPSNode(Node):
             durability=QoSDurabilityPolicy.VOLATILE,        # Do not store old messages
             depth=1
         )
-
-        self.create_subscription(NavSatFix, '/ublox_gps_node/fix', self.gps_cbk, qos_best_effort_volatile)
+        # For critical real-time commands, reliable but no stored history
+        qos_reliable_volatile = QoSProfile(
+            reliability=QoSReliabilityPolicy.RELIABLE,  # Rety until success
+            durability=QoSDurabilityPolicy.VOLATILE,    # Do not store old messages
+            depth=5
+        )
+        self.create_subscription(NavSatFix, '/ublox_gps_node/fix', self.gps_cbk, qos_reliable_volatile)
         self.fix_vel_sub = self.create_subscription(Odometry, '/wamv/sensors/position/ground_truth_odometry',
                                                         self.position_ground_truth, qos_best_effort_volatile)
 
