@@ -87,8 +87,8 @@ class ImuFromGPSNode(Node):
             return
         if self.cur_lat == self.prev_lat and self.cur_lon == self.prev_lon:
             return
-        if self.gt_y is None and self.gt_x is None:
-            return
+        #if self.gt_y is None and self.gt_x is None:
+        #    return
         
         self.curr_orientation = self.estimate_heading()
         self.prev_lat, self.prev_lon = self.cur_lat, self.cur_lon
