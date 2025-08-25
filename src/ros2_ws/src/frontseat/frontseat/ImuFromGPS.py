@@ -20,7 +20,7 @@ class ImuFromGPSNode(Node):
             depth=1
         )
 
-        self.create_subscription(NavSatFix, '/wamv/sensors/gps/gps/fix', self.gps_cbk, qos_best_effort_volatile)
+        self.create_subscription(NavSatFix, '/ublox_gps_node/fix', self.gps_cbk, qos_best_effort_volatile)
         self.fix_vel_sub = self.create_subscription(Odometry, '/wamv/sensors/position/ground_truth_odometry',
                                                         self.position_ground_truth, qos_best_effort_volatile)
 
