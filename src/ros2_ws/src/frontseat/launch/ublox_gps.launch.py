@@ -17,7 +17,10 @@ def generate_launch_description():
         package='frontseat',
         executable='imu_estimation',
         name='imu_estimation',
-        output='screen'
+        output='screen',
+        remappings=[
+            ('/wamv/sensors/gps/gps/fix', '/ublox_gps_node/fix')
+        ]
         )
 
     return LaunchDescription([

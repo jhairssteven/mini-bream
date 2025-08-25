@@ -27,6 +27,9 @@ def generate_launch_description():
         output='screen',
         parameters=[
             vehicle_param_file,
+        ],
+        remappings=[
+            ('/wamv/sensors/gps/gps/fix', '/ublox_gps_node/fix')
         ]
     )
 

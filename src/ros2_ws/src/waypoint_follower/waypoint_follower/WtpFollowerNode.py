@@ -30,7 +30,7 @@ class WtpFollowerNode(Node):
             depth=5
         )
         
-        self.create_subscription(NavSatFix, '/wamv/sensors/gps/gps/fix', self.gps_cbk, qos_best_effort_volatile)
+        self.create_subscription(NavSatFix, '/wamv/sensors/gps/gps/fix', self.gps_cbk, qos_reliable_volatile)
         self.imu_pub = self.create_subscription(Imu, '/wamv/sensors/imu/imu/data/estimated', self.imu_cbk, qos_best_effort_volatile)
         self.goal_sub = self.create_subscription(PoseStamped, '/goal_pose', self.goal_callback, qos_best_effort_volatile)
         
