@@ -38,8 +38,8 @@ class WtpFollowerNode(Node):
         #self.left_pub = self.create_publisher(Float64, '/wamv/thrusters/left/thrust', qos_reliable_volatile)
         #self.right_pub = self.create_publisher(Float64, '/wamv/thrusters/right/thrust', qos_reliable_volatile)
         # real
-        self.left_pub = self.create_publisher(Float64, '/pwm/left_thrust_cmd', qos_reliable_volatile)
-        self.right_pub = self.create_publisher(Float64, '/pwm/right_thrust_cmd', qos_reliable_volatile)
+        self.left_pub = self.create_publisher(Float32, '/pwm/left_thrust_cmd', qos_reliable_volatile)
+        self.right_pub = self.create_publisher(Float32, '/pwm/right_thrust_cmd', qos_reliable_volatile)
 
         self.timer = self.create_timer(1.0 / 19.0, self.runner)  # 19 Hz
 
@@ -133,8 +133,8 @@ class WtpFollowerNode(Node):
 
         #self.left_pub.publish(Float64(data=float(1000*left_mtr_vel)))
         #self.right_pub.publish(Float64(data=float(1000*right_mtr_vel)))
-        self.left_pub.publish(Float64(data=float(left_mtr_vel)))
-        self.right_pub.publish(Float64(data=float(right_mtr_vel)))
+        self.left_pub.publish(Float32(data=float(left_mtr_vel)))
+        self.right_pub.publish(Float32(data=float(right_mtr_vel)))
 
 def main(args=None):
     rclpy.init()
