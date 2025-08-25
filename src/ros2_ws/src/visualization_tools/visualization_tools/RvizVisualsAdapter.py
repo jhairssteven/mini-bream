@@ -143,6 +143,7 @@ class RvizPos(Node):
         init_lat = self.get_parameter("goal_lat").value
         self.curr_lat = init_lat; self.curr_long = init_lon
         self.current_orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
+        self.estimated_current_orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
 
         self.init_UTM_x, self.init_UTM_y, _ = gps_to_utm(init_lat, init_lon)
         self.past_poses = []
@@ -157,6 +158,7 @@ class RvizPos(Node):
         )
 
         # Subscribers
+        self.create_subscription(Imu, '/wamv/sensors/imu/imu/data/estimated', self.estimated_imu_callback, qos_best_effort_volatile)
         self.create_subscription(Imu, '/wamv/sensors/imu/imu/data', self.imu_callback, qos_best_effort_volatile)
         self.create_subscription(NavSatFix, '/wamv/sensors/gps/gps/fix', self.gps_callback, qos_best_effort_volatile)
         self.create_subscription(Float32, '/compass_bearing_deg', self.heading_callback, 1)
@@ -168,6 +170,7 @@ class RvizPos(Node):
         self.ilosHeadingMarkerPub = self.create_publisher(Marker, "/heading/marker/ilos", 2)
         self.pidrOutputMarkerPub = self.create_publisher(Marker, "/heading/marker/pidr_output", 2)
         self.currPoseMarkerPub = self.create_publisher(Marker, "/curr_marker", 2)
+        self.estimated_currPoseMarkerPub = self.create_publisher(Marker, "/estimated_curr_marker", 2)
         self.goalPoseMarkerPub = self.create_publisher(Marker, "/goal_marker", 2)
         self.traversedPathPub = self.create_publisher(Path, "/traversed_path", 2)
         self.ilosHeadingPub = self.create_publisher(Float32, "/heading/value/ilos", 1)
@@ -191,21 +194,29 @@ class RvizPos(Node):
 
     def imu_callback(self, msg: Imu):
         self.current_orientation = msg.orientation
+    
+    def estimated_imu_callback(self, msg: Imu):
+        self.estimated_current_orientation = msg.orientation
 
     def gps_callback(self, msg: NavSatFix):
         self.curr_lat = msg.latitude
         self.curr_long = msg.longitude
         self.current_pose_pub()
 
+    def build_pose_arrow_marker(self, x, y, orientation, color=[1.0, 0.0, 1.0, 1.0]):
+        marker = getMarker(color, Marker.ARROW)
+        pose = Pose(position=Point(x=x, y=y, z=0.0), orientation=orientation)
+        marker.pose = pose
+        return marker, pose
+        
     def current_pose_pub(self):
         u = utm.from_latlon(self.curr_lat, self.curr_long)
         cx = u[0] - self.init_UTM_x
         cy = u[1] - self.init_UTM_y
-        
-        current_marker = getMarker([0.0,0.0,0.0,1.0], Marker.ARROW)
-        current_pose = Pose(position=Point(x=cx, y=cy, z=0.0), orientation=self.current_orientation)
-        current_marker.pose = current_pose
-        self.currPoseMarkerPub.publish(current_marker)
+
+        curr_marker, curr_pose = self.build_pose_arrow_marker(cx, cy, self.current_orientation, [0.0, 0.0, 0.0, 1.0])
+        self.currPoseMarkerPub.publish(curr_marker)
+        self.estimated_currPoseMarkerPub.publish(self.build_pose_arrow_marker(cx, cy, self.estimated_current_orientation)[0])
 
         if self.get_parameter('rst_trav_path').value:
             self.ref_path.poses = self.ref_path.poses[-1:]
@@ -214,7 +225,7 @@ class RvizPos(Node):
         current_pose_stamped = PoseStamped()
         current_pose_stamped.header.stamp = self.get_clock().now().to_msg()
         current_pose_stamped.header.frame_id = "world"
-        current_pose_stamped.pose = current_pose
+        current_pose_stamped.pose = curr_pose
         self.ref_path.poses.append(current_pose_stamped)
         self.traversedPathPub.publish(self.ref_path)
 

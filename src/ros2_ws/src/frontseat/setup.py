@@ -24,7 +24,8 @@ setup(
         'console_scripts': [
             'motor_controller = frontseat.MotorControllerNode:main',
             'thrust_source_selector = frontseat.ThrustSourceSelectorNode:main',
-            'joystick = frontseat.JoystickHandlerNode:main'
+            'joystick = frontseat.JoystickHandlerNode:main',
+            'imu_estimation = frontseat.ImuFromGPS:main'
         ],
     },
 )
