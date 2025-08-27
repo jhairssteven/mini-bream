@@ -15,7 +15,8 @@ class MotorControllerNode(Node):
         self.node_name = node_name
         self.left_motor_pwm_driver = lft_motorDriver
         self.right_motor_pwm_driver = right_motorDriver    
-    
+        self.right_max_thrust_pgt = 0.5
+        self.left_max_thrust_pgt = 0.5
         super().__init__(self.node_name)
         
         # Subscribers
@@ -27,18 +28,16 @@ class MotorControllerNode(Node):
 
 
     def __left_thrust_cbk(self, msg):
-        self.left_motor_pwm_driver.setThrust(thrust=msg.data)
-        #self.left_motor_techs = self.left_motor_pwm_controller.__techs()
+        self.left_motor_pwm_driver.setThrust(thrust=msg.data*self.left_max_thrust_pgt)
     
     def __right_thrust_cbk(self, msg):
-        self.right_motor_pwm_driver.setThrust(thrust=msg.data)
-        #self.right_motor_techs = self.left_motor_pwm_controller.__techs()
+        self.right_motor_pwm_driver.setThrust(thrust=msg.data*self.right_max_thrust_pgt)
 
 
 def main(args=None):
     rclpy.init(args=args)
 
-    left_mtr_GPIO_pin, right_mtr_GPIO_pin = [32, 33]  # Jetson Orin Mini-Bream
+    left_mtr_GPIO_pin, right_mtr_GPIO_pin = [33, 32]  # Jetson Orin Mini-Bream
 
     left_motorDriver = BlueRoboticsT200(pin=left_mtr_GPIO_pin, motor_name="left_mtr")
     right_motorDriver = BlueRoboticsT200(pin=right_mtr_GPIO_pin, motor_name="right_mtr")

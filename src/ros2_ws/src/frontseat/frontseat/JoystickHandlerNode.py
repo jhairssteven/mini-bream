@@ -10,7 +10,7 @@ class JoyController(Node):
         super().__init__(node_name)
         self.node_name = node_name
         self.left_mtr_btn_axis = 1  # left joystick vertical axis
-        self.right_mtr_btn_axis = 3 # 3 for bluetooth #4 for wired connection # right joystick vertical axis
+        self.right_mtr_btn_axis = 4 # 3 for bluetooth #4 for wired connection # right joystick vertical axis
         self.radio_on_ctrl_btn = 11
         self.stop_motors_btn = 10
         self.radio_on_ctrl = True

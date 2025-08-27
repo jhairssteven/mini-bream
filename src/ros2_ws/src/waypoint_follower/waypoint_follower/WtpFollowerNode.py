@@ -16,7 +16,8 @@ from waypoint_follower.CommonUtils import *
 class WtpFollowerNode(Node):
     def __init__(self, node_name='wtp_follower'):
         super().__init__(node_name)
-        
+        self.initialize_ros_params()
+
         # For high-rate sensor data
         qos_best_effort_volatile = QoSProfile(
             reliability=QoSReliabilityPolicy.BEST_EFFORT,   # Send ony once without retry
@@ -34,12 +35,12 @@ class WtpFollowerNode(Node):
         self.imu_pub = self.create_subscription(Imu, '/wamv/sensors/imu/imu/data/estimated', self.imu_cbk, qos_best_effort_volatile)
         self.goal_sub = self.create_subscription(PoseStamped, '/goal_pose', self.goal_callback, qos_best_effort_volatile)
         
-        # sim
-        #self.left_pub = self.create_publisher(Float64, '/wamv/thrusters/left/thrust', qos_reliable_volatile)
-        #self.right_pub = self.create_publisher(Float64, '/wamv/thrusters/right/thrust', qos_reliable_volatile)
-        # real
-        self.left_pub = self.create_publisher(Float32, '/pwm/left_thrust_cmd', qos_reliable_volatile)
-        self.right_pub = self.create_publisher(Float32, '/pwm/right_thrust_cmd', qos_reliable_volatile)
+        if self.sim_enable:
+            self.left_pub = self.create_publisher(Float64, '/wamv/thrusters/left/thrust', qos_reliable_volatile)
+            self.right_pub = self.create_publisher(Float64, '/wamv/thrusters/right/thrust', qos_reliable_volatile)
+        else:
+            self.left_pub = self.create_publisher(Float32, '/wamv/thrusters/left_thrust_cmd', qos_reliable_volatile)
+            self.right_pub = self.create_publisher(Float32, '/wamv/thrusters/right_thrust_cmd', qos_reliable_volatile)
 
         self.timer = self.create_timer(1.0 / 19.0, self.runner)  # 19 Hz
 
@@ -49,28 +50,33 @@ class WtpFollowerNode(Node):
         self.goal_x = None
         self.goal_y = None
         self.goal_yaw = None
+
+    def initialize_ros_params(self):
         
         self.declare_parameter("goal_lat", 40.448417)
         self.declare_parameter("goal_lon", -86.867750)
-        origin_lat = self.get_parameter("goal_lat").value
-        origin_lon = self.get_parameter("goal_lon").value
-        self.origin_utm_x, self.origin_utm_y = self.to_utm(origin_lat, origin_lon)
-        
+        self.declare_parameter("sim_enable", False)
         self.declare_parameter("waypoint_achieved_offset_distance", 2.0)
-        self.WAYPOINT_ACHIEVED_OFFSET_DISTANCE = self.get_parameter("waypoint_achieved_offset_distance").value
-
-        
         self.declare_parameter("kr", 0.07)
         self.declare_parameter("ka", 0.8)
         self.declare_parameter("kb", 0.1)
         self.declare_parameter("max_linear_x", 1.0)
         self.declare_parameter("max_angular_z", 0.5)
+        
+
+        origin_lat = self.get_parameter("goal_lat").value
+        origin_lon = self.get_parameter("goal_lon").value
+        self.origin_utm_x, self.origin_utm_y = self.to_utm(origin_lat, origin_lon)
+        
+        self.sim_enable = self.get_parameter("sim_enable").value
+        
+        self.WAYPOINT_ACHIEVED_OFFSET_DISTANCE = self.get_parameter("waypoint_achieved_offset_distance").value
         self.kr = self.get_parameter("kr").value
         self.ka = self.get_parameter("ka").value
         self.kb = self.get_parameter("kb").value
         self.max_linear_x = self.get_parameter("max_linear_x").value
         self.max_angular_z = self.get_parameter("max_angular_z").value
-
+        
     def goal_callback(self, msg: PoseStamped):
         x_utm = self.origin_utm_x + msg.pose.position.x
         y_utm = self.origin_utm_y + msg.pose.position.y
@@ -97,7 +103,7 @@ class WtpFollowerNode(Node):
     
     def get_curr_pose(self):
         if self.curr_x == None or self.curr_y == None or self.curr_orientation == None:
-            self.get_logger().warn("Current pose not yet available.")
+            self.get_logger().warn("Current pose not yet available.", throttle_duration_sec=2)
             return Pose2D(x=0.0, y=0.0, theta=0.0)
         
         return Pose2D(x=float(self.curr_x), y=float(self.curr_y), theta=float(self.get_yaw_from_quaternion(self.curr_orientation)))
@@ -105,7 +111,7 @@ class WtpFollowerNode(Node):
     def get_goal_pose(self):
         """ Get goal pose from Rviz if available, otherwise get 0,0, yaw= 0 Pose2D """
         if (self.goal_x == None or self.goal_y == None or self.goal_yaw == None):
-            self.get_logger().warn("Goal pose not yet available.")
+            self.get_logger().warn("Goal pose not yet available.", throttle_duration_sec=2)
             return None
         return Pose2D(x=float(self.goal_x), y=float(self.goal_y), theta=float(self.goal_yaw))
 
@@ -131,10 +137,14 @@ class WtpFollowerNode(Node):
         left_mtr_vel = np.clip(left_mtr_vel, -1, 1)
         right_mtr_vel = np.clip(right_mtr_vel, -1, 1)
 
-        #self.left_pub.publish(Float64(data=float(1000*left_mtr_vel)))
-        #self.right_pub.publish(Float64(data=float(1000*right_mtr_vel)))
-        self.left_pub.publish(Float32(data=float(left_mtr_vel)))
-        self.right_pub.publish(Float32(data=float(right_mtr_vel)))
+        if self.sim_enable:
+            self.left_pub.publish(Float64(data=float(1000*left_mtr_vel)))
+            self.right_pub.publish(Float64(data=float(1000*right_mtr_vel)))
+        else:
+            self.left_pub.publish(Float32(data=float(left_mtr_vel)))
+            self.right_pub.publish(Float32(data=float(right_mtr_vel)))
+
+        self.get_logger().info(f'v: {linear_vel}, ang_v: {angular_vel}, l_th: {left_mtr_vel}, r_th: {right_mtr_vel}')
 
 def main(args=None):
     rclpy.init()
