@@ -20,6 +20,9 @@ def generate_launch_description():
         parameters=[
             params,      
             {'rate': 19.0}
+        ],
+        remappings=[
+            ("/ublox_gps_node/fix", "/wamv/sensors/gps/gps/fix")
         ]
     )
     
