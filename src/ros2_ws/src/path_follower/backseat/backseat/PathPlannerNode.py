@@ -29,7 +29,7 @@ class PathPlannerNode(Node):
         self.declare_parameter('max_angular_velocity', 0.5)
         self.declare_parameter('max_speed', 3.0)
         self.declare_parameter('min_speed', 0.)
-        self.declare_parameter('sim_enable', True)
+        self.declare_parameter('sim_enable', False)
         self.declare_parameter('goal_lat', 40.448417)
         self.declare_parameter('goal_lon', -86.867750)
         
@@ -85,34 +85,14 @@ class PathPlannerNode(Node):
         self.linear_velocity_pct_pub = self.create_publisher(Float64, '/wamv/linear_velocity_auto', qos_best_effort_volatile)
         self.angular_velocity_pct_pub = self.create_publisher(Float64, '/wamv/angular_velocity_auto', qos_best_effort_volatile)
 
-        self.left_pub = self.create_publisher(Float64, '/wamv/thrusters/left/thrust', qos)
-        self.right_pub = self.create_publisher(Float64, '/wamv/thrusters/right/thrust', qos)
-        
-        # Publishers to control thrusters directly
-            
-        # For high-rate, non-critical sensor data
-        best_effort_volatile_qos = QoSProfile(
-            reliability=QoSReliabilityPolicy.BEST_EFFORT,   # Send ony once without retry
-            durability=QoSDurabilityPolicy.VOLATILE,        # Do not store old messages
-            depth=1
-        )
-
-        # For critical real-time commands, reliable but no stored history
-        reliable_volatile_qos = QoSProfile(
-            reliability=QoSReliabilityPolicy.RELIABLE,  # Rety until success
-            durability=QoSDurabilityPolicy.VOLATILE,    # Do not store old messages
-            depth=5
-        )
-
-        linc_qos = best_effort_volatile_qos
-        
-        """ if self.sim:
+        if self.sim_enable:
             msg_type_thrusters = Float64
-            qos_thrusters = reliable_volatile_qos
-        else: """
-        msg_type_thrusters = TorqeedoCmdStamped
-        qos_thrusters = linc_qos
+            qos_thrusters = qos_reliable_volatile
+        else:
+            msg_type_thrusters = TorqeedoCmdStamped
+            qos_thrusters = qos_best_effort_volatile
 
+        # Publishers to control thrusters directly
         self.left_thruster_publisher = self.create_publisher(msg_type_thrusters, '/wamv/thrusters/left/thrust/actual', qos_thrusters)
         self.right_thruster_publisher = self.create_publisher(msg_type_thrusters, '/wamv/thrusters/right/thrust/actual', qos_thrusters)
         
