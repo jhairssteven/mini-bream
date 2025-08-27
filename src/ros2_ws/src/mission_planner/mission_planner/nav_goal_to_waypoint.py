@@ -21,8 +21,9 @@ class ActionServerClient:
         self._goal_handle = None
         self.result = DoMission.Result()
 
-    def log(self, msg: str):
-        self.node.get_logger().info(f"[GOAL ID: {self.goal_ctr}] {msg}")
+    def log(self, msg: str, enable_logs=False):
+        if enable_logs:
+            self.node.get_logger().info(f"[GOAL ID: {self.goal_ctr}] {msg}")
 
     def send_goal(self, goal_msg: DoMission.Goal, after_done_callback: Callable[[DoMission.Result], None]):
         # Cancel previous goal if any
@@ -31,10 +32,10 @@ class ActionServerClient:
         self.goal_ctr += 1
         goal_msg.id = self.goal_ctr
 
-        self.log("Waiting for action server...")
+        #self.log("Waiting for action server...")
         self._client.wait_for_server()
 
-        self.log("Sending goal...")
+        self.log("Sending new mission...", enable_logs=True)
         send_future = self._client.send_goal_async(goal_msg, feedback_callback=self.feedback_cb)
         send_future.add_done_callback(self.goal_response_cb)
         self.after_done_callback = after_done_callback
