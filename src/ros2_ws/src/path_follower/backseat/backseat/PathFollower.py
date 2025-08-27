@@ -234,6 +234,7 @@ class PathFollower:
     def __init__(self, node, mission, path_creator, log_data=True, handover_offs=None):
         self.node = node
         self.declare_parameters()
+        self.replan_triggered = False
 
         if not handover_offs:
             handover_offs = self.node.get_parameter("handover_offs").value
@@ -460,7 +461,9 @@ class PathFollower:
                                                 current_wp_idx = self.orig_index, 
                                                 original_path = self.original_path)
                 self.work_index = 0             # Make sure to start from the first element of the augmented path
-
+                self.replan_triggered = True
+            else:
+                self.replan_triggered = False
             # node.logdebug("Working path len is %d, current idx is %d", len(self.working_path), self.work_index)
             self.look_ahead = self.get_look_ahead(self.ye)
             # Update controller 

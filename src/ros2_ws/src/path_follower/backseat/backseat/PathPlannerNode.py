@@ -44,6 +44,8 @@ class PathPlannerNode(Node):
         self.max_linear_velocity = self.get_parameter('max_linear_velocity').value
         self.max_angular_velocity = self.get_parameter('max_angular_velocity').value
 
+        self.goal_lat = self.get_parameter('goal_lat').value
+        self.goal_lon = self.get_parameter('goal_lon').value
 
         self.mission = None
         self.path_follower = None
@@ -60,6 +62,8 @@ class PathPlannerNode(Node):
         self.wind_dir = 0
         self.wind_speed = 0
         self.mission_complete = False
+
+        self.paths_published = False
 
         self._feedback = DoMission.Feedback()
         self._result = DoMission.Result()
@@ -238,46 +242,51 @@ class PathPlannerNode(Node):
     def __publish_paths(self, wk_path, orig_path):
         self.wk_path_pub.publish(wk_path)
         self.orig_path_pub.publish(orig_path)
+        self.paths_published = True
 
-    def __update_follower(self):
+    def waypoints_to_ros_path(self, waypoints, x_ref, y_ref, frame_id='world'):
+        """
+        Convert a list of waypoints to a ROS Path message relative to a reference point.
+        
+        :param waypoints: List of waypoints, each with pose.utm_x and pose.utm_y attributes
+        :param goal_lat: Latitude of the reference goal
+        :param goal_lon: Longitude of the reference goal
+        :param frame_id: Frame ID to set for the Path and poses
+        :return: nav_msgs.msg.Path
+        """
+        path_ros = Path()
+        path_ros.header.frame_id = frame_id
+
+        for wp in waypoints:
+            pose = PoseStamped()
+            pose.header.frame_id = frame_id
+            pose.pose.position.x = wp.pose.utm_x - x_ref
+            pose.pose.position.y = wp.pose.utm_y - y_ref
+            pose.pose.position.z = 0.0
+            pose.pose.orientation.x = 0.0
+            pose.pose.orientation.y = 0.0
+            pose.pose.orientation.z = 0.0
+            pose.pose.orientation.w = 1.0  # Identity quaternion
+            path_ros.poses.append(pose)
+        
+        return path_ros
+
+    def __update_follower(self, new_mission=True):
         """! Main loop intended to update the output of the path following algorithm.
         @param  None.
         @return None.
         """
         # Convert wk_path and orig_path from PathFollower into ROS Path messages 
-        wk_path,orig_path = self.path_follower.get_generated_paths()
-        wk_path_ros = Path()
-        wk_path_ros.header.frame_id = 'world'
-        orig_path_ros = Path()
-        orig_path_ros.header.frame_id = 'world'
-        x_ref,y_ref,_,_ = utm.from_latlon(self.get_parameter('goal_lat').value, self.get_parameter('goal_lon').value)
-        
-        for i,wp in enumerate(wk_path):
-            pose = PoseStamped()
-            pose.header.frame_id = 'world'
-            pose.pose.position.x = wp.pose.utm_x - x_ref
-            pose.pose.position.y = wp.pose.utm_y - y_ref
-            pose.pose.position.z = 0.0
-            pose.pose.orientation.x = 0.0
-            pose.pose.orientation.y = 0.0
-            pose.pose.orientation.z = 0.0
-            pose.pose.orientation.w = 0.0
-            wk_path_ros.poses.append(pose)
-        for i,wp in enumerate(orig_path):
-            pose = PoseStamped()
-            pose.header.frame_id = 'world'
-            pose.pose.position.x = wp.pose.utm_x - x_ref
-            pose.pose.position.y = wp.pose.utm_y - y_ref
-            pose.pose.position.z = 0.0
-            pose.pose.orientation.x = 0.0
-            pose.pose.orientation.y = 0.0
-            pose.pose.orientation.z = 0.0
-            pose.pose.orientation.w = 0.0
-            orig_path_ros.poses.append(pose)
+        if new_mission or not self.paths_published or self.path_follower.replan_triggered:
+            x_ref, y_ref, _, _ = utm.from_latlon(self.goal_lat, self.goal_lon)
 
-        self.__publish_paths(wk_path_ros, orig_path_ros)
+            wk_path, orig_path = self.path_follower.get_generated_paths()
+            wk_path_ros = self.waypoints_to_ros_path(wk_path, x_ref, y_ref)
+            orig_path_ros = self.waypoints_to_ros_path(orig_path, x_ref, y_ref)
+            self.__publish_paths(wk_path_ros, orig_path_ros)
+            new_mission = False
+
         self.current_wp.ToUTM()
-
 
         mc, self.tgt_heading, self.xte, self.tgt_wp = self.path_follower.update(current_wp = self.current_wp,
                                                                                 speed = self.current_speed)
@@ -320,13 +329,14 @@ class PathPlannerNode(Node):
             return DoMission.Result(mission_complete=False)
 
         self.path_follower = PathFollower(self, mission=self.mission, path_creator=DubinsPath)
-
+        new_mission = True
         while not self.mission_complete:
             if goal_handle.is_cancel_requested:
                 goal_handle.canceled()
                 return DoMission.Result(mission_complete=False)
 
-            self.__update_follower()
+            self.__update_follower(new_mission=new_mission)
+            new_mission = False
             self._feedback.xt_error = float(abs(self.path_follower.ye))
             goal_handle.publish_feedback(self._feedback)
             rclpy.spin_once(self, timeout_sec=0.1)
