@@ -15,8 +15,8 @@ class MotorControllerNode(Node):
         self.node_name = node_name
         self.left_motor_pwm_driver = lft_motorDriver
         self.right_motor_pwm_driver = right_motorDriver    
-        self.right_max_thrust_pgt = 0.5
-        self.left_max_thrust_pgt = 0.5
+        self.right_max_thrust_pgt = 0.8
+        self.left_max_thrust_pgt = 1.0
         super().__init__(self.node_name)
         
         # Subscribers
