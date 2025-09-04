@@ -168,8 +168,9 @@ class NavGoalToWaypoint:
         """ mission: A list of geo waypoints (output of __local_to_geo()) """
         goal_msg = DoMission.Goal()
         goal_msg.mission = mission
-        self._action_client.send_goal(goal_msg)
-
+        self._action_client.send_goal(goal_msg, self.dummy_fun)
+    def dummy_fun(self, result: DoMission.Result):
+        pass
     def buildMissionFromPoseArray(self, msg: Path):
         """ Build a mission from a given list of Poses, appending (and starting from) the current position."""
         current_geo = self.getCurrentGeoPosition()

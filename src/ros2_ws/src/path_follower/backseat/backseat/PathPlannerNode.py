@@ -315,11 +315,28 @@ class PathPlannerNode(Node):
             wps.append(copy.deepcopy(wp))
         return NavigationTools.Mission(waypoints=wps)
 
-    def __run(self, goal_handle):
-        #self.get_logger().info(f'Executing new mission: {goal_handle.request}')
+    def __mission_step(self):
+        if self.goal_handle.is_cancel_requested:
+            self.goal_handle.canceled()
+            self.timer.cancel()
+            return DoMission.Result(mission_complete=False)
 
+        self.__update_follower(new_mission=self.new_mission)
+        self.new_mission = False
+
+        self._feedback.xt_error = float(abs(self.path_follower.ye))
+        self.goal_handle.publish_feedback(self._feedback)
+
+        if self.mission_complete:
+            result = DoMission.Result(mission_complete=True)
+            self.goal_handle.succeed()
+            self.timer.cancel()
+            self.get_logger().info("Mission completed")
+            return result
+    
+    def __run(self, goal_handle):
+        # Initialize mission
         if goal_handle.request.filename:
-            self.get_logger().info(f'The filename is: {goal_handle.request.filename}')
             self.mission = NavigationTools.Mission(filename=goal_handle.request.filename)
         elif goal_handle.request.mission:
             self.mission = self.__load_mission(goal_handle.request.mission)
@@ -329,23 +346,14 @@ class PathPlannerNode(Node):
             return DoMission.Result(mission_complete=False)
 
         self.path_follower = PathFollower(self, mission=self.mission, path_creator=DubinsPath)
-        new_mission = True
-        while not self.mission_complete:
-            if goal_handle.is_cancel_requested:
-                goal_handle.canceled()
-                return DoMission.Result(mission_complete=False)
+        self.new_mission = True
+        self.goal_handle = goal_handle
 
-            self.__update_follower(new_mission=new_mission)
-            new_mission = False
-            self._feedback.xt_error = float(abs(self.path_follower.ye))
-            goal_handle.publish_feedback(self._feedback)
-            rclpy.spin_once(self, timeout_sec=0.1)
-
-        result = DoMission.Result()
-        result.mission_complete = True
-        goal_handle.succeed()
-        self.get_logger().info('Mission completed')
-        return result
+        # Start periodic mission updates
+        self.timer = self.create_timer(0.1, self.__mission_step)
+        
+        # TODO: Correctly handled cancelation of previous goals to prevent bottlenecks.
+        return DoMission.Result()
 
     def getMarker(self, color=[1, 0, 0, 1], type=Marker.ARROW, lwh=None):
         mkr = Marker()
