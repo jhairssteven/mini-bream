@@ -24,7 +24,8 @@ from backseat.DataLogger import *
 class PathPlannerNode(Node):
     def __init__(self):
         super().__init__('path_planner_node')
-
+        self.get_logger().set_level(rclpy.logging.LoggingSeverity.ERROR)
+        
         self.declare_parameter('max_linear_velocity', 3.0)
         self.declare_parameter('max_angular_velocity', 0.5)
         self.declare_parameter('max_speed', 3.0)
@@ -298,6 +299,9 @@ class PathPlannerNode(Node):
         self.xtrac_err_pub.publish(Float32(data=float(abs(self.path_follower.ye))))
         if (mc == False):
             self.__publish_veh_output()
+        else:
+            # Publish a zero velocity as a last command
+            self.__speeddir2diffdrive(speed=0.0, dir=0.0, k=1)
         self.mission_complete = mc
 
     def __load_mission(self, mission):
