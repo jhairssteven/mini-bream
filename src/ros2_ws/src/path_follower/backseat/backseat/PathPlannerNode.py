@@ -5,26 +5,40 @@ import numpy as np
 import copy
 import rclpy
 import tf_transformations as tf
+
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSDurabilityPolicy
-from linc_msgs.msg import TorqeedoCmdStamped
 from rclpy.node import Node
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
-from backseat_msgs.msg import Locg
-from backseat_msgs.action import DoMission
+from rclpy.executors import MultiThreadedExecutor
+
+
 from visualization_msgs.msg import Marker
 from geometry_msgs.msg import Vector3Stamped, Pose, PoseStamped
 from sensor_msgs.msg import NavSatFix, Imu
 from std_msgs.msg import Float32, Float64
 from nav_msgs.msg import Path
+from linc_msgs.msg import TorqeedoCmdStamped
+from backseat_msgs.msg import Locg
+from backseat_msgs.action import DoMission
 
 from backseat.NavigationTools import *
 from backseat.PathFollower import *
 from backseat.DataLogger import *
+import logging
+
+class DebugOnlyFilter(logging.Filter):
+    def filter(self, record):
+        return record.levelno == logging.DEBUG
 
 class PathPlannerNode(Node):
     def __init__(self):
         super().__init__('path_planner_node')
         self.get_logger().set_level(rclpy.logging.LoggingSeverity.ERROR)
+        """ # Get node logger
+        logger = self.get_logger()
+        # Clear existing filters
+        for h in logger.handlers:
+            h.addFilter(DebugOnlyFilter()) """
         
         self.declare_parameter('max_linear_velocity', 3.0)
         self.declare_parameter('max_angular_velocity', 0.5)
@@ -69,8 +83,8 @@ class PathPlannerNode(Node):
         self._feedback = DoMission.Feedback()
         self._result = DoMission.Result()
 
-        self.data_logger = DataLogger(data_description='field_test_jun_07/Rendezvouz_paper',
-                                      headers=['head_err', 'tgt_heading', 'speed', 'wind_dir', 'wind_speed'])
+        #self.data_logger = DataLogger(data_description='field_test_jun_07/Rendezvouz_paper',
+        #                              headers=['head_err', 'tgt_heading', 'speed', 'wind_dir', 'wind_speed'])
 
         qos = QoSProfile(depth=10)
         
@@ -134,7 +148,8 @@ class PathPlannerNode(Node):
         return GoalResponse.ACCEPT
 
     def __cancel_callback(self, goal_handle):
-        #self.get_logger().info('Received cancel request')
+        self.get_logger().info('Received cancel request')
+        
         return CancelResponse.ACCEPT
 
     def __read_position_cbk(self, msg):
@@ -236,7 +251,7 @@ class PathPlannerNode(Node):
         x = np.abs(head_err)
         speed = np.clip(m*x+b,min_speed,max_speed)
 
-        self.data_logger.log_data([head_err, self.tgt_heading, speed, self.wind_dir, self.wind_speed])
+        #self.data_logger.log_data([head_err, self.tgt_heading, speed, self.wind_dir, self.wind_speed])
         self.__speeddir2diffdrive(speed, self.head_u, k=1)
     
 
@@ -292,7 +307,7 @@ class PathPlannerNode(Node):
         mc, self.tgt_heading, self.xte, self.tgt_wp = self.path_follower.update(current_wp = self.current_wp,
                                                                                 speed = self.current_speed)
         
-        self.lookahead_pub.publish(Float32(data=self.path_follower.look_ahead))
+        self.lookahead_pub.publish(Float32(data=float(self.path_follower.look_ahead)))
         #rclpy.loginfo('mc:{},wp_mode:{}'.format(mc,self.tgt_wp.wp_mode)) 
 
         self.publishWorkingWypt(self.path_follower.working_path[self.path_follower.work_index])
@@ -319,27 +334,7 @@ class PathPlannerNode(Node):
             wps.append(copy.deepcopy(wp))
         return NavigationTools.Mission(waypoints=wps)
 
-    def __mission_step(self):
-        if self.goal_handle.is_cancel_requested:
-            self.goal_handle.canceled()
-            self.timer.cancel()
-            return DoMission.Result(mission_complete=False)
-
-        self.__update_follower(new_mission=self.new_mission)
-        self.new_mission = False
-
-        self._feedback.xt_error = float(abs(self.path_follower.ye))
-        self.goal_handle.publish_feedback(self._feedback)
-
-        if self.mission_complete:
-            result = DoMission.Result(mission_complete=True)
-            self.goal_handle.succeed()
-            self.timer.cancel()
-            self.get_logger().info("Mission completed")
-            return result
-    
     def __run(self, goal_handle):
-        # Initialize mission
         if goal_handle.request.filename:
             self.mission = NavigationTools.Mission(filename=goal_handle.request.filename)
         elif goal_handle.request.mission:
@@ -351,13 +346,24 @@ class PathPlannerNode(Node):
 
         self.path_follower = PathFollower(self, mission=self.mission, path_creator=DubinsPath)
         self.new_mission = True
-        self.goal_handle = goal_handle
+        self.mission_complete = False
+        self.get_logger().info('New mission loaded. Executing...')
+        while not self.mission_complete:
+            if goal_handle.is_cancel_requested:
+                goal_handle.canceled()
+                self.get_logger().warn('Cancel requested')
+                return DoMission.Result(mission_complete=False)
+            
+            self.__update_follower(new_mission=self.new_mission)
+            self.new_mission = False
 
-        # Start periodic mission updates
-        self.timer = self.create_timer(0.1, self.__mission_step)
+            self._feedback.xt_error = float(abs(self.path_follower.ye))
+            goal_handle.publish_feedback(self._feedback)
+
+        goal_handle.succeed()
+        self.get_logger().info("Mission completed")
         
-        # TODO: Correctly handled cancelation of previous goals to prevent bottlenecks.
-        return DoMission.Result()
+        return DoMission.Result(mission_complete=True)
 
     def getMarker(self, color=[1, 0, 0, 1], type=Marker.ARROW, lwh=None):
         mkr = Marker()
@@ -418,7 +424,8 @@ class PathPlannerNode(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = PathPlannerNode()
-    rclpy.spin(node)
+    # We use a MultiThreadedExecutor to handle incoming goal requests concurrently
+    rclpy.spin(node, executor=MultiThreadedExecutor())
     rclpy.shutdown()
 
 if __name__ == '__main__':
