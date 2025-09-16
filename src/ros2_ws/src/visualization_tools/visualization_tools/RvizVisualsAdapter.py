@@ -171,6 +171,7 @@ class RvizPos(Node):
         #self.goalPoseMarkerPub = self.create_publisher(Marker, "/goal_marker", 2)
         
         self.traversedPathPub = self.create_publisher(Path, "/traversed_path", 2)
+        self.vis_traversedPathPub = self.create_publisher(Path, "/vis/traversed_path", 2)
         
         self.ilosHeadingPub = self.create_publisher(Float32, "/heading/value/ilos", 1)
         self.currAcuteHeadingPub = self.create_publisher(Float32, "/heading/value/curr_acute_heading", 1)
@@ -219,6 +220,7 @@ class RvizPos(Node):
         current_pose_stamped.pose = current_pose
         self.ref_path.poses.append(current_pose_stamped)
         self.traversedPathPub.publish(self.ref_path)
+        self.vis_traversedPathPub.publish(self.ref_path)
 
     def getCurrentXY(self):
         ux, uy, _ = gps_to_utm(self.curr_lat, self.curr_long)
