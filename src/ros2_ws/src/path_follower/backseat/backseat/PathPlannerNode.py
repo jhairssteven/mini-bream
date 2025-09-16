@@ -122,7 +122,7 @@ class PathPlannerNode(Node):
         self.lookahead_pub = self.create_publisher(Float32, '/lookahead', qos)
         self.way_gps_pub = self.create_publisher(Locg, '/way_gps', qos)
         self.wk_path_pub = self.create_publisher(Path, '/working_path', qos)
-        self.vis_wk_path_pub = self.create_publisher(Path, '/vis/working_path', qos)
+        self.vis_wk_path_pub = self.create_publisher(Path, '/log/working_path', qos)
         self.orig_path_pub = self.create_publisher(Path, '/original_path', qos)
 
         if self.sim_enable:

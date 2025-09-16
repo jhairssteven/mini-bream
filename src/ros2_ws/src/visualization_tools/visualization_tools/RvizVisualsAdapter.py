@@ -171,7 +171,7 @@ class RvizPos(Node):
         #self.goalPoseMarkerPub = self.create_publisher(Marker, "/goal_marker", 2)
         
         self.traversedPathPub = self.create_publisher(Path, "/traversed_path", 2)
-        self.vis_traversedPathPub = self.create_publisher(Path, "/vis/traversed_path", 2)
+        self.vis_traversedPathPub = self.create_publisher(Path, "/log/traversed_path", 2)
         
         self.ilosHeadingPub = self.create_publisher(Float32, "/heading/value/ilos", 1)
         self.currAcuteHeadingPub = self.create_publisher(Float32, "/heading/value/curr_acute_heading", 1)
