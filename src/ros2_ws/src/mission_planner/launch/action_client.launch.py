@@ -21,7 +21,7 @@ def generate_launch_description():
 
     mission_name_arg = DeclareLaunchArgument(
         'mission_name',
-        default_value='mission',
+        default_value='vrx',
         description='Directory name containing the mission.csv file'
     )
     # TODO: Update to ros2
