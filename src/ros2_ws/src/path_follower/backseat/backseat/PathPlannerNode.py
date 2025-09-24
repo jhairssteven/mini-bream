@@ -30,6 +30,7 @@ class PathPlannerNode(Node):
         self.declare_parameter('sim_enable', True)
         self.declare_parameter('goal_lat', 40.448417)
         self.declare_parameter('goal_lon', -86.867750)
+        self.declare_parameter('motor_thrust_scaling_factor', 1000.0)
         
         self.declare_parameter('kp', 3.6)
         self.declare_parameter('ki', 2.553)
@@ -39,7 +40,7 @@ class PathPlannerNode(Node):
         self.max_speed = self.get_parameter('max_speed').value
         self.min_speed = self.get_parameter('min_speed').value
         self.sim_enable = self.get_parameter('sim_enable').value
-
+        self.motor_thrust_scaling_factor = self.get_parameter('motor_thrust_scaling_factor').value
 
         self.mission = None
         self.path_follower = None
@@ -155,8 +156,8 @@ class PathPlannerNode(Node):
         left = np.clip(left,-1,1)
         right = np.clip(right,-1,1)
 
-        #self.left_pub.publish(Float64(data=float(1000*left)))
-        #self.right_pub.publish(Float64(data=float(1000*right)))
+        self.left_pub.publish(Float64(data=float(self.motor_thrust_scaling_factor*left)))
+        self.right_pub.publish(Float64(data=float(self.motor_thrust_scaling_factor*right)))
 
         angular_velocity_pct = turn
         linear_velocity_pct = np.clip(speed, -1, 1)
