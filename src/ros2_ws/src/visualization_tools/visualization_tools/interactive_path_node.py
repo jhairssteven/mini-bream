@@ -18,11 +18,23 @@ class InteractivePathNode(Node):
         # Service to trigger path publishing
         self.srv = self.create_service(Trigger, 'rviz_path', self.handle_rviz_path)
 
-        default_positions = [
+        default_positions_real = [
+            [[-47.141273498535156, -80.43031311035156, 0.0], [-6.45511755159589e-10, 2.688708988785038e-08, -0.8835675716400146, 0.46830350160598755]],
+            [[-52.69406509399414, -89.04141998291016, -3.814697265625e-06], [3.5078819848877174e-09, -4.886067550557982e-09, -0.8672135472297668, 0.49793654680252075]],
+            [[-36.103206634521484, -75.05271911621094, 0.0], [1.66443037130648e-08, -2.2421579259912505e-08, -0.9893193244934082, 0.1457638442516327]]
+
+        ]
+        default_positions_sim = [
             [[-50.247276306152344, -139.0640411376953, 1.9073486328125e-06], [0.0, 0.0, -0.9998044967651367, 0.01977263018488884]],
             [[-65.58441925048828, -146.8583984375, 0.0], [0.0, 0.0, -0.8125176429748535, 0.5829366445541382]],
             [[-67.28180694580078, -152.09947204589844, 0.0], [0.0, 0.0, -0.8039597868919373, 0.5946836471557617]],
         ]
+        default_positions_slip_dock = [
+            [[20.1, 7.0, 0.0], [0.0, 0.0, -0.9198061227798462, 0.39237311482429504]],
+            [[10.0, 0.0, 0.0], [0.0, 0.0, -0.9999958872795105, 0.0027884477749466896]],
+            [[4.0, 0.0, 0.0], [0.0, 0.0, -0.9999873042106628, 0.005036592483520508]],
+        ]
+        default_positions = default_positions_sim
         self.num_markers = len(default_positions)
         for i, pos in enumerate(default_positions):
             self.create_interactive_marker(i, pos[0], pos[1])
@@ -34,10 +46,10 @@ class InteractivePathNode(Node):
         x, y, _ = pos
         q_x, q_y, q_z, q_w = quat
         int_marker = InteractiveMarker()
-        int_marker.header.frame_id = "world"
+        int_marker.header.frame_id = "world" #"slip_dock"
         int_marker.name = f"pose_{index}"
         int_marker.description = f"Pose {index}"
-        int_marker.scale = 1.0
+        int_marker.scale = 2.0
         int_marker.pose.position.x = x
         int_marker.pose.position.y = y
         int_marker.pose.position.z = 0.0

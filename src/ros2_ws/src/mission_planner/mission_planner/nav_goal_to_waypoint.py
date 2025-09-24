@@ -9,62 +9,72 @@ from geographic_msgs.msg import GeoPose
 from nav_msgs.msg import Path
 from backseat_msgs.action import DoMission
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSDurabilityPolicy
+from typing import Callable
 import utm
 
 
 class ActionServerClient:
     def __init__(self, node: Node):
         self.node = node
+        #self.node.get_logger().set_level(rclpy.logging.LoggingSeverity.ERROR)
         self._client = ActionClient(node, DoMission, 'path_planner_action')
+        self.current_goal_handle = None
+        self.result = DoMission.Result()
         self.goal_ctr = 0
-        self._goal_handle = None
 
-    def log(self, msg: str):
-        self.node.get_logger().info(f"[GOAL ID: {self.goal_ctr}] {msg}")
+    def log(self, msg: str, enable_logs=False, cancel=False):
+        #if enable_logs:
+         # if printing logs for cancel operations, the goal id is the previous of the current goal (goal_ctr)
+         # for 2 goals only
+        goal_id = self.goal_ctr
+        if cancel:
+             goal_id -= 1
+        self.node.get_logger().info(f"[GOAL ID: {goal_id}] {msg}")
 
-    def send_goal(self, goal_msg: DoMission.Goal):
-        # Cancel previous goal if any
-        self.cancel_goal()
-
+    def send_goal(self, goal_msg: DoMission.Goal, after_done_callback: Callable[[DoMission.Result], None]):
         self.goal_ctr += 1
         goal_msg.id = self.goal_ctr
 
-        self.log("Waiting for action server...")
         self._client.wait_for_server()
 
-        self.log("Sending goal...")
-        send_future = self._client.send_goal_async(goal_msg, feedback_callback=self.feedback_cb)
+        self.log("Sending new mission...", enable_logs=True)
+        send_future = self._client.send_goal_async(
+            goal_msg, 
+            feedback_callback=self.feedback_cb
+        )
         send_future.add_done_callback(self.goal_response_cb)
-
-    def cancel_goal(self):
-        if self._goal_handle is not None:
-            self.log("Canceling current goal...")
-            cancel_future = self._goal_handle.cancel_goal_async()
-            cancel_future.add_done_callback(self.cancel_done_cb)
-        else:
-            self.log("No active goal to cancel.")
-
-    def cancel_done_cb(self, future):
-        cancel_response = future.result()
-        if len(cancel_response.goals_canceling) > 0:
-            self.log("Goal successfully canceled.")
-        else:
-            self.log("Failed to cancel goal or goal already completed.")
+        self.after_done_callback = after_done_callback
 
     def goal_response_cb(self, future):
-        goal_handle = future.result()
-        if not goal_handle.accepted:
-            self.log("Goal was rejected.")
+        new_goal_handle = future.result()
+        if not new_goal_handle.accepted:
+            self.log("New goal was rejected.")
             return
+        # Set what to do if goal was accepted
+        new_goal_handle.get_result_async().add_done_callback(self.process_result)
 
-        #self.log("Goal accepted.")
-        self._goal_handle = goal_handle
-        goal_handle.get_result_async().add_done_callback(self.done_cb)
+        # Cancel current goal being executed
+        if self.current_goal_handle is not None:
+            self.current_goal_handle.cancel_goal_async().add_done_callback(self.goal_cancelled)
+        self.current_goal_handle = new_goal_handle # Update rgoal eference
 
-    def done_cb(self, future):
-        result = future.result().result
-        self.log(f"Mission complete: {result.mission_complete}")
-        self._goal_handle = None  # Clear handle once result is received
+    def goal_cancelled(self, future):
+        cancel_response = future.result()
+        if len(cancel_response.goals_canceling) > 0:
+            self.log('Goal successfully canceled', cancel=True)
+        else:
+            self.log('Goal failed to cancel', cancel=True)
+
+
+    def process_result(self, future):
+        self.result = future.result().result
+        # Quick fix (Currently the only case where mission complete is false, is when a cancelation occurs)
+        mc = self.result.mission_complete
+        if not mc:
+            self.log(f"Mission complete: {self.result.mission_complete}", cancel=True)
+            
+        self.current_goal_handle = None  # Clear handle once result is received
+        self.after_done_callback(self.result)
 
     def feedback_cb(self, feedback_msg):
         # feedback = feedback_msg.feedback
@@ -163,8 +173,11 @@ class NavGoalToWaypoint:
         """ mission: A list of geo waypoints (output of __local_to_geo()) """
         goal_msg = DoMission.Goal()
         goal_msg.mission = mission
-        self._action_client.send_goal(goal_msg)
-
+        self._action_client.send_goal(goal_msg, self.dummy_fun)
+    
+    def dummy_fun(self, result: DoMission.Result):
+        pass
+    
     def buildMissionFromPoseArray(self, msg: Path):
         """ Build a mission from a given list of Poses, appending (and starting from) the current position."""
         current_geo = self.getCurrentGeoPosition()

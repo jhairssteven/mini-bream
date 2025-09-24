@@ -125,7 +125,7 @@ class DubinsPath:
             x = wp.ToUTM().pose.utm_x
             y = wp.ToUTM().pose.utm_y
             angle = wp.pose.head            # ENU Frame angle (East = 0 deg, North = 90 deg)
-            self.node.get_logger().info(f"{x}, {y}, {angle}")
+            #self.node.get_logger().info(f"{x}, {y}, {angle}")
             q1 = (x, y, angle)
 
             if idx > 0:
@@ -139,7 +139,7 @@ class DubinsPath:
                 path.extend(configurations)
             q0 = q1
         cnt = 0
-        self.node.get_logger().info(f"Number of points generated in the path, {len(path)}")
+        #self.node.get_logger().info(f"Number of points generated in the path, {len(path)}")
         for i,p in enumerate(path):
             zone = mission[0].ToUTM().pose.utm_zone
             if main_wp_idxs[cnt] != i:
@@ -173,7 +173,7 @@ class DubinsPath:
         self.turning_radius = turn_radius
         self.step_size = step_size
 
-        self.node.get_logger().info(f"Dubins radius {self.turning_radius}, step {self.step_size}")
+        #self.node.get_logger().info(f"Dubins radius {self.turning_radius}, step {self.step_size}")
         self.generate_path(mission, log)
         
     
@@ -234,6 +234,7 @@ class PathFollower:
     def __init__(self, node, mission, path_creator, log_data=True, handover_offs=None):
         self.node = node
         self.declare_parameters()
+        self.replan_triggered = False
 
         if not handover_offs:
             handover_offs = self.node.get_parameter("handover_offs").value
@@ -248,10 +249,10 @@ class PathFollower:
         self.mission = mission
         self.path_hdlr = self.path_creator = path_creator(self.node, mission)
         self.original_path = self.path_hdlr.path
-        self.node.get_logger().info('-'*20)
-        self.node.get_logger().info('start: {}'.format(self.path_hdlr.path[0]))
-        self.node.get_logger().info('end  : {}'.format(self.path_hdlr.path[-1]))
-        self.node.get_logger().info('-'*20)
+        #self.node.get_logger().info('-'*20)
+        #self.node.get_logger().info('start: {}'.format(self.path_hdlr.path[0]))
+        #self.node.get_logger().info('end  : {}'.format(self.path_hdlr.path[-1]))
+        #self.node.get_logger().info('-'*20)
         self.working_path = self.original_path.copy()
         # Initialize path follower parameters
         self.mission_complete = False
@@ -460,7 +461,9 @@ class PathFollower:
                                                 current_wp_idx = self.orig_index, 
                                                 original_path = self.original_path)
                 self.work_index = 0             # Make sure to start from the first element of the augmented path
-
+                self.replan_triggered = True
+            else:
+                self.replan_triggered = False
             # node.logdebug("Working path len is %d, current idx is %d", len(self.working_path), self.work_index)
             self.look_ahead = self.get_look_ahead(self.ye)
             # Update controller 

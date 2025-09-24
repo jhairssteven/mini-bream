@@ -161,10 +161,10 @@ class RvizPos(Node):
         self.create_subscription(Imu, '/wamv/sensors/imu/imu/data/estimated', self.estimated_imu_callback, qos_best_effort_volatile)
         self.create_subscription(Imu, '/wamv/sensors/imu/imu/data', self.imu_callback, qos_best_effort_volatile)
         self.create_subscription(NavSatFix, '/wamv/sensors/gps/gps/fix', self.gps_callback, qos_best_effort_volatile)
-        self.create_subscription(Float32, '/compass_bearing_deg', self.heading_callback, 1)
-        self.create_subscription(Telem, '/telemetry', self.telem_callback, 1)
+        #self.create_subscription(Float32, '/compass_bearing_deg', self.heading_callback, 1)
+        #self.create_subscription(Telem, '/telemetry', self.telem_callback, 1)
         self.create_subscription(Locg, '/way_gps', self.way_gps_callback, 1)
-        self.create_subscription(Path, '/ref_path', self.ref_path_callback, 1)
+        #self.create_subscription(Path, '/ref_path', self.ref_path_callback, 1)
 
         # Publishers
         self.ilosHeadingMarkerPub = self.create_publisher(Marker, "/heading/marker/ilos", 2)
@@ -173,6 +173,8 @@ class RvizPos(Node):
         self.estimated_currPoseMarkerPub = self.create_publisher(Marker, "/estimated_curr_marker", 2)
         self.goalPoseMarkerPub = self.create_publisher(Marker, "/goal_marker", 2)
         self.traversedPathPub = self.create_publisher(Path, "/traversed_path", 2)
+        self.vis_traversedPathPub = self.create_publisher(Path, "/log/traversed_path", 2)
+        
         self.ilosHeadingPub = self.create_publisher(Float32, "/heading/value/ilos", 1)
         self.currAcuteHeadingPub = self.create_publisher(Float32, "/heading/value/curr_acute_heading", 1)
         self.PIDrErrorPub = self.create_publisher(Float32, "/pid/rotational/error", 1)
@@ -228,6 +230,7 @@ class RvizPos(Node):
         current_pose_stamped.pose = curr_pose
         self.ref_path.poses.append(current_pose_stamped)
         self.traversedPathPub.publish(self.ref_path)
+        self.vis_traversedPathPub.publish(self.ref_path)
 
     def getCurrentXY(self):
         ux, uy, _ = gps_to_utm(self.curr_lat, self.curr_long)

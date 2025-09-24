@@ -5,29 +5,46 @@ import numpy as np
 import copy
 import rclpy
 import tf_transformations as tf
-from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSDurabilityPolicy
 
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSDurabilityPolicy
 from rclpy.node import Node
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
-from backseat_msgs.msg import Locg
-from backseat_msgs.action import DoMission
+from rclpy.executors import MultiThreadedExecutor
+
+
 from visualization_msgs.msg import Marker
 from geometry_msgs.msg import Vector3Stamped, Pose, PoseStamped
 from sensor_msgs.msg import NavSatFix, Imu
 from std_msgs.msg import Float32, Float64
 from nav_msgs.msg import Path
+from linc_msgs.msg import TorqeedoCmdStamped
+from backseat_msgs.msg import Locg
+from backseat_msgs.action import DoMission
 
 from backseat.NavigationTools import *
 from backseat.PathFollower import *
 from backseat.DataLogger import *
+import logging
+
+class DebugOnlyFilter(logging.Filter):
+    def filter(self, record):
+        return record.levelno == logging.DEBUG
 
 class PathPlannerNode(Node):
     def __init__(self):
         super().__init__('path_planner_node')
-
-        self.declare_parameter('max_speed', 1.0)
-        self.declare_parameter('min_speed', 0.2)
-        self.declare_parameter('sim_enable', True)
+        self.get_logger().set_level(rclpy.logging.LoggingSeverity.ERROR)
+        """ # Get node logger
+        logger = self.get_logger()
+        # Clear existing filters
+        for h in logger.handlers:
+            h.addFilter(DebugOnlyFilter()) """
+        
+        self.declare_parameter('max_linear_velocity', 3.0)
+        self.declare_parameter('max_angular_velocity', 0.5)
+        self.declare_parameter('max_speed', 3.0)
+        self.declare_parameter('min_speed', 0.)
+        self.declare_parameter('sim_enable', False)
         self.declare_parameter('goal_lat', 40.448417)
         self.declare_parameter('goal_lon', -86.867750)
         self.declare_parameter('motor_thrust_scaling_factor', 1000.0)
@@ -41,6 +58,11 @@ class PathPlannerNode(Node):
         self.min_speed = self.get_parameter('min_speed').value
         self.sim_enable = self.get_parameter('sim_enable').value
         self.motor_thrust_scaling_factor = self.get_parameter('motor_thrust_scaling_factor').value
+        self.max_linear_velocity = self.get_parameter('max_linear_velocity').value
+        self.max_angular_velocity = self.get_parameter('max_angular_velocity').value
+
+        self.goal_lat = self.get_parameter('goal_lat').value
+        self.goal_lon = self.get_parameter('goal_lon').value
 
         self.mission = None
         self.path_follower = None
@@ -58,11 +80,13 @@ class PathPlannerNode(Node):
         self.wind_speed = 0
         self.mission_complete = False
 
+        self.paths_published = False
+
         self._feedback = DoMission.Feedback()
         self._result = DoMission.Result()
 
-        self.data_logger = DataLogger(data_description='field_test_jun_07/Rendezvouz_paper',
-                                      headers=['head_err', 'tgt_heading', 'speed', 'wind_dir', 'wind_speed'])
+        #self.data_logger = DataLogger(data_description='field_test_jun_07/Rendezvouz_paper',
+        #                              headers=['head_err', 'tgt_heading', 'speed', 'wind_dir', 'wind_speed'])
 
         qos = QoSProfile(depth=10)
         
@@ -79,17 +103,28 @@ class PathPlannerNode(Node):
             depth=5
         )
         
-        self.linear_velocity_pct_pub = self.create_publisher(Float64, '/wamv/linear_velocity', qos_best_effort_volatile)
-        self.angular_velocity_pct_pub = self.create_publisher(Float64, '/wamv/angular_velocity', qos_best_effort_volatile)
+        self.linear_velocity_pct_pub = self.create_publisher(Float64, '/wamv/linear_velocity_auto', qos_best_effort_volatile)
+        self.angular_velocity_pct_pub = self.create_publisher(Float64, '/wamv/angular_velocity_auto', qos_best_effort_volatile)
 
-        self.left_pub = self.create_publisher(Float64, '/wamv/thrusters/left/thrust', qos_reliable_volatile)
-        self.right_pub = self.create_publisher(Float64, '/wamv/thrusters/right/thrust', qos_reliable_volatile)
+        if self.sim_enable:
+            msg_type_thrusters = Float64
+            qos_thrusters = qos_reliable_volatile
+        else:
+            msg_type_thrusters = TorqeedoCmdStamped
+            qos_thrusters = qos_best_effort_volatile
+
+        # Publishers to control thrusters directly
+        self.left_thruster_publisher = self.create_publisher(msg_type_thrusters, '/wamv/thrusters/left/thrust/actual', qos_thrusters)
+        self.right_thruster_publisher = self.create_publisher(msg_type_thrusters, '/wamv/thrusters/right/thrust/actual', qos_thrusters)
+        
+        
         self.working_waypoint_pub = self.create_publisher(Marker, '/goal_marker', qos)
         self.xtrac_err_pub = self.create_publisher(Float32, '/xtrac_err_abs', qos)
         self.head_err_pub = self.create_publisher(Float32, '/head_err_deg', qos)
         self.lookahead_pub = self.create_publisher(Float32, '/lookahead', qos)
         self.way_gps_pub = self.create_publisher(Locg, '/way_gps', qos)
         self.wk_path_pub = self.create_publisher(Path, '/working_path', qos)
+        self.vis_wk_path_pub = self.create_publisher(Path, '/log/working_path', qos)
         self.orig_path_pub = self.create_publisher(Path, '/original_path', qos)
 
         if self.sim_enable:
@@ -112,11 +147,12 @@ class PathPlannerNode(Node):
         self.get_logger().info('Server initialized. Waiting for new mission...')
 
     def __goal_callback(self, goal_request):
-        self.get_logger().info('Received goal request')
+        #self.get_logger().info('Received goal request')
         return GoalResponse.ACCEPT
 
     def __cancel_callback(self, goal_handle):
         self.get_logger().info('Received cancel request')
+        
         return CancelResponse.ACCEPT
 
     def __read_position_cbk(self, msg):
@@ -142,7 +178,17 @@ class PathPlannerNode(Node):
             self.current_wp.pose.head = head
         self.current_wp.depth = 0.0
     
-    def __speeddir2diffdrive(self, speed, dir, k = 0.1):
+    def build_thruster_msg(self, thrust, clk_stamp):
+        """ if self.sim:
+            msg = Float64()
+            msg.data = thrust
+        else: """
+        msg = TorqeedoCmdStamped()
+        msg.header.stamp = clk_stamp
+        msg.cmd = thrust
+        return msg
+    
+    def __speeddir2diffdrive(self, speed, dir, k = 0.1, diff_drive=False):
         """! Internal call to transfor a speed and direction command to a
          differential drive command for the ASV.
         @param  speed   init_appForward speed of the vehicle.
@@ -161,10 +207,27 @@ class PathPlannerNode(Node):
 
         angular_velocity_pct = turn
         linear_velocity_pct = np.clip(speed, -1, 1)
-        self.max_linear_vel = 3.0
-        self.max_angular_vel = 0.5
+        angular_velocity_pct = np.clip(dir,-1,1)
+
+        if (diff_drive):
+            # left_thrust = self.max_linear_vel*linear_velocity_pct - self.max_angular_vel*angular_velocity_pct
+            # right_thrust = self.max_linear_vel*linear_velocity_pct + self.max_angular_vel*angular_velocity_pct
+            left =  speed - k*angular_velocity_pct
+            right = speed + k*angular_velocity_pct
+            left = np.clip(left,-1,1)
+            right = np.clip(right,-1,1)
+            clk_stamp = self.get_clock().now().to_msg()
+            left_thrust_msg = self.build_thruster_msg(1000*left, clk_stamp)
+            right_thrust_msg = self.build_thruster_msg(1000*right, clk_stamp)
+            self.left_thruster_publisher.publish(left_thrust_msg)
+            self.right_thruster_publisher.publish(right_thrust_msg)
+            return
+
+        self.max_linear_vel = self.get_parameter('max_linear_velocity').value
+        self.max_angular_vel = self.get_parameter('max_angular_velocity').value
         self.linear_velocity_pct_pub.publish(Float64(data=self.max_linear_vel*linear_velocity_pct))
         self.angular_velocity_pct_pub.publish(Float64(data=self.max_angular_vel*angular_velocity_pct))
+        
 
     def __publish_veh_output(self):
         """ Function to outuput the resulting controlled variables to the actuators."""
@@ -187,65 +250,73 @@ class PathPlannerNode(Node):
         KD = self.get_parameter("kd").value
         self.head_u = KP*head_err + KI*self.head_i + KD*derivative
         self.head_prev_error = head_err
-        up = self.get_parameter("max_speed").value
-        low = self.get_parameter("min_speed").value
-        x_up = 0.15
-        x_low = 0.4
-        m = (up-low)/(x_up-x_low)
-        b = up - m*x_up
-        x = np.abs(head_err)
-        speed = np.clip(m*x+b,low,up)
-        # TODO: use constant forward speed from parameter (how if .declare_parameter is mandatory?)
-        # speed = self.get_parameter("fw_speed").value if self.has_parameter("fw_speed") else c_speed
-        # ==========================
+        #self.get_logger().info(f'desired head: {self.head_u}, head_error: {self.head_prev_error}')
+        
+        max_speed = self.get_parameter("max_speed").value
+        min_speed = self.get_parameter("min_speed").value
 
-        self.data_logger.log_data([head_err, self.tgt_heading, speed, self.wind_dir, self.wind_speed])
+        angle_threshold_fast = 0.15 # rads
+        angle_threshold_slow = 0.4  # rads
+        
+        m = (max_speed-min_speed)/(angle_threshold_fast-angle_threshold_slow)
+        b = max_speed - m*angle_threshold_fast
+
+        x = np.abs(head_err)
+        speed = np.clip(m*x+b,min_speed,max_speed)
+
+        #self.data_logger.log_data([head_err, self.tgt_heading, speed, self.wind_dir, self.wind_speed])
         self.__speeddir2diffdrive(speed, self.head_u, k=1)
     
 
     def __publish_paths(self, wk_path, orig_path):
+        self.vis_wk_path_pub.publish(wk_path)
         self.wk_path_pub.publish(wk_path)
         self.orig_path_pub.publish(orig_path)
+        self.paths_published = True
 
-    def __update_follower(self):
+    def waypoints_to_ros_path(self, waypoints, x_ref, y_ref, frame_id='world'):
+        """
+        Convert a list of waypoints to a ROS Path message relative to a reference point.
+        
+        :param waypoints: List of waypoints, each with pose.utm_x and pose.utm_y attributes
+        :param goal_lat: Latitude of the reference goal
+        :param goal_lon: Longitude of the reference goal
+        :param frame_id: Frame ID to set for the Path and poses
+        :return: nav_msgs.msg.Path
+        """
+        path_ros = Path()
+        path_ros.header.frame_id = frame_id
+
+        for wp in waypoints:
+            pose = PoseStamped()
+            pose.header.frame_id = frame_id
+            pose.pose.position.x = wp.pose.utm_x - x_ref
+            pose.pose.position.y = wp.pose.utm_y - y_ref
+            pose.pose.position.z = 0.0
+            pose.pose.orientation.x = 0.0
+            pose.pose.orientation.y = 0.0
+            pose.pose.orientation.z = 0.0
+            pose.pose.orientation.w = 1.0  # Identity quaternion
+            path_ros.poses.append(pose)
+        
+        return path_ros
+
+    def __update_follower(self, new_mission=True):
         """! Main loop intended to update the output of the path following algorithm.
         @param  None.
         @return None.
         """
         # Convert wk_path and orig_path from PathFollower into ROS Path messages 
-        wk_path,orig_path = self.path_follower.get_generated_paths()
-        wk_path_ros = Path()
-        wk_path_ros.header.frame_id = 'world'
-        orig_path_ros = Path()
-        orig_path_ros.header.frame_id = 'world'
-        x_ref,y_ref,_,_ = utm.from_latlon(self.get_parameter('goal_lat').value, self.get_parameter('goal_lon').value)
-        
-        for i,wp in enumerate(wk_path):
-            pose = PoseStamped()
-            pose.header.frame_id = 'world'
-            pose.pose.position.x = wp.pose.utm_x - x_ref
-            pose.pose.position.y = wp.pose.utm_y - y_ref
-            pose.pose.position.z = 0.0
-            pose.pose.orientation.x = 0.0
-            pose.pose.orientation.y = 0.0
-            pose.pose.orientation.z = 0.0
-            pose.pose.orientation.w = 0.0
-            wk_path_ros.poses.append(pose)
-        for i,wp in enumerate(orig_path):
-            pose = PoseStamped()
-            pose.header.frame_id = 'world'
-            pose.pose.position.x = wp.pose.utm_x - x_ref
-            pose.pose.position.y = wp.pose.utm_y - y_ref
-            pose.pose.position.z = 0.0
-            pose.pose.orientation.x = 0.0
-            pose.pose.orientation.y = 0.0
-            pose.pose.orientation.z = 0.0
-            pose.pose.orientation.w = 0.0
-            orig_path_ros.poses.append(pose)
+        if new_mission or not self.paths_published or self.path_follower.replan_triggered:
+            x_ref, y_ref, _, _ = utm.from_latlon(self.goal_lat, self.goal_lon)
 
-        self.__publish_paths(wk_path_ros, orig_path_ros)
+            wk_path, orig_path = self.path_follower.get_generated_paths()
+            wk_path_ros = self.waypoints_to_ros_path(wk_path, x_ref, y_ref)
+            orig_path_ros = self.waypoints_to_ros_path(orig_path, x_ref, y_ref)
+            self.__publish_paths(wk_path_ros, orig_path_ros)
+            new_mission = False
+
         self.current_wp.ToUTM()
-
 
         mc, self.tgt_heading, self.xte, self.tgt_wp = self.path_follower.update(current_wp = self.current_wp,
                                                                                 speed = self.current_speed)
@@ -257,6 +328,9 @@ class PathPlannerNode(Node):
         self.xtrac_err_pub.publish(Float32(data=float(abs(self.path_follower.ye))))
         if (mc == False):
             self.__publish_veh_output()
+        else:
+            # Publish a zero velocity as a last command
+            self.__speeddir2diffdrive(speed=0.0, dir=0.0, k=1)
         self.mission_complete = mc
 
     def __load_mission(self, mission):
@@ -275,10 +349,7 @@ class PathPlannerNode(Node):
         return NavigationTools.Mission(waypoints=wps)
 
     def __run(self, goal_handle):
-        self.get_logger().info(f'Executing new mission: {goal_handle.request}')
-
         if goal_handle.request.filename:
-            self.get_logger().info(f'The filename is: {goal_handle.request.filename}')
             self.mission = NavigationTools.Mission(filename=goal_handle.request.filename)
         elif goal_handle.request.mission:
             self.mission = self.__load_mission(goal_handle.request.mission)
@@ -288,22 +359,25 @@ class PathPlannerNode(Node):
             return DoMission.Result(mission_complete=False)
 
         self.path_follower = PathFollower(self, mission=self.mission, path_creator=DubinsPath)
-
+        self.new_mission = True
+        self.mission_complete = False
+        self.get_logger().info('New mission loaded. Executing...')
         while not self.mission_complete:
             if goal_handle.is_cancel_requested:
                 goal_handle.canceled()
+                self.get_logger().warn('Cancel requested')
                 return DoMission.Result(mission_complete=False)
+            
+            self.__update_follower(new_mission=self.new_mission)
+            self.new_mission = False
 
-            self.__update_follower()
             self._feedback.xt_error = float(abs(self.path_follower.ye))
             goal_handle.publish_feedback(self._feedback)
-            rclpy.spin_once(self, timeout_sec=0.1)
 
-        result = DoMission.Result()
-        result.mission_complete = True
         goal_handle.succeed()
-        self.get_logger().info('Mission completed')
-        return result
+        self.get_logger().info("Mission completed")
+        
+        return DoMission.Result(mission_complete=True)
 
     def getMarker(self, color=[1, 0, 0, 1], type=Marker.ARROW, lwh=None):
         mkr = Marker()
@@ -364,7 +438,8 @@ class PathPlannerNode(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = PathPlannerNode()
-    rclpy.spin(node)
+    # We use a MultiThreadedExecutor to handle incoming goal requests concurrently
+    rclpy.spin(node, executor=MultiThreadedExecutor())
     rclpy.shutdown()
 
 if __name__ == '__main__':
