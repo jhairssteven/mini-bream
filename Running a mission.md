@@ -19,7 +19,7 @@ chmod -R u+x /workspace
 ros2 launch linc_gz docking_harner.launch.py
 ```
 
-- Launches tools to visualize current pose and trajectories on Rviz.
+- Launches tools to visualize current pose, trajectories and to send custom trajectories through RViz.
 ```shell
 ros2 launch visualization_tools visuals.launch.py vehicle:=<file_name>
 ```
@@ -28,13 +28,13 @@ ros2 launch visualization_tools visuals.launch.py vehicle:=<file_name>
 ros2 launch backseat mission.launch.py vehicle:=<file_name>
 ```
 
-- Launch the mission planner with a custom mission. Replace `<mission_file_name>` with one from the `mission_planner/missions` directory.
+- Launch the mission planner with a custom mission. Replace `<mission_file_name>` with one from the `mission_planner/missions` directory. The structure is a list of GPS waypoints describing your mission (order matters, first waypoint is first processed), the planner would always use the current pose as starting point for any mission.
 
 Defaults:
 
 ```yaml
 load_mission_from_file='false'
-mission_name='mission'
+mission_name='vrx'
 vehicle='vrx
 ```
 
