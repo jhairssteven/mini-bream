@@ -249,7 +249,7 @@ class PathPlannerNode(Node):
         mc, self.tgt_heading, self.xte, self.tgt_wp = self.path_follower.update(current_wp = self.current_wp,
                                                                                 speed = self.current_speed)
         
-        self.lookahead_pub.publish(Float32(data=self.path_follower.look_ahead))
+        self.lookahead_pub.publish(Float32(data=float(self.path_follower.look_ahead)))
         #rclpy.loginfo('mc:{},wp_mode:{}'.format(mc,self.tgt_wp.wp_mode)) 
 
         self.publishWorkingWypt(self.path_follower.working_path[self.path_follower.work_index])
