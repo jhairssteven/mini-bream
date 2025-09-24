@@ -48,6 +48,7 @@ class PathPlannerNode(Node):
         self.declare_parameter('goal_lat', 40.448417)
         self.declare_parameter('goal_lon', -86.867750)
         self.declare_parameter('motor_thrust_scaling_factor', 1000.0)
+        self.declare_parameter('publish_diff_drive', True)
         
         self.declare_parameter('kp', 3.6)
         self.declare_parameter('ki', 2.553)
@@ -61,6 +62,7 @@ class PathPlannerNode(Node):
         self.max_linear_velocity = self.get_parameter('max_linear_velocity').value
         self.max_angular_velocity = self.get_parameter('max_angular_velocity').value
 
+        self.publish_diff_drive = self.get_parameter('publish_diff_drive').get_parameter_value().bool_value
         self.goal_lat = self.get_parameter('goal_lat').value
         self.goal_lon = self.get_parameter('goal_lon').value
 
@@ -114,8 +116,8 @@ class PathPlannerNode(Node):
             qos_thrusters = qos_best_effort_volatile
 
         # Publishers to control thrusters directly
-        self.left_thruster_publisher = self.create_publisher(msg_type_thrusters, '/wamv/thrusters/left/thrust/actual', qos_thrusters)
-        self.right_thruster_publisher = self.create_publisher(msg_type_thrusters, '/wamv/thrusters/right/thrust/actual', qos_thrusters)
+        self.left_thruster_publisher = self.create_publisher(msg_type_thrusters, '/wamv/thrusters/left/thrust', qos_thrusters)
+        self.right_thruster_publisher = self.create_publisher(msg_type_thrusters, '/wamv/thrusters/right/thrust', qos_thrusters)
         
         
         self.working_waypoint_pub = self.create_publisher(Marker, '/goal_marker', qos)
@@ -179,13 +181,13 @@ class PathPlannerNode(Node):
         self.current_wp.depth = 0.0
     
     def build_thruster_msg(self, thrust, clk_stamp):
-        """ if self.sim:
+        if self.sim_enable:
             msg = Float64()
             msg.data = thrust
-        else: """
-        msg = TorqeedoCmdStamped()
-        msg.header.stamp = clk_stamp
-        msg.cmd = thrust
+        else:
+            msg = TorqeedoCmdStamped()
+            msg.header.stamp = clk_stamp
+            msg.cmd = thrust
         return msg
     
     def __speeddir2diffdrive(self, speed, dir, k = 0.1, diff_drive=False):
@@ -202,9 +204,6 @@ class PathPlannerNode(Node):
         left = np.clip(left,-1,1)
         right = np.clip(right,-1,1)
 
-        self.left_pub.publish(Float64(data=float(self.motor_thrust_scaling_factor*left)))
-        self.right_pub.publish(Float64(data=float(self.motor_thrust_scaling_factor*right)))
-
         angular_velocity_pct = turn
         linear_velocity_pct = np.clip(speed, -1, 1)
         angular_velocity_pct = np.clip(dir,-1,1)
@@ -217,8 +216,9 @@ class PathPlannerNode(Node):
             left = np.clip(left,-1,1)
             right = np.clip(right,-1,1)
             clk_stamp = self.get_clock().now().to_msg()
-            left_thrust_msg = self.build_thruster_msg(1000*left, clk_stamp)
-            right_thrust_msg = self.build_thruster_msg(1000*right, clk_stamp)
+            
+            left_thrust_msg = self.build_thruster_msg(self.motor_thrust_scaling_factor*left, clk_stamp)
+            right_thrust_msg = self.build_thruster_msg(self.motor_thrust_scaling_factor*right, clk_stamp)
             self.left_thruster_publisher.publish(left_thrust_msg)
             self.right_thruster_publisher.publish(right_thrust_msg)
             return
@@ -265,7 +265,7 @@ class PathPlannerNode(Node):
         speed = np.clip(m*x+b,min_speed,max_speed)
 
         #self.data_logger.log_data([head_err, self.tgt_heading, speed, self.wind_dir, self.wind_speed])
-        self.__speeddir2diffdrive(speed, self.head_u, k=1)
+        self.__speeddir2diffdrive(speed, self.head_u, k=1, diff_drive=self.publish_diff_drive)
     
 
     def __publish_paths(self, wk_path, orig_path):
@@ -330,7 +330,7 @@ class PathPlannerNode(Node):
             self.__publish_veh_output()
         else:
             # Publish a zero velocity as a last command
-            self.__speeddir2diffdrive(speed=0.0, dir=0.0, k=1)
+            self.__speeddir2diffdrive(speed=0.0, dir=0.0, k=1, diff_drive=self.publish_diff_drive)
         self.mission_complete = mc
 
     def __load_mission(self, mission):

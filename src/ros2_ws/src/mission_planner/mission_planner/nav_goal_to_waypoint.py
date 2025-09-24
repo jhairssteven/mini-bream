@@ -70,8 +70,7 @@ class ActionServerClient:
         self.result = future.result().result
         # Quick fix (Currently the only case where mission complete is false, is when a cancelation occurs)
         mc = self.result.mission_complete
-        if not mc:
-            self.log(f"Mission complete: {self.result.mission_complete}", cancel=True)
+        self.log(f"Mission complete: {self.result.mission_complete}", cancel=bool(not mc))
             
         self.current_goal_handle = None  # Clear handle once result is received
         self.after_done_callback(self.result)
