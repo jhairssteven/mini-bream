@@ -11,7 +11,7 @@ from backseat_msgs.action import DoMission
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSDurabilityPolicy
 from typing import Callable
 import utm
-
+from typing import Callable, Optional
 
 class ActionServerClient:
     def __init__(self, node: Node):
@@ -31,7 +31,7 @@ class ActionServerClient:
              goal_id -= 1
         self.node.get_logger().info(f"[GOAL ID: {goal_id}] {msg}")
 
-    def send_goal(self, goal_msg: DoMission.Goal, after_done_callback: Callable[[DoMission.Result], None]):
+    def send_goal(self, goal_msg: DoMission.Goal, after_done_callback: Optional[Callable[[DoMission.Result], None]] = None):
         self.goal_ctr += 1
         goal_msg.id = self.goal_ctr
 
