@@ -1,6 +1,6 @@
 /**:
   ros__parameters:
-    sim_enable: False
+    sim_enable: True
     
     # Dubins
     dubins_radius: 8.0
