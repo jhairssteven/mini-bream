@@ -5,8 +5,8 @@ import os
 
 def generate_launch_description():
     topics_to_record = [
-        '/wamv/thrusters/left/thrust/actual',
-        '/wamv/thrusters/right/thrust/actual',
+        '/wamv/thrusters/left/thrust',
+        '/wamv/thrusters/right/thrust',
     ]
     
     timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')

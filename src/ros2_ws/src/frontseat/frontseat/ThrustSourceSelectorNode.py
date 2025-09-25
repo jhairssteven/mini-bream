@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Float32, Bool
+from std_msgs.msg import Float32, Float64, Bool
 from frontseat.qos_profiles import reliable_volatile_qos, best_effort_volatile_qos
 
 class ThrustSourceSelectorNode(Node):
@@ -24,8 +24,8 @@ class ThrustSourceSelectorNode(Node):
         self.right_thrust = 0.0
         
         # Subscribers
-        self.create_subscription(Float32, '/wamv/thrusters/left_thrust_cmd', self.__frontseat_left_thrust_cbk, best_effort_volatile_qos)
-        self.create_subscription(Float32, '/wamv/thrusters/right_thrust_cmd', self.__frontseat_right_thrust_cbk, best_effort_volatile_qos)
+        self.create_subscription(Float64, '/wamv/thrusters/left/thrust', self.__frontseat_left_thrust_cbk, best_effort_volatile_qos)
+        self.create_subscription(Float64, '/wamv/thrusters/right/thrust', self.__frontseat_right_thrust_cbk, best_effort_volatile_qos)
         self.create_subscription(Float32, '/radio/thrusters/left_cmd', self.__radio_left_thrust_cbk, best_effort_volatile_qos)
         self.create_subscription(Float32, '/radio/thrusters/right_cmd', self.__radio_right_thrust_cbk, best_effort_volatile_qos)
         self.create_subscription(Bool, '/radio/on_ctrl', self.__radio_on_ctrl_cbk, best_effort_volatile_qos)

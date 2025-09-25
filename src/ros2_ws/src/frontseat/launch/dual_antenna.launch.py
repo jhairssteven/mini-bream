@@ -40,7 +40,8 @@ def generate_launch_description():
         name='dual_antenna',
         output='screen',
         remappings=[
-            #('/baseline/heading', '/wamv/sensors/imu/imu/data')
+            ('/baseline/heading', '/wamv/sensors/imu/imu/data'),
+            ('/dA/gps/center/fix', '/wamv/sensors/gps/gps/fix')
         ]
     )
 
