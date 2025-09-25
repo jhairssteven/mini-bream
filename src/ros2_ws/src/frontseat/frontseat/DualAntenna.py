@@ -120,8 +120,8 @@ class DualAntenna(Node):
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.header.frame_id = "gps_center_link"
 
-        msg.status.status = NavSatStatus.STATUS_FIX
-        msg.status.service = NavSatStatus.SERVICE_GPS
+        msg.status.status = self.gps1_msg.status.status
+        msg.status.service = self.gps1_msg.status.service
 
         msg.latitude = lat
         msg.longitude = lon

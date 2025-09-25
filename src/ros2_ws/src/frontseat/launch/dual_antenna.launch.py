@@ -26,13 +26,13 @@ def get_gps_node_launcher(gps_params, publish_rate=19.0, device='/dev/ttyACM0', 
 
 def generate_launch_description():
 
-    #config_directory = os.path.join(
-    #    get_package_share_directory('ublox_gps'),
-    #    'config')
-    #gps_params = os.path.join(config_directory, 'c94_m8p_rover.yaml')
+    config_directory = os.path.join(
+        get_package_share_directory('ublox_gps'),
+        'config')
+    gps_params = os.path.join(config_directory, 'c94_m8p_rover.yaml')
 
-    #gps1_node = get_gps_node_launcher(gps_params, publish_rate=19.0, device='/dev/ttyACM0', output_topic='/fix1')
-    #gps2_node = get_gps_node_launcher(gps_params, publish_rate=19.0, device='/dev/ttyACM1', output_topic='/fix2')
+    gps1_node = get_gps_node_launcher(gps_params, publish_rate=19.0, device='/dev/ttyACM0', output_topic='/fix1')
+    gps2_node = get_gps_node_launcher(gps_params, publish_rate=19.0, device='/dev/ttyACM1', output_topic='/fix2')
     
     dual_antenna_node = Node(
         package='frontseat',
@@ -46,22 +46,22 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        #gps1_node,
-        #gps2_node,
+        gps1_node,
+        gps2_node,
         dual_antenna_node,
 
         # Event handler to shut down the whole launch file when either gps node dies
-        #RegisterEventHandler(
-        #    event_handler=launch.event_handlers.OnProcessExit(
-        #        target_action=gps1_node,
-        #        on_exit=[EmitEvent(
-        #            event=Shutdown())],
-        #    )),
-        #RegisterEventHandler(
-        #    event_handler=launch.event_handlers.OnProcessExit(
-        #        target_action=gps2_node,
-        #        on_exit=[EmitEvent(
-        #            event=Shutdown())],
-        #    )),
+        RegisterEventHandler(
+            event_handler=launch.event_handlers.OnProcessExit(
+                target_action=gps1_node,
+                on_exit=[EmitEvent(
+                    event=Shutdown())],
+            )),
+        RegisterEventHandler(
+            event_handler=launch.event_handlers.OnProcessExit(
+                target_action=gps2_node,
+                on_exit=[EmitEvent(
+                    event=Shutdown())],
+            )),
         ]
     )
