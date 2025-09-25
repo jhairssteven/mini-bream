@@ -17,7 +17,6 @@ from geometry_msgs.msg import Vector3Stamped, Pose, PoseStamped
 from sensor_msgs.msg import NavSatFix, Imu
 from std_msgs.msg import Float32, Float64
 from nav_msgs.msg import Path
-from linc_msgs.msg import TorqeedoCmdStamped
 from backseat_msgs.msg import Locg
 from backseat_msgs.action import DoMission
 
@@ -108,12 +107,8 @@ class PathPlannerNode(Node):
         self.linear_velocity_pct_pub = self.create_publisher(Float64, '/wamv/linear_velocity_auto', qos_best_effort_volatile)
         self.angular_velocity_pct_pub = self.create_publisher(Float64, '/wamv/angular_velocity_auto', qos_best_effort_volatile)
 
-        if self.sim_enable:
-            msg_type_thrusters = Float64
-            qos_thrusters = qos_reliable_volatile
-        else:
-            msg_type_thrusters = TorqeedoCmdStamped
-            qos_thrusters = qos_best_effort_volatile
+        msg_type_thrusters = Float64
+        qos_thrusters = qos_reliable_volatile
 
         # Publishers to control thrusters directly
         self.left_thruster_publisher = self.create_publisher(msg_type_thrusters, '/wamv/thrusters/left/thrust', qos_thrusters)
@@ -180,15 +175,8 @@ class PathPlannerNode(Node):
             self.current_wp.pose.head = head
         self.current_wp.depth = 0.0
     
-    def build_thruster_msg(self, thrust, clk_stamp):
-        if self.sim_enable:
-            msg = Float64()
-            msg.data = thrust
-        else:
-            msg = TorqeedoCmdStamped()
-            msg.header.stamp = clk_stamp
-            msg.cmd = thrust
-        return msg
+    def build_thruster_msg(self, thrust):
+        return 
     
     def __speeddir2diffdrive(self, speed, dir, k = 0.1, diff_drive=False):
         """! Internal call to transfor a speed and direction command to a
@@ -215,10 +203,9 @@ class PathPlannerNode(Node):
             right = speed + k*angular_velocity_pct
             left = np.clip(left,-1,1)
             right = np.clip(right,-1,1)
-            clk_stamp = self.get_clock().now().to_msg()
             
-            left_thrust_msg = self.build_thruster_msg(self.motor_thrust_scaling_factor*left, clk_stamp)
-            right_thrust_msg = self.build_thruster_msg(self.motor_thrust_scaling_factor*right, clk_stamp)
+            left_thrust_msg = Float64(data = self.motor_thrust_scaling_factor*left)
+            right_thrust_msg = Float64(data = self.motor_thrust_scaling_factor*right)
             self.left_thruster_publisher.publish(left_thrust_msg)
             self.right_thruster_publisher.publish(right_thrust_msg)
             return
