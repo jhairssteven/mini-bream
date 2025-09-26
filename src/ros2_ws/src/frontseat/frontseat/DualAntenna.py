@@ -35,11 +35,12 @@ class DualAntenna(Node):
     """ Heading estimation using a dual GPS antenna """
     def __init__(self, node_name='dual_antenna'):
         super().__init__(node_name)
-        #self.origin_gps = GPS(40.448417, -86.867750) # Harner
-        self.origin_gps = GPS(40.40229852, -86.84558228) # Kepner
+        self.origin_gps_lat, self.origin_gps_lon = 40.448417, -86.867750 #harner
+        #self.origin_gps_lat, self.origin_gps_lon = 40.40229852, -86.84558228 #kepner
+        self.origin_gps = GPS(self.origin_gps_lat, self.origin_gps_lon)
         self.ox, self.oy = self.origin_gps.to_utm()
-        self.gps1 = GPS(40.40229852, -86.84558228)
-        self.gps2 = GPS(40.40229852, -86.84558228)
+        self.gps1 = GPS(self.origin_gps_lat, self.origin_gps_lon)
+        self.gps2 = GPS(self.origin_gps_lat, self.origin_gps_lon)
         self.gps1_msg = None # To save the GPS ros msg
         self.gps2_msg = None # To save the GPS ros msg
         self.topic_gps1 = '/fix1'
@@ -53,8 +54,9 @@ class DualAntenna(Node):
         self.gps_center_pub = self.create_publisher(NavSatFix, '/dA/gps/center/fix', best_effort_volatile_qos)
         self.stats_pub = self.create_publisher(String, '/dA/stats2', reliable_volatile_qos)
         
-        self.timer = self.create_timer(1.0 / 3.0, self.compute_baseline_heading)
-        self.timer = self.create_timer(1.0 / 19.0, self.publish_averaged_gps)
+        self.base_line_heading_timer = self.create_timer(1.0 / 3.0, self.compute_baseline_heading)
+        self.averaged_gps_timer = self.create_timer(1.0 / 19.0, self.publish_averaged_gps)
+        self.timer_headings = self.create_timer(3 , self.timer_headings_cbk)
 
         # Debug
         self.heading_value_pub_deg = self.create_publisher(Float32, '/dA/heading/estimated/degrees/value', reliable_volatile_qos)
@@ -64,21 +66,27 @@ class DualAntenna(Node):
         self.gt_gps_separation = self.create_publisher(Float32, '/dA/separation/ground_truth/value', reliable_volatile_qos)
         self.gps_gt_separation=0.96 # m
         self.prev_x, self.prev_y = None, None
-
+        self.can_publish_headings = True
 
         # Visuals
-        self.marker_pub = self.create_publisher(Marker, '/dA/heading/marker', 10)
-        self.gps1_path_pub = self.create_publisher(Path, '/gps1/path', 10)
+        self.marker_pub = self.create_publisher(Marker, '/relay/dA/heading/estimated/marker', 10)
+        self.tangent_heading_pub = self.create_publisher(Marker, '/relay/dA/heading/tangent/marker', 10)
+        self.gps1_path_pub = self.create_publisher(Path, '/relay/gps1/path', 10)
         self.gps1_path = Path()
         self.gps1_path.header.frame_id = "world"
         
-        self.gps2_path_pub = self.create_publisher(Path, '/gps2/path', 10)
+        self.gps2_path_pub = self.create_publisher(Path, '/relay/gps2/path', 10)
         self.gps2_path = Path()
         self.gps2_path.header.frame_id = "world"
 
-        # increment for next marker
-        self.marker_id_counter = 0
+        self.gps_center_path_pub = self.create_publisher(Path, '/relay/gps_center/path', 10)
+        self.gps_center_path = Path()
+        self.gps_center_path.header.frame_id = "world"
         
+
+        # increment for next heading marker
+        self.marker_id_counter = 0
+    
     def gps1_cbk(self, msg):
         self.gps1.lat, self.gps1.lon = msg.latitude, msg.longitude
         self.gps1_msg = msg
@@ -138,9 +146,9 @@ class DualAntenna(Node):
         gps1_x, gps1_y = self.gps1.to_utm()
         gps2_x, gps2_y = self.gps2.to_utm()
         # vector that goes from gps2 -> gps1
-        Px = gps2_x-gps1_x
-        Py = gps2_y-gps1_y
-        baseline_heading = np.arctan2(Py, Px)# + (180+90+5)*np.pi/180 # 90 deg offset is necessary since the GPSs were mounted across the vehicle
+        Px = gps1_x-gps2_x
+        Py = gps1_y-gps2_y
+        baseline_heading = np.arctan2(Py, Px) # + (180+90+5)*np.pi/180 # 90 deg offset is necessary since the GPSs were mounted across the vehicle
         imu_msg = self.publish_heading_as_imu_msg(baseline_heading)
         gpss_estimated_separation = np.hypot(Px, Py)
         
@@ -160,14 +168,34 @@ class DualAntenna(Node):
 
         # Visuals
         # Visualize the estimated heading as an arrow marker, at the position of GPS1
-        if self.marker_id_counter % 2 == 0:
-            self.publish_arrow_marker_at(x=gps1_x - self.ox, y=gps1_y - self.oy, quaternion=imu_msg.orientation, color=(0.0, 0.0, 1.0, 1.0))
-            self.publish_arrow_marker_at(x=gps1_x - self.ox, y=gps1_y - self.oy, quaternion=self.get_yaw_as_quaternion(gt_heading), color=(0.0,0.0,0.0,1.0))
+        #if self.marker_id_counter % 2 == 0:
+        if self.can_publish_headings:
+            self.publish_arrow_marker_at(self.marker_pub, 
+                                        x=gps1_x - self.ox, 
+                                        y=gps1_y - self.oy, 
+                                        quaternion=imu_msg.orientation, 
+                                        id=1, 
+                                        color=(0.0, 0.0, 1.0, 1.0))
+            self.publish_arrow_marker_at(self.tangent_heading_pub, 
+                                        x=gps1_x - self.ox, 
+                                        y=gps1_y - self.oy, 
+                                        quaternion=self.get_yaw_as_quaternion(gt_heading), 
+                                        id=1, 
+                                        color=(0.0,0.0,0.0,1.0))
+            self.can_publish_headings = False
+
+        gps_center_x = (gps1_x + gps2_x)/2
+        gps_center_y = (gps1_y + gps2_y)/2
 
         # Visualize GPS1 and GPS2 trajectories
         self.add_point_to_path_and_publish(self.gps1_path_pub, self.gps1_path, gps1_x-self.ox, gps1_y-self.oy)
         self.add_point_to_path_and_publish(self.gps2_path_pub, self.gps2_path, gps2_x-self.ox, gps2_y-self.oy)
+        self.add_point_to_path_and_publish(self.gps_center_path_pub, self.gps_center_path, gps_center_x-self.ox, gps_center_y-self.oy)
     
+    def timer_headings_cbk(self):
+        self.can_publish_headings = True
+        
+
     def get_yaw_as_quaternion(self, yaw):
         q = tf.quaternion_from_euler(0.0, 0.0, yaw)
         return Quaternion(x = q[0], y = q[1], z = q[2], w = q[3])
@@ -189,12 +217,12 @@ class DualAntenna(Node):
         #self.get_logger().info(f'Published IMU with yaw: {yaw_rad*180/np.pi} deg')
         return imu_msg
 
-    def publish_arrow_marker_at(self, x, y, quaternion, color=(0.0, 1.0, 0.0, 1.0)):
+    def publish_arrow_marker_at(self, marker_pub, x, y, quaternion, id, color=(0.0, 1.0, 0.0, 1.0)):
         marker = Marker()
         marker.header.frame_id = "world"
         marker.header.stamp = self.get_clock().now().to_msg()
         marker.ns = "pose_marker"
-        marker.id = self.marker_id_counter
+        marker.id = id if id == 0 else self.marker_id_counter
         marker.type = Marker.ARROW
         marker.action = Marker.ADD
 
@@ -216,7 +244,7 @@ class DualAntenna(Node):
         marker.color.b = color[2]
         marker.color.a = color[3]
 
-        self.marker_pub.publish(marker)
+        marker_pub.publish(marker)
         
         # increment for next marker
         self.marker_id_counter += 1
