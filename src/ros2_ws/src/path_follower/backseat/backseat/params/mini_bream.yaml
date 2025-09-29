@@ -1,36 +1,43 @@
-path_planner:
+/**:
   ros__parameters:
+    sim_enable: True
+    
     # Dubins
-    dubins_radius: 8
-    dubins_step_size: 1.0
-    replan_dist: 10.0
-    no_of_laps: 3 
+    dubins_radius: 3.0
+    dubins_step_size: 0.5
+    replan_dist: 4.0
+    no_of_laps: 10
 
     # Are these used?
     handover_offs: 1 # Meters before the end of the path to handover control of the vehicle
-    lookahead: 8.0  # Distance to look ahead to select next target waypoint when in need to replan. It is not lookahead of ILOS.
-    ilos_lookahead: 6
-
+    
     # Linear speed limits
-    max_speed         : 0.3
-    min_speed         : 0.1
-    # fw_speed: 0
-
-    # kepner coord (inside lab)
-    goal_lat          : 40.4024453
-    goal_lon          : -86.84539439999999
+    max_linear_speed: 0.17 
+    
+    #origin_gps: [40.40229852, -86.84558228] # kepner
+    #origin_gps: [40.448417, -86.867750]     # harner
+    goal_lat          : 40.448417
+    goal_lon          : -86.867750
     goal_head         : 1.5
 
     # Rotational PID gains
-    kp : 1    # kp makes it faster
-    kd : 7    # kd reduces overshoot
-    ki : 0.5  # ki reduces settling error
+    kp : 1.0 # kp makes it faster
+    kd : 0.0 # kd reduces overshoot
+    ki : 0.0 # ki reduces settling error
 
     # ILOS
-    lookahead     : 20.0 # meters
-    lookahead_min : 10
-    lookahead_max : 25
-    conv_rate     : 8.0
-    gamma         : 0.502 # Integral gain
+    replan_lookahead: 8.0  # Distance to look ahead to select next target waypoint when in need to replan. It is not replan_lookahead of ILOS.
+    lookahead_min : 3
+    lookahead_max : 4
+    conv_rate     : 18.0
+    gamma         : 0.2 # Integral gain
 
-    sim_enable: false
+
+wtp_follower:
+  ros__parameters:
+    waypoint_achieved_offset_distance: 2.0
+    kr            : 0.07  # 0.07
+    ka            : 0.8   # 0.01
+    kb            : 0.1   # 0.0
+    max_linear_x  : 0.5   # 1.0
+    max_angular_z : 0.2   # 0.2
