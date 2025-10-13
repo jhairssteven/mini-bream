@@ -1,0 +1,4 @@
+output_bags:
+- uri: rosbag2_1969_12_31-19_58_01_gps_only
+  topics: [/fix1, /fix2]
+

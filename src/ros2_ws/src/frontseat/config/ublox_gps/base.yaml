@@ -1,0 +1,14 @@
+ublox_gps_node:
+  ros__parameters:
+    debug: 1                    # Range 0-4 (0 means no debug statements will print)
+    device: /dev/ttyACM0
+    frame_id: gps
+    uart1:
+      baudrate: 38400
+    # TMODE3 Config
+    #tmode3: 0                   # Survey-In Mode
+    inf:
+      all: true                   # Whether to display all INF messages in console
+    config_on_startup: false
+    publish:
+      all: true

@@ -6,3 +6,4 @@ __pycache__/
 dqn_ws/
 logs/
 .vscode/
+field_tests/
