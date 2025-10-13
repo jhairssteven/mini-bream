@@ -12,8 +12,8 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', glob('launch/*')),
-        ('share/' + package_name + '/config/cameras', glob('config/cameras/*')),
-        ('share/' + package_name + '/config/ublox_gps', glob('config/ublox_gps/*')),
+        ('share/' + package_name + '/config' + '/cameras', glob('config/cameras/*')),
+        ('share/' + package_name + '/config' + '/ublox_gps', glob('config/ublox_gps/*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -29,6 +29,7 @@ setup(
             'joystick = frontseat.JoystickHandlerNode:main',
             'imu_estimation = frontseat.ImuFromGPS:main',
             'dual_antenna = frontseat.DualAntenna:main',
+            'moving_base_rtk = frontseat.MovingBaseRTK:main',
         ],
     },
 )
