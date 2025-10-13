@@ -7,9 +7,7 @@ Panels:
         - /Global Options1
         - /Status1
         - /Grid1
-        - /Path1
         - /Path1/Topic1
-        - /MarkerArray1
       Splitter Ratio: 0.5
     Tree Height: 575
   - Class: rviz_common/Selection
@@ -34,10 +32,10 @@ Visualization Manager:
   Class: ""
   Displays:
     - Alpha: 0.5
-      Cell Size: 1
+      Cell Size: 4
       Class: rviz_default_plugins/Grid
       Color: 160; 160; 164
-      Enabled: false
+      Enabled: true
       Line Style:
         Line Width: 0.029999999329447746
         Value: Lines
@@ -48,9 +46,9 @@ Visualization Manager:
         Y: 0
         Z: 0
       Plane: XY
-      Plane Cell Count: 500
+      Plane Cell Count: 1000
       Reference Frame: <Fixed Frame>
-      Value: false
+      Value: true
     - Alpha: 1
       Buffer Length: 1
       Class: rviz_default_plugins/Path
@@ -121,10 +119,10 @@ Visualization Manager:
         Value: /curr_marker
       Value: true
     - Class: rviz_default_plugins/Marker
-      Enabled: false
+      Enabled: true
       Name: ilos_heading
       Namespaces:
-        {}
+        "": true
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -132,12 +130,12 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /heading/marker/ilos
-      Value: false
+      Value: true
     - Class: rviz_default_plugins/Marker
-      Enabled: false
+      Enabled: true
       Name: goal_wpt
       Namespaces:
-        {}
+        "": true
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -145,7 +143,7 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /goal_marker
-      Value: false
+      Value: true
     - Class: rviz_default_plugins/InteractiveMarkers
       Enable Transparency: true
       Enabled: true
@@ -160,29 +158,7 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: false
-        front_0:
-          Value: true
-        front_1:
-          Value: true
-        front_10:
-          Value: true
-        front_11:
-          Value: true
-        front_12:
-          Value: true
-        front_2:
-          Value: true
         map:
-          Value: true
-        side_0:
-          Value: true
-        side_1:
-          Value: true
-        side_10:
-          Value: true
-        side_12:
-          Value: true
-        side_2:
           Value: true
         wamv:
           Value: false
@@ -194,14 +170,10 @@ Visualization Manager:
           Value: false
         wamv/wamv/base_link/front_camera_sensor:
           Value: false
-        wamv/wamv/base_link/front_camera_sensor_optical:
-          Value: true
         wamv/wamv/base_link/lidar_wamv_sensor:
           Value: false
         wamv/wamv/base_link/middle_left_camera_sensor:
           Value: false
-        wamv/wamv/base_link/middle_left_camera_sensor_optical:
-          Value: true
         wamv/wamv/cpu_cases_link:
           Value: false
         wamv/wamv/front_camera_link:
@@ -246,90 +218,20 @@ Visualization Manager:
           Value: false
         wamv/wamv/right_propeller_link:
           Value: false
-        world:
-          Value: true
       Marker Scale: 1
       Name: TF
       Show Arrows: true
       Show Axes: true
       Show Names: true
       Tree:
-        world:
-          map:
-            wamv/base_link:
-              wamv:
-                wamv/wamv/base_link:
-                  wamv/wamv/base_link/contact_sensor:
-                    {}
-                  wamv/wamv/base_link/front_camera_sensor:
-                    wamv/wamv/base_link/front_camera_sensor_optical:
-                      front_0:
-                        {}
-                      front_1:
-                        {}
-                      front_10:
-                        {}
-                      front_11:
-                        {}
-                      front_12:
-                        {}
-                      front_2:
-                        {}
-                  wamv/wamv/base_link/lidar_wamv_sensor:
-                    {}
-                  wamv/wamv/base_link/middle_left_camera_sensor:
-                    wamv/wamv/base_link/middle_left_camera_sensor_optical:
-                      side_0:
-                        {}
-                      side_1:
-                        {}
-                      side_10:
-                        {}
-                      side_12:
-                        {}
-                      side_2:
-                        {}
-                  wamv/wamv/cpu_cases_link:
-                    {}
-                  wamv/wamv/front_camera_post_link:
-                    wamv/wamv/front_camera_post_arm_link:
-                      wamv/wamv/front_camera_link:
-                        wamv/wamv/front_camera_link_optical:
-                          {}
-                  wamv/wamv/left_battery_link:
-                    {}
-                  wamv/wamv/lidar_wamv_post_link:
-                    wamv/wamv/lidar_wamv_post_arm_link:
-                      wamv/wamv/lidar_wamv_link:
-                        {}
-                  wamv/wamv/middle_left_camera_post_link:
-                    wamv/wamv/middle_left_camera_post_arm_link:
-                      wamv/wamv/middle_left_camera_link:
-                        wamv/wamv/middle_left_camera_link_optical:
-                          {}
-                  wamv/wamv/right_battery_link:
-                    {}
-                wamv/wamv/gps_wamv_link:
-                  wamv/wamv/gps_wamv_link/navsat:
-                    {}
-                wamv/wamv/imu_wamv_link:
-                  wamv/wamv/imu_wamv_link/imu_wamv_sensor:
-                    {}
-                wamv/wamv/left_engine_link:
-                  {}
-                wamv/wamv/left_propeller_link:
-                  {}
-                wamv/wamv/right_engine_link:
-                  {}
-                wamv/wamv/right_propeller_link:
-                  {}
+        {}
       Update Interval: 0
       Value: true
     - Class: rviz_default_plugins/MarkerArray
       Enabled: true
       Name: MarkerArray
       Namespaces:
-        target: true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -341,7 +243,7 @@ Visualization Manager:
       Enabled: true
       Name: MarkerArray
       Namespaces:
-        target: true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -353,7 +255,7 @@ Visualization Manager:
       Enabled: true
       Name: Marker
       Namespaces:
-        boat: true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -408,22 +310,22 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 24.848613739013672
+      Distance: 38.98875045776367
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -67.76201629638672
-        Y: -147.30224609375
-        Z: 0.6489907503128052
+        X: -298.8160095214844
+        Y: 62.76662826538086
+        Z: 1.2906694412231445
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.4297964572906494
+      Pitch: 1.4947963953018188
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz_default_plugins)
       Yaw: 0.6953986883163452
@@ -444,5 +346,5 @@ Window Geometry:
   Views:
     collapsed: true
   Width: 1200
-  X: 1638
+  X: 2012
   Y: 45

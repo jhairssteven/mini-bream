@@ -6,17 +6,17 @@ from launch.events import Shutdown
 import launch
 import os
 
-def get_gps_node_launcher(gps_params, publish_rate=19.0, device='/dev/ttyACM0', output_topic='/fix1'):
+def get_gps_node_launcher(gps_params, publish_rate=19.0, device='/dev/ttyACM0', ns='gps', output_topic='/fix1'):
     return Node(
         package='ublox_gps',
         executable='ublox_gps_node',
         output='screen',
         parameters=[
             gps_params,      
-            {
-                'rate': publish_rate,
-                'device': device
-            }
+            #{
+            #    'rate': publish_rate,
+            #    'device': device
+            #}
             
         ],
         remappings=[
@@ -27,12 +27,13 @@ def get_gps_node_launcher(gps_params, publish_rate=19.0, device='/dev/ttyACM0', 
 def generate_launch_description():
 
     config_directory = os.path.join(
-        get_package_share_directory('ublox_gps'),
-        'config')
-    gps_params = os.path.join(config_directory, 'c94_m8p_rover.yaml')
+        get_package_share_directory('frontseat'),
+        'config', 'ublox_gps')
+    base_gps_params = os.path.join(config_directory, 'base.yaml')
+    rover_gps_params = os.path.join(config_directory, 'rover.yaml')
 
-    gps1_node = get_gps_node_launcher(gps_params, publish_rate=19.0, device='/dev/ttyACM0', output_topic='/fix1')
-    gps2_node = get_gps_node_launcher(gps_params, publish_rate=19.0, device='/dev/ttyACM1', output_topic='/fix2')
+    gps_base = get_gps_node_launcher(base_gps_params, publish_rate=19.0, device='/dev/ttyACM0', ns='base_gps', output_topic='/fix/base')
+    gps_rover = get_gps_node_launcher(rover_gps_params, publish_rate=19.0, device='/dev/ttyACM1', ns='rover_gps', output_topic='/fix/rover')
     
     dual_antenna_node = Node(
         package='frontseat',
@@ -40,28 +41,31 @@ def generate_launch_description():
         name='dual_antenna',
         output='screen',
         remappings=[
+            ('/fix1', '/fix/rover'),
+            ('/fix2', '/fix/base'),
             ('/baseline/heading', '/wamv/sensors/imu/imu/data'),
             ('/dA/gps/center/fix', '/wamv/sensors/gps/gps/fix')
         ]
     )
 
     return LaunchDescription([
-        gps1_node,
-        gps2_node,
+        #gps_base,
+        #gps_rover,
         dual_antenna_node,
+ #       imu_estimation,
 
         # Event handler to shut down the whole launch file when either gps node dies
-        RegisterEventHandler(
-            event_handler=launch.event_handlers.OnProcessExit(
-                target_action=gps1_node,
-                on_exit=[EmitEvent(
-                    event=Shutdown())],
-            )),
-        RegisterEventHandler(
-            event_handler=launch.event_handlers.OnProcessExit(
-                target_action=gps2_node,
-                on_exit=[EmitEvent(
-                    event=Shutdown())],
-            )),
+        #RegisterEventHandler(
+        #    event_handler=launch.event_handlers.OnProcessExit(
+        #        target_action=gps_base,
+        #        on_exit=[EmitEvent(
+        #            event=Shutdown())],
+        #    )),
+        #RegisterEventHandler(
+        #    event_handler=launch.event_handlers.OnProcessExit(
+        #        target_action=gps_rover,
+        #        on_exit=[EmitEvent(
+        #            event=Shutdown())],
+        #    )),
         ]
     )
