@@ -4,5 +4,6 @@ ublox_gps_node:
     device: /dev/ttyACM1
     frame_id: gps_rover
     publish:
-      all: true
+      nav:
+        all: true
     config_on_startup: false
