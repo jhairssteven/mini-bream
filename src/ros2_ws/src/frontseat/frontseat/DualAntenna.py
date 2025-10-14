@@ -5,6 +5,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import NavSatFix, Imu
 from std_msgs.msg import String, Float32
 from geometry_msgs.msg import Quaternion
+from ublox_msgs.msg import NavRELPOSNED9
 import tf_transformations as tf
 
 from frontseat.qos_profiles import reliable_transient_local_qos, best_effort_volatile_qos, reliable_volatile_qos
@@ -51,8 +52,14 @@ class DualAntenna(Node):
         self.create_subscription(NavSatFix, self.topic_gps1, self.gps1_cbk, reliable_volatile_qos)
         self.create_subscription(NavSatFix, self.topic_gps2, self.gps2_cbk, reliable_volatile_qos)
         self.create_subscription(Imu, '/navheading', self.nav_heading_cbk, reliable_volatile_qos)
-        
+        self.create_subscription(
+            NavRELPOSNED9,
+            '/navrelposned',
+            self.nav_rel_pos_heading_cbk,
+            reliable_volatile_qos
+        )
         self.heading_pub = self.create_publisher(Imu, self.baseline_heading_topic, best_effort_volatile_qos)
+        self.rel_pose_heading_enu_imu_pub = self.create_publisher(Imu, '/rel_pos_heading_enu', best_effort_volatile_qos)
         self.nav_heading_imu_msg = None
         self.gps_center_pub = self.create_publisher(NavSatFix, '/dA/gps/center/fix', best_effort_volatile_qos)
         self.stats_pub = self.create_publisher(String, '/dA/stats2', reliable_volatile_qos)
@@ -63,9 +70,12 @@ class DualAntenna(Node):
 
         # Debug
         self.heading_value_pub_deg = self.create_publisher(Float32, '/dA/heading/estimated/degrees/value', reliable_volatile_qos)
+        self.navheading_value_pub_deg = self.create_publisher(Float32, '/dA/heading/navheading/degrees/value', reliable_volatile_qos)
+        self.rel_pose_heading_enu_deg_pub = self.create_publisher(Float32, '/dA/heading/rel_pos/enu/degrees/value', reliable_volatile_qos)
         self.gt_vehicle_heading_pub_deg = self.create_publisher(Float32, '/dA/heading/ground_truth/degrees/value', reliable_volatile_qos)
         self.diff_heading_value_pub_deg = self.create_publisher(Float32, '/dA/heading/abs_diff/degrees/value', reliable_volatile_qos)
         self.gpss_estimated_separation = self.create_publisher(Float32, '/dA/separation/estimated/value', reliable_volatile_qos)
+        self.baseline_length_pub = self.create_publisher(Float32, '/dA/separation/rel_pos/value', reliable_volatile_qos)
         self.gt_gps_separation = self.create_publisher(Float32, '/dA/separation/ground_truth/value', reliable_volatile_qos)
         self.gps_gt_separation=0.96 # m
         self.prev_x, self.prev_y = None, None
@@ -76,6 +86,7 @@ class DualAntenna(Node):
         self.tangent_heading_pub_history = self.create_publisher(Marker, '/relay/dA/heading/tangent/marker/history', 10)
         
         self.marker_pub = self.create_publisher(Marker, '/relay/dA/heading/estimated/marker', 10)
+        self.rel_pose_marker_pub = self.create_publisher(Marker, '/relay/dA/heading/rel_pose/marker', 10)
         self.tangent_heading_pub = self.create_publisher(Marker, '/relay/dA/heading/tangent/marker', 10)
 
         self.gps1_path_pub = self.create_publisher(Path, '/relay/gps1/path', 10)
@@ -118,6 +129,43 @@ class DualAntenna(Node):
                                         quaternion=msg.orientation, 
                                         id=0, 
                                         color=(0.0, 1.0, 0.0, 1.0))
+        qx = msg.orientation.x
+        qy = msg.orientation.y
+        qz = msg.orientation.z
+        qw = msg.orientation.w
+        
+        _, _, yaw = tf.euler_from_quaternion([qx, qy, qz, qw])
+        self.navheading_value_pub_deg.publish(Float32(data=yaw*180/np.pi))
+
+    def nav_rel_pos_heading_cbk(self, msg):
+        heading_ned_deg = msg.rel_pos_heading * 1e-5
+
+        # Check if heading is valid from bit 7 in msg flags
+        is_heading_valid = bool(msg.flags & (1 << 7))
+        if not is_heading_valid:
+            self.get_logger().warning('Heading solution is not valid. Use other heading value.')
+        
+        # Convert to ENU
+        self.rel_pose_heading_enu_deg = (90.0 - heading_ned_deg) % 360.0
+        # Convert to meters
+        self.baseline_length = (msg.rel_pos_length + msg.rel_pos_hp_length * 0.1) * 1e-2
+
+        self.rel_pose_heading_enu_deg_pub.publish(Float32(data=self.rel_pose_heading_enu_deg))
+        self.baseline_length_pub.publish(Float32(data=self.baseline_length))
+
+        rel_pos_imu_msg = self.publish_heading_as_imu_msg(self.rel_pose_heading_enu_deg*np.pi/180, None, self.rel_pose_heading_enu_imu_pub)
+
+        gps1_x, gps1_y = self.gps1.to_utm()
+        gps2_x, gps2_y = self.gps2.to_utm()
+        gps_center_x = (gps1_x + gps2_x)/2 - self.ox
+        gps_center_y = (gps1_y + gps2_y)/2 - self.oy
+
+        self.publish_arrow_marker_at(self.rel_pose_marker_pub, 
+                                        x=gps_center_x, 
+                                        y=gps_center_y, 
+                                        quaternion=rel_pos_imu_msg.orientation, 
+                                        id=0, 
+                                        color=(0.5, 0.0, 0.8, 1.0))
 
     def get_ground_truth_heading(self, x, y, default_if_none):
         """ Estimate the ground truth heading by taking the 
@@ -228,7 +276,7 @@ class DualAntenna(Node):
         q = tf.quaternion_from_euler(0.0, 0.0, yaw)
         return Quaternion(x = q[0], y = q[1], z = q[2], w = q[3])
 
-    def publish_heading_as_imu_msg(self, yaw_rad, gimu_msg=None):
+    def publish_heading_as_imu_msg(self, yaw_rad, gimu_msg=None, publisher=None):
         
         if gimu_msg:
             self.heading_pub.publish(gimu_msg)
@@ -245,7 +293,10 @@ class DualAntenna(Node):
         imu_msg.linear_acceleration.y = 0.0
         imu_msg.linear_acceleration.z = 0.0
 
-        self.heading_pub.publish(imu_msg)
+        if publisher:
+            publisher.publish(imu_msg)
+        else:
+            self.heading_pub.publish(imu_msg)
         #self.get_logger().info(f'Published IMU with yaw: {yaw_rad*180/np.pi} deg')
         return imu_msg
 
