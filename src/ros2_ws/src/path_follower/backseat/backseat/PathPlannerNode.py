@@ -67,7 +67,7 @@ class PathPlannerNode(Node):
 
         self.mission = None
         self.path_follower = None
-        self.current_wp = NavigationTools.Waypoint(gps_lat=0, gps_lon=0)
+        self.current_vehicle_wp = NavigationTools.Waypoint(gps_lat=0, gps_lon=0)
         self.tgt_heading = 0.0
         self.xte = 0.0
         self.tgt_wp = NavigationTools.Waypoint(gps_lat=0, gps_lon=0)
@@ -153,8 +153,8 @@ class PathPlannerNode(Node):
         return CancelResponse.ACCEPT
 
     def __read_position_cbk(self, msg):
-        self.current_wp.pose.gps_lat = msg.latitude
-        self.current_wp.pose.gps_lon = msg.longitude
+        self.current_vehicle_wp.pose.gps_lat = msg.latitude
+        self.current_vehicle_wp.pose.gps_lon = msg.longitude
 
     def __read_speed_cbk(self, msg):
         self.current_speed = np.linalg.norm([msg.vector.x, msg.vector.y])
@@ -169,11 +169,11 @@ class PathPlannerNode(Node):
         if self.sim_enable:
             quaternion = (msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w)
             _, _, head = tf.euler_from_quaternion(quaternion)
-            self.current_wp.pose.head = head
+            self.current_vehicle_wp.pose.head = head
         else:
             head = NavigationTools.GpsCalculations().convert_2_angle(msg.data)
-            self.current_wp.pose.head = head
-        self.current_wp.depth = 0.0
+            self.current_vehicle_wp.pose.head = head
+        self.current_vehicle_wp.depth = 0.0
     
     def build_thruster_msg(self, thrust_pct):
         """ thrust_pct: a Value between [-1, 1] """
@@ -207,12 +207,12 @@ class PathPlannerNode(Node):
 
     def __velocity_control_step(self):
         """Compute velocity control commands and publish them to actuators."""
-        head_err = NavigationTools().GpsCalculations().angdiff(self.tgt_heading, self.current_wp.pose.head)
-        #rclpy.loginfo(f'tgt_heading: {self.tgt_heading*180/np.pi}, {self.current_wp.pose.head*180/np.pi}, {head_err*180/np.pi}')
+        head_err = NavigationTools().GpsCalculations().angdiff(self.tgt_heading, self.current_vehicle_wp.pose.head)
+        #rclpy.loginfo(f'tgt_heading: {self.tgt_heading*180/np.pi}, {self.current_vehicle_wp.pose.head*180/np.pi}, {head_err*180/np.pi}')
         self.head_err_pub.publish(Float32(data=float(head_err*180/np.pi)))
         way_gps_msg = Locg()
         way_gps_msg.dbear = float(self.tgt_heading)
-        way_gps_msg.bear = float(self.current_wp.pose.head)
+        way_gps_msg.bear = float(self.current_vehicle_wp.pose.head)
         self.way_gps_pub.publish(way_gps_msg)
         
         
@@ -301,9 +301,9 @@ class PathPlannerNode(Node):
             self.__publish_paths(wk_path_ros, orig_path_ros)
             new_mission = False
 
-        self.current_wp.ToUTM()
+        self.current_vehicle_wp.ToUTM()
 
-        mc, self.tgt_heading, self.xte, self.tgt_wp = self.path_follower.update(current_wp = self.current_wp,
+        mc, self.tgt_heading, self.xte, self.tgt_wp = self.path_follower.update(current_wp = self.current_vehicle_wp,
                                                                                 speed = self.current_speed)
         
         self.lookahead_pub.publish(Float32(data=float(self.path_follower.look_ahead)))
