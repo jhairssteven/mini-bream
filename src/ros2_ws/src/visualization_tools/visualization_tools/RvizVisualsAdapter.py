@@ -179,7 +179,7 @@ class RvizPos(Node):
         self.currAcuteHeadingPub = self.create_publisher(Float32, "/heading/value/curr_acute_heading", 1)
         self.PIDrErrorPub = self.create_publisher(Float32, "/pid/rotational/error", 1)
 
-        self.ilosHeadingMarker = getMarker([0.5,1.0,0.25,1.0], Marker.ARROW, [25,0.2,0.2])
+        self.ilosHeadingMarker = getMarker([0.5,1.0,0.25,1.0], Marker.ARROW, [10,0.09,0.2])
         self.pidrOutputMarker = getMarker([0.9,0.8,0.2,1.0], Marker.ARROW)
         self.goalPoseMarker = getMarker([0.0,0.0,1.0,1.0], Marker.ARROW)
         self.get_logger().info("'rviz_pose' node initialized...")
