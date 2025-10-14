@@ -326,7 +326,7 @@ class PathPlannerNode(Node):
             wp = {'lat': p.position.latitude,
                   'lon': p.position.longitude,
                   'depth': 0.0,
-                  'head': head,
+                  'head': head, # [-pi, pi]
                   'dive_mode': NavigationTools.DiveStyle['NONE'],
                   'wp_mode': NavigationTools.WayPointMode.REGULAR}
             

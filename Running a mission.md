@@ -44,4 +44,4 @@ ros2 launch mission_planner action_client.launch.py load_mission_from_file:='tru
 
 > **Note: If `Mission_complete=False` appears on the log just (or the mission trajectory doesn't show up on RViz) try running again the launch file. This behaviour is a known issue (see [issues](../../../README.md#issues)).**
 
-- If you want to create a new mission, follow the directory structure and file names of the sample missions. No code changes need to be made. See [usage](mission_planner/README.md)
+- If you want to create a new mission, follow the directory structure and file names of the sample missions. No code changes need to be made. Recall the yaw angle must be in radians in the range [-pi, pi] See [usage](mission_planner/README.md)
