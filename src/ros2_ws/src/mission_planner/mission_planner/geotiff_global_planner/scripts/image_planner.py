@@ -2,7 +2,7 @@
 import numpy as np
 from PIL import Image, ImageDraw
 import python_motion_planning as pmp
-import tif_img_editor
+#import geotiff_global_planner.scripts.tif_img_editor
 
 import heapq
 import numpy as np
@@ -98,7 +98,7 @@ class GridPlanner:
     Handles grid creation from a binary image and path planning using A*.
     """
 
-    def __init__(self, image_path, target_width=50, target_height=50):
+    def __init__(self, image_path, target_width=50, target_height=50, img_array=None):
         """
         Initializes the planner with the image and target resolution.
 
@@ -107,18 +107,37 @@ class GridPlanner:
             target_width (int): Width of the planning grid.
             target_height (int): Height of the planning grid.
         """
+        if img_array is not None:
+            # convert three channel image to a single channel binary mask, 
+            # with foreground as white pixels and background as black pixels
+            mask = np.any(img_array < 255, axis=-1).astype(np.uint8) * 255
+            self.img_original = Image.fromarray(mask).convert('L')
+
+        else:
+            # Load the original image and convert to grayscale
+            self.img_original = Image.open(image_path).convert('L')
+
         self.image_path = image_path
         self.target_width = target_width
         self.target_height = target_height
 
-        # Load the original grayscale image
-        self.img_original = Image.open(image_path).convert('L')
-        # Resize for planning grid
-        self.grid_img = self.img_original.resize(
-            (target_width, target_height), Image.Resampling.LANCZOS
-        )
+        # --- Resize while preserving aspect ratio ---
+        original_width, original_height = self.img_original.size
+        aspect_ratio = original_width / original_height
+
+        if (target_width / target_height) > aspect_ratio:
+            # Fit to height
+            new_height = target_height
+            new_width = int(aspect_ratio * new_height)
+        else:
+            # Fit to width
+            new_width = target_width
+            new_height = int(new_width / aspect_ratio)
+
+        self.grid_img = self.img_original.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
         #self.grid_img = tif_img_editor.draw_bridge_and_close_image(self.grid_img, grayscale=True)
-        self.grid_img.save('/grid_img.png')
+        self.grid_img.save('./grid_img.png')
         self.grid_array = np.array(self.grid_img)
         print(self.grid_array.shape)
         self.map_height, self.map_width = self.grid_array.shape
@@ -182,17 +201,19 @@ class GridPlanner:
             _, goal_point = self.get_default_start_goal()
         
         # Create planning environment
+        print('Creating grid')
         env = pmp.Grid(self.map_width, self.map_height)
         env.update(self.obstacles_set)
 
-        if start_point == goal_point:
+        if np.all(start_point == goal_point):
             raise ValueError("Start and Goal points are the same. Cannot plan.")
 
         # Run planner
         planner = AStarWithPartial(start=start_point, goal=goal_point, env=env)
+        print('Planning')
         cost, path, expand, exact_path = planner.plan()
         
-        planner.plot.animation(path, str(planner), cost, expand)
+        #planner.plot.animation(path, str(planner), cost, expand)
 
         # Print info
 
@@ -314,7 +335,7 @@ def draw_path_on_img(img, B, OUTPUT_PATH_FILE=None, save_to_image=False):
 # Main Execution
 # ==============================================================================
 
-def main():
+def python_motion_planning_lib_main():
     # Import the planner and visualize function
     #from grid_planner_module import GridPlanner, visualize
 
@@ -350,6 +371,146 @@ def main():
 
     print(f"Start: {start_point}, Goal: {goal_point}")
 
+import imageio
+import time
+import pyastar2d
+
+class AStartPlanner():
+    def __init__(self, save_output=True, output_dir='./img_with_path.png'):
+        self.save_output = save_output
+        self.output_dir = output_dir
+
+    def plan(self, image_path=None, image_array=None, start=None, goal=None, save_output=True, output_dir=None):
+        """ 
+        image_path: A .tiff or .png or .jpg image. Traversable pixels are white, non traversable pixels are black
+        start: Pixel to start path. Pixel coordinates (x, y) of a valid traversable pixel
+        goal: Pixel to finish path. Pixel coordinates (x, y) of a valid traversable pixel
+        Returns:
+            path: The pixel coordinates of the path in 'image_path'. Format: [[i0, j0], [i1, j1], ...]
+        """
+
+        grid, maze = self.read_img_as_grid(image_path=image_path, image_array=image_array)
+        start, goal = self.get_start_and_goal(grid, start, goal)
+        
+        t0 = time.time()
+        path = pyastar2d.astar_path(grid, start, goal, allow_diagonal=False)
+        dur = time.time() - t0
+        print(f"Found path of length {path.shape[0]} in {dur:.6f}s")
+
+        if path.shape[0] > 0 and save_output:
+            self.save_path_to_img(path, maze, output_dir)
+        else:
+            print("No path found")
+
+        return path
+
+    def save_path_to_img(self, path, maze, output_dir):
+        
+        #maze = maze.astype(np.int8) * 255
+        maze = np.stack((maze.astype(np.uint8),) * 3, axis=-1) # convert to 3 channel
+        # Update path pixels to red color
+        maze[path[:, 0], path[:, 1]] = (255, 0, 0)
+
+        print(f"Plotting path to {output_dir}")
+        imageio.imwrite(output_dir, maze)
+    
+    def get_start_and_goal(self, grid, start=None, goal=None):
+        if start and goal and (start.all() is not None and goal.all() is not None):
+            # Ensure are traversable pixels
+            if (grid[start[0], [start[1]]] != 1) or (grid[goal[0], goal[1]] != 1):
+                raise ValueError(f'Either {start} or {goal} is not a traversable pixel')
+        else:
+            # if not start, goal is provided, find some automatically
+            if start == None:
+                # start is the first index in the bottom-most row that has a 1
+                rows_with_ones = np.where(np.any(grid == 1, axis=1))[0]
+                last_row_idx = rows_with_ones[-1]
+                start_j, = np.where(grid[last_row_idx, :] == 1)
+                start = np.array([last_row_idx, start_j[0]])
+            if goal == None:
+                # end is the last index in the top-most row that has a 1
+                rows_with_ones = np.where(np.any(grid == 1, axis=1))[0]
+                first_row_idx = rows_with_ones[0]  # last row that has a 1
+                end_i, = np.where(grid[first_row_idx, :] == 1)
+                goal = np.array([first_row_idx, end_i[-1]])
+        
+        return start, goal
+    
+    def read_img_as_grid(self, image_path, image_array=None):
+        """ Read the image and process into a valid cost-grid
+            Returns:
+                grid: The costs grid
+                maze: The single channel grayscale img array read from 'image_path'
+        """
+        if image_array is None:
+            maze = imageio.imread(image_path)
+
+            if maze is None:
+                print(f"No file found: {image_path}")
+                return
+            else:
+                print(f"Loaded maze of shape {maze.shape} from {image_path}")
+        else:
+            maze = image_array
+
+        if maze.ndim == 3:
+            print("Input image has 3 channels; converting to grayscale.")
+            maze = np.mean(maze, axis=2).astype(np.uint8)
+        
+        # Get a binary mask with white color for traversable area
+        maze[np.where(maze < 128)] = 0
+        maze[np.where(maze > 128)] = 255
+
+
+        grid = maze.astype(np.float32)
+        grid[grid == 0] = np.inf # Black pixels asign infinite cost
+        grid[grid == 255] = 1 # White pixels cost of 1
+
+        assert grid.min() == 1, "cost of moving must be at least 1"
+
+        return grid, maze
+
+
+
+import argparse
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        "An example of using pyastar2d to find the solution to a maze"
+    )
+    parser.add_argument(
+        "--input", type=str, default="/workspace/codebase/mini-bream/src/ros2_ws/src/mission_planner/mission_planner/geotiff_global_planner/assets/global_map/river_map.png",
+        help="Path to the black-and-white image to be used as input.",
+    )
+    parser.add_argument(
+        "--output", type=str, default="/workspace/codebase/mini-bream/src/ros2_ws/src/mission_planner/mission_planner/geotiff_global_planner/assets/output/river_map.png", 
+        help="Path to where the output will be written",
+    )
+
+    args = parser.parse_args()
+    return args
 
 if __name__ == '__main__':
-    main()
+    #python_motion_planning_lib_main()
+    args = parse_args()
+
+    data = np.load('/workspace/codebase/mini-bream/src/ros2_ws/src/mission_planner/mission_planner/depth_bev_data.npz')
+    BEV_start=data['BEV_start']
+    BEV_goal=data['BEV_goal']
+    bev_image_vis=data['bev_image_vis']
+    
+    print('BEV_start', BEV_start)
+    print('BEV_goal', BEV_goal[1], BEV_goal[0])
+    print("bev_image_vis.shape", bev_image_vis.shape)
+    
+    maze_inv = np.copy(bev_image_vis)
+    maze_inv[np.where(bev_image_vis < 250)] = 255
+    maze_inv[np.where(bev_image_vis > 250)] = 0
+
+    astart_planner = AStartPlanner(save_output=True, output_dir=args.output)
+    path = astart_planner.plan(image_path=args.input, 
+                               image_array=maze_inv, 
+                               start=np.array([BEV_start[1], BEV_start[0]]),
+                               goal=np.array([BEV_goal[1], BEV_goal[0]]),
+                               save_output=True, 
+                               output_dir=args.output)
