@@ -7,6 +7,7 @@ import python_motion_planning as pmp
 import heapq
 import numpy as np
 from python_motion_planning.utils import Env, Grid, Node
+import os
 
 class AStarWithPartial(pmp.AStar):
     """ Class override to get one valid path for the 
@@ -376,11 +377,11 @@ import time
 import pyastar2d
 
 class AStartPlanner():
-    def __init__(self, save_output=True, output_dir='./img_with_path.png'):
+    def __init__(self, save_output=True, output_dir='./', filename='img_with_path'):
         self.save_output = save_output
         self.output_dir = output_dir
 
-    def plan(self, image_path=None, image_array=None, start=None, goal=None, save_output=True, output_dir=None):
+    def plan(self, image_path=None, image_array=None, start=None, goal=None, save_output=True, output_dir=None, filename='img_with_path'):
         """ 
         image_path: A .tiff or .png or .jpg image. Traversable pixels are white, non traversable pixels are black
         start: Pixel to start path. Pixel coordinates (x, y) of a valid traversable pixel
@@ -392,42 +393,79 @@ class AStartPlanner():
         grid, maze = self.read_img_as_grid(image_path=image_path, image_array=image_array)
         start, goal = self.get_start_and_goal(grid, start, goal)
         
+        print(f'Image shape {maze.shape}, start: {start}, goal: {goal}')
+
         t0 = time.time()
         path = pyastar2d.astar_path(grid, start, goal, allow_diagonal=False)
         dur = time.time() - t0
         print(f"Found path of length {path.shape[0]} in {dur:.6f}s")
 
         if path.shape[0] > 0 and save_output:
-            self.save_path_to_img(path, maze, output_dir)
+            self.save_path_to_img(path, maze, output_dir, filename=filename)
         else:
             print("No path found")
 
         return path
 
-    def save_path_to_img(self, path, maze, output_dir):
+    def save_path_to_img(self, path, maze, output_dir, filename='img_with_path'):
         
         #maze = maze.astype(np.int8) * 255
         maze = np.stack((maze.astype(np.uint8),) * 3, axis=-1) # convert to 3 channel
         # Update path pixels to red color
         maze[path[:, 0], path[:, 1]] = (255, 0, 0)
 
-        print(f"Plotting path to {output_dir}")
-        imageio.imwrite(output_dir, maze)
+        os.makedirs(output_dir, exist_ok=True)
+        save_path = os.path.join(output_dir, filename + '.png')
+        
+        print(f"Plotting path to {save_path}")
+        imageio.imwrite(save_path, maze)
     
     def get_start_and_goal(self, grid, start=None, goal=None):
-        if start and goal and (start.all() is not None and goal.all() is not None):
-            # Ensure are traversable pixels
-            if (grid[start[0], [start[1]]] != 1) or (grid[goal[0], goal[1]] != 1):
-                raise ValueError(f'Either {start} or {goal} is not a traversable pixel')
+        """
+        Get start and goal positions in the grid.
+        If provided start/goal are invalid (out of bounds or non-traversable),
+        find the nearest valid cell (value == 1) using Euclidean distance.
+        """
+
+        # Get all valid traversable points
+        valid_points = np.argwhere(grid == 1)
+
+        def find_nearest_valid(point):
+            """Return the nearest valid cell to 'point' using Euclidean distance."""
+            if valid_points.size == 0:
+                raise ValueError("Grid has no traversable (value=1) cells.")
+            distances = np.linalg.norm(valid_points - np.array(point), axis=1)
+            nearest_idx = np.argmin(distances)
+            return valid_points[nearest_idx]
+
+        def is_valid(point):
+            """Check if a point is inside grid and traversable."""
+            r, c = point
+            if 0 <= r < grid.shape[0] and 0 <= c < grid.shape[1]:
+                return grid[r, c] == 1
+            return False
+
+        if start is not None and goal is not None:
+            # Ensure start and goal are numpy arrays
+            start, goal = np.array(start), np.array(goal)
+
+            # Ensure are traversable pixels or find closest valid if necessary
+            if not is_valid(start):
+                print('Start point: {start} is not traversable')
+                start = find_nearest_valid(start)
+
+            if not is_valid(goal):
+                print('Goal point: {start} is not traversable')
+                goal = find_nearest_valid(goal)
         else:
             # if not start, goal is provided, find some automatically
-            if start == None:
+            if start is None:
                 # start is the first index in the bottom-most row that has a 1
                 rows_with_ones = np.where(np.any(grid == 1, axis=1))[0]
                 last_row_idx = rows_with_ones[-1]
                 start_j, = np.where(grid[last_row_idx, :] == 1)
                 start = np.array([last_row_idx, start_j[0]])
-            if goal == None:
+            if goal is None:
                 # end is the last index in the top-most row that has a 1
                 rows_with_ones = np.where(np.any(grid == 1, axis=1))[0]
                 first_row_idx = rows_with_ones[0]  # last row that has a 1
@@ -458,8 +496,12 @@ class AStartPlanner():
             maze = np.mean(maze, axis=2).astype(np.uint8)
         
         # Get a binary mask with white color for traversable area
-        maze[np.where(maze < 128)] = 0
-        maze[np.where(maze > 128)] = 255
+        if np.max(maze) == 1:
+            maze[np.where(maze == 1)] = 255
+            maze[np.where(maze == 0)] = 0
+        elif np.max(max) == 255:
+            maze[np.where(maze < 128)] = 0
+            maze[np.where(maze > 128)] = 255
 
 
         grid = maze.astype(np.float32)
