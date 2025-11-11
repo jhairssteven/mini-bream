@@ -7,3 +7,4 @@ dqn_ws/
 logs/
 .vscode/
 field_tests/
+src/ros2_ws/src/mission_planner/mission_planner/moloplanner/assets
