@@ -20,14 +20,15 @@ depth_pipeline:
   focal_length_x: 1580.29      # (float) camera calibration parameter, default=1580.29
   focal_length_y: 1581.78      # (float) camera calibration parameter, default=1581.78
   # Enable specific results' saving (saves to 'outdir')
-  pred_only: false             # (bool) only save depth prediction, default=false
-  save_pcl: false              # (bool) save pointcloud to .ply file, default=false
-  plot_summary: false          # (bool) save summary image (depth + mask + BEV), default=false
-  grayscale: false             # (bool) disable color palette, default=false
-  write_singles: false         # (bool) write intermediate module images, default=false
+  pred_only: true             # (bool) only save depth prediction, default=false
+  save_pcl: true              # (bool) save pointcloud to .ply file, default=false
+  plot_summary: true          # (bool) save summary image (depth + mask + BEV), default=false
+  grayscale: true             # (bool) disable color palette, default=false
+  write_singles: true         # (bool) write intermediate module images, default=false
 
 astart_planner:
-  outdir: "/workspace/codebase/mini-bream/src/ros2_ws/src/mission_planner/mission_planner/moloplanner/assets/output_dir/astart_planner"
+  outdir: "/workspace/codebase/mini-bream/src/ros2_ws/src/mission_planner/mission_planner/moloplanner/assets/output_dir/astart_planner_part3"
+  save_output: true
 
 moloplanner:
   bev_inpainted_dir: "/workspace/codebase/mini-bream/src/ros2_ws/src/mission_planner/mission_planner/moloplanner/assets/BEV_inpainted_ks_10_square"

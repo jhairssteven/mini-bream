@@ -387,7 +387,7 @@ class AStartPlanner():
         start: Pixel to start path. Pixel coordinates (x, y) of a valid traversable pixel
         goal: Pixel to finish path. Pixel coordinates (x, y) of a valid traversable pixel
         Returns:
-            path: The pixel coordinates of the path in 'image_path'. Format: [[i0, j0], [i1, j1], ...]
+            path (ndarray) Format: [[i0, j0], [i1, j1], ...]: The pixel coordinates of the path in 'image_path'.
         """
 
         grid, maze = self.read_img_as_grid(image_path=image_path, image_array=image_array)
@@ -400,8 +400,9 @@ class AStartPlanner():
         dur = time.time() - t0
         print(f"Found path of length {path.shape[0]} in {dur:.6f}s")
 
-        if path.shape[0] > 0 and save_output:
-            self.save_path_to_img(path, maze, output_dir, filename=filename)
+        if path.shape[0] > 0:
+            if save_output:
+                self.save_path_to_img(path, maze, output_dir, filename=filename)
         else:
             print("No path found")
 

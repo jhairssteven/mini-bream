@@ -32,6 +32,9 @@ class DepthModel():
         depth_anything.load_state_dict(torch.load(args.load_from, map_location='cpu'))
         self.depth_anything = depth_anything.to(DEVICE).eval()
 
+        # BEV projection data
+        self.x_min = 0; self.z_min = 0; self.cell_size = 0; self.height = 0
+
     def get_depth(self, filename, image_input, mask, args):
 
         # Read the image using OpenCV
@@ -150,6 +153,9 @@ class DepthModel():
         width = int((x_max - x_min) / cell_size)
         height = int((z_max - z_min) / cell_size)
 
+        # Save projection properties to perform inverse mappint if necessary
+        self.x_min = x_min; self.z_min = z_min; self.cell_size = cell_size; self.height = height
+        
         bev_bgr_color = 1.0 # White
         bev_image = np.ones((height, width, 3), dtype=np.float32) * bev_bgr_color
         
@@ -162,6 +168,7 @@ class DepthModel():
 
         # Fill pixels (color map)
         for i in range(len(u)):
+            # check if u[i] and v[i] are not pixels for x_max and z_max respectively
             if 0 <= u[i] < width and 0 <= v[i] < height:
                 #water_color = [1.0, 1.0, 1.0] if args.bev_as_binary_mask else colors[i]
                 bev_image[height - v[i] - 1, u[i], :] = colors[i]
@@ -212,6 +219,71 @@ class DepthModel():
                 cv2.imwrite(combined_output_path, combined)
         return bev_image_vis, bev_binary_image_uint8, bev_filename, bev_image_binary_inpainted_uint8
 
+    def bev_pixels_to_meters(self, pixel_coords, x_min, z_min, cell_size, height, plot=False):
+        """
+        Convert BEV pixel coordinates back to (x, z) in meters.
+        
+        Parameters
+        ----------
+        pixel_coords : array-like of shape (N, 2)
+            List or array of (u, row) pixel coordinates in BEV image.
+            u = column index (x direction), row = row index (y direction in image)
+        x_min : float
+            Minimum x value used to create the BEV (same as in pcl_to_BEV).
+        z_min : float
+            Minimum z value used to create the BEV (same as in pcl_to_BEV).
+        cell_size : float
+            Size of one pixel in meters (same as in pcl_to_BEV).
+        height : int
+            Height of the BEV image.
+        
+        Returns
+        -------
+        np.ndarray of shape (N, 2)
+            Each row is [x, z] in meters.
+        """
+        
+        pixel_coords = np.asarray(pixel_coords)
+        u = pixel_coords[:, 0]
+        row = pixel_coords[:, 1]
+
+        # invert the image coordinate system
+        v = height - 1 - row # no need to include height since origin is below for img
+        #height - 1 - v = row # actually 1 + v = row
+        # map back to meters
+        x = u * cell_size + x_min
+        z = v * cell_size + z_min
+        print("x_min, z_min, cell_size, height", x_min, z_min, cell_size, height)
+        
+        # Optional visualization
+        if plot:
+            # Create a blank image
+            # Determine the image size in pixels (scale meters to pixels)
+            margin = 50  # pixels around path
+            scale = 100  # pixels per meter for visualization
+
+            x_px = ((x - x.min()) * scale).astype(np.int32) + margin
+            z_px = ((z - z.min()) * scale).astype(np.int32) + margin
+
+            img_height = z_px.max() + margin
+            img_width = x_px.max() + margin
+            img = np.ones((img_height, img_width, 3), dtype=np.uint8) * 255  # white background
+
+            # Draw path
+            for k in range(1, len(x_px)):
+                cv2.line(img, (x_px[k-1], z_px[k-1]), (x_px[k], z_px[k]), (255, 0, 0), 2)  # blue line
+                cv2.circle(img, (x_px[k], z_px[k]), 3, (0, 0, 255), -1)  # red points
+
+            # Draw grid lines every 0.5 meters
+            grid_spacing = int(0.5 * scale)
+            for gx in range(0, img_width, grid_spacing):
+                cv2.line(img, (gx, 0), (gx, img_height), (200, 200, 200), 1)
+            for gz in range(0, img_height, grid_spacing):
+                cv2.line(img, (0, gz), (img_width, gz), (200, 200, 200), 1)
+            save_path = '/workspace/codebase/mini-bream/src/ros2_ws/src/mission_planner/mission_planner/moloplanner/assets/output_dir/astart_planner_part3/path_in_meters.png'
+            cv2.imwrite(save_path, img)
+        return np.stack((x, z), axis=1)
+    
 
     def world_to_bev_coords(self, point: np.ndarray, x_min: float, z_min: float, cell_size: float, height: int) -> tuple[int, int]:
         """
@@ -237,19 +309,22 @@ class DepthModel():
         pcd_tree = o3d.geometry.KDTreeFlann(pcd)
 
         for query in queries:
-            _, idx, _ = pcd_tree.search_knn_vector_3d(query, 1)
-            nearest_point = points[idx[0]]
+            if query is None:
+                nearest_bev_pixel.append(None)
+            else:
+                _, idx, _ = pcd_tree.search_knn_vector_3d(query, 1)
+                nearest_point = points[idx[0]]
 
-            # --- Compute BEV bounds ---
-            x_min, x_max = points[:, 0].min(), points[:, 0].max()
-            z_min, z_max = points[:, 2].min(), points[:, 2].max()
-            width = int((x_max - x_min) / cell_size)
-            height = int((z_max - z_min) / cell_size)
+                # --- Compute BEV bounds ---
+                x_min, x_max = points[:, 0].min(), points[:, 0].max()
+                z_min, z_max = points[:, 2].min(), points[:, 2].max()
+                width = int((x_max - x_min) / cell_size)
+                height = int((z_max - z_min) / cell_size)
 
-            # --- Map query and nearest point to BEV pixels ---
-            u_query, v_query = self.world_to_bev_coords(query, x_min, z_min, cell_size, height)
-            u_nearest, v_nearest = self.world_to_bev_coords(nearest_point, x_min, z_min, cell_size, height)
-            nearest_bev_pixel.append((u_nearest, v_nearest))
+                # --- Map query and nearest point to BEV pixels ---
+                u_query, v_query = self.world_to_bev_coords(query, x_min, z_min, cell_size, height)
+                u_nearest, v_nearest = self.world_to_bev_coords(nearest_point, x_min, z_min, cell_size, height)
+                nearest_bev_pixel.append((u_nearest, v_nearest))
 
         return nearest_bev_pixel
 

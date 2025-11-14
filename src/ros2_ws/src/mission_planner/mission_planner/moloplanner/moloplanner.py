@@ -7,38 +7,83 @@ import open3d as o3d
 # image planner depends
 from geotiff_global_planner.scripts.geo_transform_utils import GeoImageTransformer
 from geotiff_global_planner.scripts.image_planner import GridPlanner, draw_path_on_img, AStartPlanner
+import moloplanner.planning_utils as planning_utils
 import os
-
-IMG_FILE = '/workspace/codebase/mini-bream/src/ros2_ws/src/mission_planner/mission_planner/moloplanner/input_imgs/frame_2.png'
 
 class Moloplanner():
     
     def __init__(self):
         self.pipeline_args, self.config = self.parse_args()
         self.depth_pipeline = DepthPipeline(self.pipeline_args)
+        self.astart_planner_args = self.config['astart_planner']
 
     def get_running_args(self):
         return self.pipeline_args, self.config
     
-    def run(self, astart_outdir, pcd_bev_binary_mask, filebasename, pcd=None):
+    def bev_pixel_astart_path(self, 
+            start_point=np.array([0.0, 0.0, 0.0]), goal_point=None, 
+            pcd_bev_binary_mask=None, filebasename='unnamed', img_filepath=None, 
+            pcd=None):
+        """ 
+            Given a pointcloud 'pcd' and a (start, goal) pair of points, return a A* path un pixel coordinates
+            in the 'pcd_bev_binary_mask' or 'img_filepath' (which ever is given).
+
+            Args:
+            
+            Start and goal point coordinates in the 'pcd' for the A* path generation
+            start_point: Numpy array (x, y, z). Defaults to the origin point in the 'pcd'
+            goal_point: Numpy array (x, y, z)
+            pcd: 3D pointcloud
+
+            Returns:
+            path (ndarray) Format: [[i0, j0], [i1, j1], ...]: The pixel coordinates of the path in 'image_path'.
+            
+        """
+        if img_filepath is not None:
+            if not (pcd_bev_binary_mask is None and pcd is None):
+                raise ValueError("'img_filepath' is defined, 'pcd' and its bev binary should not be defined in this case")
+        
         depth_pipeline = self.depth_pipeline
         if pcd is None:
-            pcd, bev_image_vis, bev_binary_image_uint8, bev_image_binary_inpainted_uint8 = depth_pipeline.process_img(IMG_FILE)
-
-        start_point = np.array([0.0, 0.0, 0.0])
-        goal_point = np.array([10, 4, 5]) # x, y, z # given by the global planner
+            pcd, bev_image_vis, bev_binary_image_uint8, bev_image_binary_inpainted_uint8 = depth_pipeline.process_img(img_filepath)
 
         # the pixel coordinates of BEV projection of given points in the PCD
         BEV_start, BEV_goal = depth_pipeline.depth_model.get_nearest_point_bev_pixel(pcd, [start_point, goal_point])
 
         astart_planner = AStartPlanner()
         path = astart_planner.plan(image_path=None, 
-                            image_array=pcd_bev_binary_mask, 
-                            start=np.array([BEV_start[1], BEV_start[0]]),
-                            goal=None, #np.array([BEV_goal[1], BEV_goal[0]]),
-                            save_output=True, 
-                            output_dir=astart_outdir,
-                            filename= filebasename + '_astart_planner')
+                            image_array=bev_image_binary_inpainted_uint8, 
+                            start=np.array([BEV_start[1], BEV_start[0]]) if BEV_start is not None else None,
+                            goal=np.array([BEV_goal[1], BEV_goal[0]]) if BEV_goal is not None else None,
+                            save_output=self.astart_planner_args['save_output'], 
+                            output_dir=self.astart_planner_args['outdir'],
+                            filename =filebasename + '_astart_planner')
+        return path, pcd
+
+    def tf_next_waypoint_to_pcl_frame(self, next_waypoint_gps, camera_frame_origin_gps, boat_heading_deg):
+        """ 
+        Args:
+            next_waypoint_gps (tuple[float, float]):
+                Target waypoint as (latitude, longitude) in decimal degrees.
+            camera_frame_origin_gps (tuple[float, float]):
+                GPS coordinates (latitude, longitude) of the camera frame origin in decimal degrees.
+            camera_frame_orientation_deg (float):
+                Orientation of the camera frame (degrees) w.r.t to x axis of UTM origin. This is used as the rotation
+                applied when converting GPS coordinates into the local frame.
+
+         Returns: goal point (x, y, z) numpy arrays """
+        
+        camera_frame_orientation_deg = boat_heading_deg - 90 # (camera's x axis is 90deg CW rotated w.r.t the boat's heading.)
+        
+        nw_in_camera_frame = planning_utils.gps_to_local_frame(
+            target_gps=next_waypoint_gps,
+            origin_gps=camera_frame_origin_gps,
+            frame_orientation_deg=camera_frame_orientation_deg
+        )
+        x, y = nw_in_camera_frame
+        goal_point = np.array([x, 0, y]) # camera's y is set to z coordinate to match coordinate frame in pcl.
+        print('The goal point is this one:    ', goal_point)
+        return goal_point
 
     def parse_args(self):
         parser = argparse.ArgumentParser()
@@ -66,6 +111,83 @@ class Moloplanner():
         pipeline_args = PipelineArgs(**config['depth_pipeline'])
 
         return pipeline_args, config
+    
+    def create_grid(self, size=10, step=1):
+        lines = []
+        points = []
+        
+        # Create parallel lines along X and Y
+        for i in np.arange(-size, size+step, step):
+            # Lines along X (parallel to X axis)
+            points.append([i, 0, -size])
+            points.append([i, 0, size])
+            lines.append([len(points)-2, len(points)-1])
+            
+            # Lines along Z (parallel to Z axis)
+            points.append([-size, 0, i])
+            points.append([size, 0, i])
+            lines.append([len(points)-2, len(points)-1])
+                
+        # Create LineSet
+        line_set = o3d.geometry.LineSet(
+            points=o3d.utility.Vector3dVector(points),
+            lines=o3d.utility.Vector2iVector(lines)
+        )
+        line_set.colors = o3d.utility.Vector3dVector([[0.7, 0.7, 0.7] for _ in lines])
+        return line_set
+
+    def plot_path_on_pointcloud(self, coords_m, pcd=None, point_size=2.0):
+        """
+        Visualize a path (coords_m) on top of a point cloud using Open3D.
+        
+        Parameters
+        ----------
+        coords_m : np.ndarray of shape (N,2)
+            X-Z coordinates of the path in meters.
+        pcd : open3d.geometry.PointCloud or None
+            Original point cloud to show in the background. If None, shows only path.
+        point_size : float
+            Size of points in the visualizer.
+        """
+
+        vis_objects = []
+
+        # Add point cloud if provided
+        if pcd is not None:
+            vis_objects.append(pcd)
+
+        # Convert path coords to 3D (y = 0)
+        path_points = np.zeros((coords_m.shape[0], 3))
+        path_points[:, 0] = coords_m[:, 0]  # x
+        path_points[:, 2] = coords_m[:, 1]  # z
+        
+        # Create LineSet for the path
+        path_lines = [[i, i+1] for i in range(len(path_points)-1)]
+        colors = [[1.0, 0.0, 0.0] for _ in path_lines]  # red
+
+        line_set = o3d.geometry.LineSet(
+            points=o3d.utility.Vector3dVector(path_points),
+            lines=o3d.utility.Vector2iVector(path_lines)
+        )
+        line_set.colors = o3d.utility.Vector3dVector(colors)
+
+        # Optionally, draw points as small spheres along the path
+        path_spheres = o3d.geometry.PointCloud()
+        path_spheres.points = o3d.utility.Vector3dVector(path_points)
+        path_spheres.colors = o3d.utility.Vector3dVector(np.tile([1,0,0], (len(path_points),1)))
+
+        vis_objects.extend([line_set, path_spheres])
+
+        # 2. Create a coordinate frame
+        axis = o3d.geometry.TriangleMesh.create_coordinate_frame(
+            size=1.0,
+            origin=[0, 0, 0]
+        )
+        grid = self.create_grid(size=10, step=1)
+        vis_objects.extend([grid, axis])
+
+        # Visualize
+        o3d.visualization.draw_geometries(vis_objects, point_show_normal=False)
 
 if __name__ == '__main__':
     import cv2, glob
@@ -80,7 +202,7 @@ if __name__ == '__main__':
     bev_npys_filenames = glob.glob(os.path.join(moloplanner_args['bevs_npy'], '**/*'), recursive=True)
     
     print(f'Files to process: pcds: {len(pcds_filenames)}, bev_npys {len(bev_npys_filenames)}')
-    for idx, pcd_path in enumerate(pcds_filenames):
+    for idx, pcd_path in enumerate(pcds_filenames[:1]):
         original_img_filename = os.path.splitext(os.path.basename(pcd_path))[0]
         print(f'Progress {idx+1}/{len(pcds_filenames)}: {original_img_filename}')
 
@@ -100,13 +222,32 @@ if __name__ == '__main__':
         kernel = np.ones((10, 1), np.uint8)   # increase size for thicker fill
         bev_binary_inpainted = cv2.morphologyEx(bev_binary_bool, cv2.MORPH_CLOSE, kernel)
         
+        goal_point = molo_planner.tf_next_waypoint_to_pcl_frame(
+            next_waypoint_gps=(40.443026, -86.763256), 
+            camera_frame_origin_gps=(40.44286291645092, -86.76329222468132), 
+            boat_heading_deg=90)
         
-        molo_planner.run(
-            astart_planner_args['outdir'], 
-            bev_binary_inpainted, 
-            filebasename=original_img_filename, 
-            pcd=pcd)
-    
+        bev_pixel_astart_path, pcd = molo_planner.bev_pixel_astart_path(
+            start_point=np.array([0.0, 0.0, 0.0]), goal_point=goal_point, 
+            pcd_bev_binary_mask=None, 
+            filebasename=original_img_filename,
+            img_filepath="/workspace/codebase/mini-bream/src/ros2_ws/src/mission_planner/mission_planner/moloplanner/assets/input_imgs/frames_output/frame_5.png",
+            pcd=None)
+        
+        # Swapt path ([[i, j], ...]  (row, col)) to (col, row)
+        astart_path = bev_pixel_astart_path[:, [1, 0]]
+
+        
+        pcl_meters_astart_path = molo_planner.depth_pipeline.depth_model.bev_pixels_to_meters(
+            astart_path,
+            molo_planner.depth_pipeline.depth_model.x_min, 
+            molo_planner.depth_pipeline.depth_model.z_min, 
+            molo_planner.depth_pipeline.depth_model.cell_size, 
+            molo_planner.depth_pipeline.depth_model.height,
+            plot=True)
+        
+        
+        molo_planner.plot_path_on_pointcloud(pcl_meters_astart_path[::5], pcd=pcd)
     
     """ 
      Usage:
