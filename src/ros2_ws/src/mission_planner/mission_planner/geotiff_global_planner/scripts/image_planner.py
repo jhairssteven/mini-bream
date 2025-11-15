@@ -392,19 +392,18 @@ class AStartPlanner():
 
         grid, maze = self.read_img_as_grid(image_path=image_path, image_array=image_array)
         start, goal = self.get_start_and_goal(grid, start, goal)
-        
-        print(f'Image shape {maze.shape}, start: {start}, goal: {goal}')
 
+        print(f"[A* Planner] Using grid with shape {grid.shape}. Start: {start}, Goal: {goal}")
         t0 = time.time()
         path = pyastar2d.astar_path(grid, start, goal, allow_diagonal=False)
         dur = time.time() - t0
-        print(f"Found path of length {path.shape[0]} in {dur:.6f}s")
+        print(f"[A* Planner] Found path of length {path.shape[0]} elements in {dur:.6f}s")
 
         if path.shape[0] > 0:
             if save_output:
                 self.save_path_to_img(path, maze, output_dir, filename=filename)
         else:
-            print("No path found")
+            print("[A* Planner] No path found")
 
         return path
 
@@ -418,7 +417,7 @@ class AStartPlanner():
         os.makedirs(output_dir, exist_ok=True)
         save_path = os.path.join(output_dir, filename + '.png')
         
-        print(f"Plotting path to {save_path}")
+        print(f"[A* Planner] Plotting path to {save_path}")
         imageio.imwrite(save_path, maze)
     
     def get_start_and_goal(self, grid, start=None, goal=None):
@@ -452,11 +451,11 @@ class AStartPlanner():
 
             # Ensure are traversable pixels or find closest valid if necessary
             if not is_valid(start):
-                print('Start point: {start} is not traversable')
+                print(f'[A* Planner] Given start point: {start} is not traversable. Finding closest...')
                 start = find_nearest_valid(start)
 
             if not is_valid(goal):
-                print('Goal point: {start} is not traversable')
+                print(f'[A* Planner] Given goal point: {goal} is not traversable. Finding closest...')
                 goal = find_nearest_valid(goal)
         else:
             # if not start, goal is provided, find some automatically
@@ -476,42 +475,57 @@ class AStartPlanner():
         return start, goal
     
     def read_img_as_grid(self, image_path, image_array=None):
-        """ Read the image and process into a valid cost-grid
-            Returns:
-                grid: The costs grid
-                maze: The single channel grayscale img array read from 'image_path'
         """
-        if image_array is None:
-            maze = imageio.imread(image_path)
+        Read an image and convert it into a cost grid for navigation.
 
-            if maze is None:
+        Parameters
+        ----------
+        image_path : str
+            Path to the image file on disk. Ignored if `image_array` is provided.
+        image_array : np.ndarray or None, optional
+            A pre-loaded image array. If None, the image is read from `image_path`.
+
+        Returns
+        -------
+        grid : np.ndarray (dtype=float32, shape=(H, W))
+            A 2D float32 cost grid where:
+                - grid[y, x] = 1.0   → traversable (white pixel)
+                - grid[y, x] = inf   → non-traversable (black pixel)
+
+        image_array : np.ndarray (dtype=uint8, shape=(H, W))
+            The grayscale 2D uint8 image (0-255), after conversion and binarization.
+        """
+
+        if image_array is None:
+            image_array = imageio.imread(image_path)
+
+            if image_array is None:
                 print(f"No file found: {image_path}")
                 return
             else:
-                print(f"Loaded maze of shape {maze.shape} from {image_path}")
-        else:
-            maze = image_array
+                print(f"Loaded Image of shape {image_array.shape}")
 
-        if maze.ndim == 3:
+        if image_array.ndim == 3:
             print("Input image has 3 channels; converting to grayscale.")
-            maze = np.mean(maze, axis=2).astype(np.uint8)
+            image_array = np.mean(image_array, axis=2).astype(np.uint8)
         
         # Get a binary mask with white color for traversable area
-        if np.max(maze) == 1:
-            maze[np.where(maze == 1)] = 255
-            maze[np.where(maze == 0)] = 0
-        elif np.max(max) == 255:
-            maze[np.where(maze < 128)] = 0
-            maze[np.where(maze > 128)] = 255
+        if np.max(image_array) == 1:
+            image_array[np.where(image_array == 1)] = 255
+            image_array[np.where(image_array == 0)] = 0
+        elif np.max(image_array) == 255:
+            image_array[np.where(image_array < 128)] = 0
+            image_array[np.where(image_array > 128)] = 255
 
 
-        grid = maze.astype(np.float32)
+        # Create a cost grid based on the grayscale-color image
+        grid = image_array.astype(np.float32)
         grid[grid == 0] = np.inf # Black pixels asign infinite cost
         grid[grid == 255] = 1 # White pixels cost of 1
 
         assert grid.min() == 1, "cost of moving must be at least 1"
 
-        return grid, maze
+        return grid, image_array
 
 
 

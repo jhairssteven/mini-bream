@@ -27,10 +27,8 @@ depth_pipeline:
   write_singles: true         # (bool) write intermediate module images, default=false
 
 astart_planner:
-  outdir: "/workspace/codebase/mini-bream/src/ros2_ws/src/mission_planner/mission_planner/moloplanner/assets/output_dir/astart_planner_part3"
+  outdir: "/workspace/codebase/mini-bream/src/ros2_ws/src/mission_planner/mission_planner/moloplanner/assets/output_dir/astart_planner"
   save_output: true
 
 moloplanner:
-  bev_inpainted_dir: "/workspace/codebase/mini-bream/src/ros2_ws/src/mission_planner/mission_planner/moloplanner/assets/BEV_inpainted_ks_10_square"
-  pcds_path: "/workspace/codebase/mini-bream/src/ros2_ws/src/mission_planner/mission_planner/moloplanner/assets/BEV_inpainted_ks_10_square/as_pcl/"
-  bevs_npy: "/workspace/codebase/mini-bream/src/ros2_ws/src/mission_planner/mission_planner/moloplanner/assets/BEV_inpainted_ks_10_square/bev_binary_as_npy/"
+  test_img: "/workspace/codebase/mini-bream/src/ros2_ws/src/mission_planner/mission_planner/moloplanner/assets/input_imgs/frames_output/frame_5.png"

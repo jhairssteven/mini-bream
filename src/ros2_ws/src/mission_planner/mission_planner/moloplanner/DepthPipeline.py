@@ -29,7 +29,7 @@ class DepthModel():
         }
         
         depth_anything = DepthAnythingV2(**model_configs[args.encoder])
-        depth_anything.load_state_dict(torch.load(args.load_from, map_location='cpu'))
+        depth_anything.load_state_dict(torch.load(args.load_from, map_location='cpu', weights_only=True))
         self.depth_anything = depth_anything.to(DEVICE).eval()
 
         # BEV projection data
@@ -49,7 +49,7 @@ class DepthModel():
         pcd = self.as_pcl(depth_pred, args, raw_image, output_base, mask)
         bev_image_vis, bev_binary_image_uint8, bev_filename, bev_image_binary_inpainted_uint8 = self.pcl_to_BEV(pcd, output_base, args, raw_image)
         
-        print(f'[{output_base}] depth (min, max): {round(depth_pred.min(), 3)}, {round(depth_pred.max(), 3)} (m)')
+        print(f'[{output_base}] [DA2] Estimated depth (min, max): {round(depth_pred.min(), 3)} (m), {round(depth_pred.max(), 3)} (m)')
         
         depth_pred = (depth_pred - depth_pred.min()) / (depth_pred.max() - depth_pred.min()) * 255.0
         depth = depth_pred.astype(np.uint8)
@@ -219,7 +219,7 @@ class DepthModel():
                 cv2.imwrite(combined_output_path, combined)
         return bev_image_vis, bev_binary_image_uint8, bev_filename, bev_image_binary_inpainted_uint8
 
-    def bev_pixels_to_meters(self, pixel_coords, x_min, z_min, cell_size, height, plot=False):
+    def bev_pixels_to_meters(self, pixel_coords, x_min, z_min, cell_size, height, save_img_path=False):
         """
         Convert BEV pixel coordinates back to (x, z) in meters.
         
@@ -253,10 +253,10 @@ class DepthModel():
         # map back to meters
         x = u * cell_size + x_min
         z = v * cell_size + z_min
-        print("x_min, z_min, cell_size, height", x_min, z_min, cell_size, height)
+        print(f"[BEV img properties] x_min: {x_min} (m), z_min: {z_min} (m), cell_size: {cell_size} px/m, BEV img height {height} pixels")
         
         # Optional visualization
-        if plot:
+        if save_img_path:
             # Create a blank image
             # Determine the image size in pixels (scale meters to pixels)
             margin = 50  # pixels around path
@@ -469,10 +469,11 @@ class PipelineArgs:
 class DepthPipeline():
     def __init__(self, args: PipelineArgs):
         self.args = args
-        self.depth_model = DepthModel(args)
         self.device = self.get_device()
         self.sam2_checkpoint = args.sam2_checkpoint
         self.model_cfg = args.sam2_model_cfg
+        print('loading DA2 and SAM2 models...')
+        self.depth_model = DepthModel(args)
         self.sam2_wrapper = Sam2Wrapper(device=self.device, sam2_checkpoint=self.sam2_checkpoint, model_cfg=self.model_cfg)
 
 

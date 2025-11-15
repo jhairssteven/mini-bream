@@ -50,6 +50,58 @@ def gps_to_local_frame(
 
     return delta_local
 
+def local_frame_to_gps(
+    delta_local: np.ndarray,
+    origin_gps: tuple,
+    frame_orientation_deg: float
+) -> tuple:
+    """
+    Convert a local-frame (x_local, y_local) coordinate back into GPS (lat, lon),
+    given the local frame origin and its orientation w.r.t. UTM X axis.
+
+    Parameters
+    ----------
+    delta_local : np.ndarray
+        2D vector [x_local, y_local] in meters in the local frame.
+    origin_gps : tuple (lat, lon)
+        GPS coordinate of the origin of the local frame.
+    frame_orientation_deg : float
+        Orientation of the local frame w.r.t. UTM X axis.
+        - Same convention as in gps_to_local_frame.
+
+    Returns
+    -------
+    tuple : (lat, lon)
+        GPS coordinates corresponding to delta_local.
+    """
+
+    # Convert origin to UTM
+    origin_utm = utm.from_latlon(origin_gps[0], origin_gps[1])
+    origin_xy = np.array([origin_utm[0], origin_utm[1]])
+
+    # Rotation matrix UTM → local was R.T
+    # So local → UTM uses R
+    theta = np.deg2rad(frame_orientation_deg)
+    R = np.array([
+        [np.cos(theta), -np.sin(theta)],
+        [np.sin(theta),  np.cos(theta)]
+    ])
+
+    # Convert local displacement back into UTM displacement
+    delta_utm = R @ delta_local
+
+    # Compute the absolute UTM coordinates
+    target_xy = origin_xy + delta_utm
+
+    # Convert back to GPS
+    lat, lon = utm.to_latlon(
+        target_xy[0],   # Easting
+        target_xy[1],   # Northing
+        origin_utm[2],  # UTM zone number
+        origin_utm[3]   # UTM zone letter
+    )
+
+    return (lat, lon)
 if __name__ == '__main__':
     """ 
     For the sample test data:
@@ -68,3 +120,18 @@ if __name__ == '__main__':
     )
     print('x, y:', x, y)
     print(f'Separation: {round(np.hypot(x, y), 3)} (m)')
+
+    ## Inverse proceses
+    delta_local = np.array([x, y])
+
+    result_gps = local_frame_to_gps(delta_local, origin_gps=camera_frame_origin_gps, frame_orientation_deg=camera_frame_orientation_deg)
+
+    
+    # The result of the inverse process should be the same as the original GPS value
+    x_r, y_r, _,_ = utm.from_latlon(result_gps[0], result_gps[1])
+    nw_x, nw_y,_,_ = utm.from_latlon(next_waypoint_gps[0], next_waypoint_gps[1])
+    print("Recovered GPS:", result_gps, ' utm: ', x_r, y_r)
+    print('Should be the same as nw_gps:', next_waypoint_gps, 'utm: ', nw_x, nw_y)
+
+    print('==== Difference should be zero ====')
+    print(f'x, y: {x_r-nw_x}, {y_r-nw_y}')
