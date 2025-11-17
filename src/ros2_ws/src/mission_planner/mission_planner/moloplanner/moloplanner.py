@@ -98,8 +98,8 @@ class Moloplanner():
         if not (pcl_xz_coordinates.ndim == 2 and pcl_xz_coordinates.shape[1] == 2):
             raise ValueError(f"Expected 'pcl_xz_coordinates' of shape (N, 2), got {pcl_xz_coordinates.shape}")
         gps_path = []
-        for pcl_xz_coordinates in pcl_meters_astart_path:            
-            delta_local = np.array([pcl_xz_coordinates[0], pcl_xz_coordinates[1]])
+        for pcl_xz_coordinate in pcl_xz_coordinates:            
+            delta_local = np.array([pcl_xz_coordinate[0], pcl_xz_coordinate[1]])
 
             camera_frame_orientation_deg = boat_heading_deg - 90 # (camera's x axis is 90deg CW rotated w.r.t the boat's heading.)
             
@@ -214,7 +214,44 @@ class Moloplanner():
 
         # Visualize
         o3d.visualization.draw_geometries(vis_objects, point_show_normal=False)
+    
+    def get_gps_local_astart_path(self, img_filepath, next_waypoint_gps, camera_frame_origin_gps, boat_heading_deg):
+        """ Given and input image and the pose of the camera's frame w.r.t to world GPS coordinates, return
+         a obstacle-aware A* path from the BEV representation of the image. """
+        img_filename = os.path.splitext(os.path.basename(img_filepath))[0]
 
+        goal_point = molo_planner.tf_next_waypoint_to_pcl_frame(
+            next_waypoint_gps=next_waypoint_gps, 
+            camera_frame_origin_gps=camera_frame_origin_gps, 
+            boat_heading_deg=boat_heading_deg)
+        
+        bev_pixel_astart_path, pcd = molo_planner.bev_pixel_astart_path(
+            start_point=np.array([0.0, 0.0, 0.0]), goal_point=goal_point, 
+            pcd_bev_binary_mask=None, 
+            filebasename=img_filename,
+            img_filepath=img_filepath,
+            pcd=None)
+        
+        # Swapt path ([[i, j], ...]  (row, col)) to (col, row)
+        astart_path = bev_pixel_astart_path[:, [1, 0]]
+
+        
+        pcl_xz_coordinates = molo_planner.depth_pipeline.depth_model.bev_pixels_to_meters(
+            astart_path,
+            molo_planner.depth_pipeline.depth_model.x_min, 
+            molo_planner.depth_pipeline.depth_model.z_min, 
+            molo_planner.depth_pipeline.depth_model.cell_size, 
+            molo_planner.depth_pipeline.depth_model.height,
+            save_img_path=True)
+        
+        # 3D visualize the pcd and the path
+        #molo_planner.plot_path_on_pointcloud(pcl_meters_astart_path[::5], pcd=pcd)
+
+        gps_local_astart_path = molo_planner.tf_pcl_coordinates_to_gps(pcl_xz_coordinates, camera_frame_origin_gps, boat_heading_deg)
+        
+        # Subsample path since the GPS resolution is less than 1m.
+        gps_local_astart_path = gps_local_astart_path[::50]
+        
 if __name__ == '__main__':
     molo_planner = Moloplanner()
     pipeline_args, config = molo_planner.get_running_args()
@@ -230,41 +267,11 @@ if __name__ == '__main__':
     boat_heading_deg=90
     
     img_filepath = moloplanner_args['test_img']
-    img_filename = os.path.splitext(os.path.basename(img_filepath))[0]
-
-    goal_point = molo_planner.tf_next_waypoint_to_pcl_frame(
-        next_waypoint_gps=next_waypoint_gps, 
-        camera_frame_origin_gps=camera_frame_origin_gps, 
-        boat_heading_deg=boat_heading_deg)
     
-    bev_pixel_astart_path, pcd = molo_planner.bev_pixel_astart_path(
-        start_point=np.array([0.0, 0.0, 0.0]), goal_point=goal_point, 
-        pcd_bev_binary_mask=None, 
-        filebasename=img_filename,
-        img_filepath=img_filepath,
-        pcd=None)
-    
-    # Swapt path ([[i, j], ...]  (row, col)) to (col, row)
-    astart_path = bev_pixel_astart_path[:, [1, 0]]
-
-    
-    pcl_meters_astart_path = molo_planner.depth_pipeline.depth_model.bev_pixels_to_meters(
-        astart_path,
-        molo_planner.depth_pipeline.depth_model.x_min, 
-        molo_planner.depth_pipeline.depth_model.z_min, 
-        molo_planner.depth_pipeline.depth_model.cell_size, 
-        molo_planner.depth_pipeline.depth_model.height,
-        save_img_path=True)
-    
-    # 3D visualize the pcd and the path
-    #molo_planner.plot_path_on_pointcloud(pcl_meters_astart_path[::5], pcd=pcd)
-
-    gps_local_astart_path = molo_planner.tf_pcl_coordinates_to_gps(pcl_meters_astart_path, camera_frame_origin_gps, boat_heading_deg)
-    
-    # Subsample path since the GPS resolution is less than 1m.
-    gps_local_astart_path = gps_local_astart_path[::50]
-    
-
+    gps_local_astart_path = molo_planner.get_gps_local_astart_path(img_filepath,
+                                                                   next_waypoint_gps,
+                                                                   camera_frame_origin_gps,
+                                                                   boat_heading_deg)
     """ 
      Usage:
      python3 -m moloplanner.moloplanner --config config.yaml --override depth_pipeline.max_depth=15 
