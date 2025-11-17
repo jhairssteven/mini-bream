@@ -1,18 +1,21 @@
 import os
 import numpy as np
-from moloplanner.DepthPipeline import DepthPipeline, PipelineArgs
+from mission_planner.moloplanner.DepthPipeline import DepthPipeline, PipelineArgs
 import argparse, yaml
 import open3d as o3d
 
 # image planner depends
-from geotiff_global_planner.scripts.image_planner import AStartPlanner
-import moloplanner.planning_utils as planning_utils
+from mission_planner.geotiff_global_planner.scripts.image_planner import AStartPlanner
+import mission_planner.moloplanner.planning_utils as planning_utils
 import cv2
 
 class Moloplanner():
     
-    def __init__(self):
-        self.pipeline_args, self.config = self.parse_args()
+    def __init__(self, config_path=None, overrides=None):
+        self.config_path = config_path
+        self.overrides = overrides or {}
+
+        self.pipeline_args, self.config = self.parse_args(config_path, overrides)
         self.depth_pipeline = DepthPipeline(self.pipeline_args)
         self.astart_planner_args = self.config['astart_planner']
         self.moloplanner_args = self.config['moloplanner']
@@ -110,19 +113,15 @@ class Moloplanner():
             gps_path.append(equivalent_gps)
         return gps_path
     
-    def parse_args(self):
-        parser = argparse.ArgumentParser()
-        parser.add_argument('--config', type=str, required=True, help='YAML configuration file')
-        parser.add_argument('--override', nargs='*', help='Optional overrides like key=value')
-        args = parser.parse_args()
+    def load_config(self, config_path, overrides=None):
+        """Load YAML config file and apply optional key=value overrides."""
 
-        # Load YAML file
-        with open(args.config, 'r') as f:
+        with open(config_path, 'r') as f:
             config = yaml.safe_load(f)
 
         # Optional overrides (e.g. --override pipeline.max-depth=15.0)
-        if args.override:
-            for kv in args.override:
+        if overrides:
+            for kv in overrides:
                 key, value = kv.split('=')
                 section, param = key.split('.')
                 # Basic auto-casting to number/bool when possible
@@ -136,6 +135,18 @@ class Moloplanner():
         pipeline_args = PipelineArgs(**config['depth_pipeline'])
 
         return pipeline_args, config
+    
+    def parse_args(self, config_path=None, overrides=None):
+        if config_path:
+            return self.load_config(config_path, overrides)
+        
+        # Parse as CLI arguments
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--config', type=str, required=True, help='YAML configuration file')
+        parser.add_argument('--override', nargs='*', help='Optional overrides like key=value')
+        args = parser.parse_args()
+
+        return self.load_config(args.config, args.override)
     
     def create_grid(self, size=10, step=1):
         lines = []
@@ -221,12 +232,12 @@ class Moloplanner():
             img_id (str): String identifying the input image 
         """
 
-        goal_point = molo_planner.tf_next_waypoint_to_pcl_frame(
+        goal_point = self.tf_next_waypoint_to_pcl_frame(
             next_waypoint_gps=next_waypoint_gps, 
             camera_frame_origin_gps=camera_frame_origin_gps, 
             boat_heading_deg=boat_heading_deg)
         
-        bev_pixel_astart_path, pcd = molo_planner.bev_pixel_astart_path(
+        bev_pixel_astart_path, pcd = self.bev_pixel_astart_path(
             start_point=np.array([0.0, 0.0, 0.0]), goal_point=goal_point, 
             pcd_bev_binary_mask=None, 
             img_id=img_id,
@@ -237,22 +248,23 @@ class Moloplanner():
         astart_path = bev_pixel_astart_path[:, [1, 0]]
 
         
-        pcl_xz_coordinates = molo_planner.depth_pipeline.depth_model.bev_pixels_to_meters(
+        pcl_xz_coordinates = self.depth_pipeline.depth_model.bev_pixels_to_meters(
             astart_path,
-            molo_planner.depth_pipeline.depth_model.x_min, 
-            molo_planner.depth_pipeline.depth_model.z_min, 
-            molo_planner.depth_pipeline.depth_model.cell_size, 
-            molo_planner.depth_pipeline.depth_model.height,
+            self.depth_pipeline.depth_model.x_min, 
+            self.depth_pipeline.depth_model.z_min, 
+            self.depth_pipeline.depth_model.cell_size, 
+            self.depth_pipeline.depth_model.height,
             save_img_path=True,
             output_dir=self.moloplanner_args['outdir'],
             img_id=img_id)
         # 3D visualize the pcd and the path
-        #molo_planner.plot_path_on_pointcloud(pcl_meters_astart_path[::5], pcd=pcd)
+        #self.plot_path_on_pointcloud(pcl_meters_astart_path[::5], pcd=pcd)
 
-        gps_local_astart_path = molo_planner.tf_pcl_coordinates_to_gps(pcl_xz_coordinates, camera_frame_origin_gps, boat_heading_deg)
+        gps_local_astart_path = self.tf_pcl_coordinates_to_gps(pcl_xz_coordinates, camera_frame_origin_gps, boat_heading_deg)
         
         # Subsample path since the GPS resolution is less than 1m.
         gps_local_astart_path = gps_local_astart_path[::50]
+        return gps_local_astart_path
         
 if __name__ == '__main__':
     molo_planner = Moloplanner()

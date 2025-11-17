@@ -5,7 +5,16 @@ package_name = 'mission_planner'
 setup(
     name=package_name,
     version='0.0.0',
-    packages=find_packages(exclude=['test']),
+    #packages=find_packages(exclude=['test']),
+    packages=[
+        'mission_planner',
+        'mission_planner.moloplanner',
+        'mission_planner.geotiff_global_planner',
+        'mission_planner.converters',
+    ],
+    package_data={
+        'mission_planner.moloplanner': ['assets/*', 'dependencies/*', 'config.yaml'],
+    },
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
@@ -22,7 +31,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'nav_goal_to_waypoint = mission_planner.nav_goal_to_waypoint:main'
+            'nav_goal_to_waypoint = mission_planner.nav_goal_to_waypoint:main',
+            'mock_planner_data_pub = mission_planner.mock_planner_data_pub:main',
+            'moloplanner_node = mission_planner.moloplanner_node:main'
         ],
     },
 )

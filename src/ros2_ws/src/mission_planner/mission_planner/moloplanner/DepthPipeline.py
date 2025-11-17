@@ -178,34 +178,34 @@ class DepthModel():
         ci_height, ci_width, _ = color_image.shape
         bev_image_vis = (bev_image[:, :, ::-1] * 255).astype(np.uint8)
         bev_filename = f"{img_id}_bev"
-        if args.pred_only:
-            output_path = os.path.join(args.outdir, img_id)
+        
+        
+        # Images manipulation for saving
+        output_path = os.path.join(args.outdir, img_id)
             
+        # Saving the binary mask as .npy and image
+        bev_binary_filename = f'{bev_filename}_binary'
+
+        npy_outdir = os.path.join(args.outdir, 'bev_binary_as_npy')
+        os.makedirs(npy_outdir, exist_ok=True)
+        saving_path = os.path.join(npy_outdir, f"{bev_binary_filename}.npy")
+        np.save(saving_path, bev_image_binary)
+
+        # === 2. SAVE USING OPENCV (for visualization) ===
+        # Convert float32 [0,1] -> uint8 [0,255]
+        bev_binary_image_uint8 = (bev_image_binary * 255).astype(np.uint8)
+        
+        
+        # Apply inpainting to reduce depth noise
+        bev_image_binary_inpainted = self.bev_binary_inpainting(bev_image_binary)
+        bev_image_binary_inpainted_uint8 = (bev_image_binary_inpainted * 255).astype(np.uint8)
+        
+        if args.pred_only:
             # Save BEV colored image only
             if args.write_singles:
                 cv2.imwrite(os.path.join(output_path, f'{bev_filename}_colored.png', ), bev_image_vis)
-
-                # Saving the binary mask as .npy and image
-                bev_binary_filename = f'{bev_filename}_binary'
-
-                npy_outdir = os.path.join(args.outdir, 'bev_binary_as_npy')
-                os.makedirs(npy_outdir, exist_ok=True)
-                saving_path = os.path.join(npy_outdir, f"{bev_binary_filename}.npy")
-                np.save(saving_path, bev_image_binary)
-
-                # === 2. SAVE USING OPENCV (for visualization) ===
-                # Convert float32 [0,1] -> uint8 [0,255]
-                bev_binary_image_uint8 = (bev_image_binary * 255).astype(np.uint8)
-                cv2.imwrite(os.path.join(args.outdir, img_id, 
-                                        f"{bev_binary_filename}.png"), 
-                                        bev_binary_image_uint8)
-                
-                # Apply inpainting to reduce depth noise
-                bev_image_binary_inpainted = self.bev_binary_inpainting(bev_image_binary)
-                bev_image_binary_inpainted_uint8 = (bev_image_binary_inpainted * 255).astype(np.uint8)
-                cv2.imwrite(os.path.join(args.outdir, img_id, 
-                                        f"{bev_binary_filename}_inpainting.png"), 
-                                        bev_image_binary_inpainted_uint8)
+                cv2.imwrite(os.path.join(args.outdir, img_id, f"{bev_binary_filename}.png"), bev_binary_image_uint8)
+                cv2.imwrite(os.path.join(args.outdir, img_id, f"{bev_binary_filename}_inpainting.png"), bev_image_binary_inpainted_uint8)
         else:
             # Concatenate original image and BEV image side by side for comparison
             # This is wrong, resizing must preserve the aspect radio
@@ -215,6 +215,8 @@ class DepthModel():
             combined_output_path = os.path.join(args.outdir, img_id, f"{img_id}_bev_comparison.png")
             if args.write_singles:
                 cv2.imwrite(combined_output_path, combined)
+        
+
         return bev_image_vis, bev_binary_image_uint8, bev_filename, bev_image_binary_inpainted_uint8
 
     def bev_pixels_to_meters(self, pixel_coords, x_min, z_min, cell_size, height, save_img_path=False, output_dir: str = None, img_id: str = None):
@@ -510,12 +512,11 @@ class DepthPipeline():
             mask=binary_mask, 
             args=self.args)
         
-        to_3ch = lambda img : cv2.merge([img, img, img]) # shape (H, W, 3)
-        bev_inpainted_3ch = to_3ch(bev_image_binary_inpainted_uint8)
-        bev_binary_3ch = to_3ch(bev_binary_image_uint8)
-        
 
         if self.args.plot_summary:
+            to_3ch = lambda img : cv2.merge([img, img, img]) # shape (H, W, 3)
+            bev_inpainted_3ch = to_3ch(bev_image_binary_inpainted_uint8)
+            bev_binary_3ch = to_3ch(bev_binary_image_uint8)
             self.plot_img_summary([raw_image_c, img_sam2_masked, depth_img, bev_image_vis, bev_binary_3ch, bev_inpainted_3ch], 
                                 os.path.join(self.args.outdir, 
                                             img_id, 
