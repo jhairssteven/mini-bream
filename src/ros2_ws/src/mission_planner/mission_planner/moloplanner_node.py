@@ -99,7 +99,7 @@ class MoloAstarPlannerNode(Node):
     # ---------- Continuous planner loop ----------
     def planner_loop(self):
         while rclpy.ok():
-            time.sleep(0.05)  # No-busy-wait loop (20 Hz polling)
+            time.sleep(5.05)  # No-busy-wait loop (20 Hz polling)
 
             # Copy the latest state safely
             with self.lock:

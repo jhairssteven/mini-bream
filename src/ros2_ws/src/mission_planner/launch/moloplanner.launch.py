@@ -19,6 +19,9 @@ def generate_launch_description():
             parameters=[
                 {"config_path": "/workspace/codebase/mini-bream/src/ros2_ws/src/mission_planner/mission_planner/moloplanner/config.yaml"},
                 {"overrides": ["depth_pipeline.max_depth=20"]}
+            ],
+            remappings=[
+                ('/camera/input_image', '/wamv/sensors/cameras/front_camera_sensor/image_raw')
             ]
         ),
     ])
