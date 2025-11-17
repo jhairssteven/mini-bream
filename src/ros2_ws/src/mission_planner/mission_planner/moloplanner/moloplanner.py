@@ -5,10 +5,9 @@ import argparse, yaml
 import open3d as o3d
 
 # image planner depends
-from geotiff_global_planner.scripts.geo_transform_utils import GeoImageTransformer
-from geotiff_global_planner.scripts.image_planner import GridPlanner, draw_path_on_img, AStartPlanner
+from geotiff_global_planner.scripts.image_planner import AStartPlanner
 import moloplanner.planning_utils as planning_utils
-import os
+import cv2
 
 class Moloplanner():
     
@@ -16,17 +15,17 @@ class Moloplanner():
         self.pipeline_args, self.config = self.parse_args()
         self.depth_pipeline = DepthPipeline(self.pipeline_args)
         self.astart_planner_args = self.config['astart_planner']
+        self.moloplanner_args = self.config['moloplanner']
 
     def get_running_args(self):
         return self.pipeline_args, self.config
     
     def bev_pixel_astart_path(self, 
             start_point=np.array([0.0, 0.0, 0.0]), goal_point=None, 
-            pcd_bev_binary_mask=None, filebasename='unnamed', img_filepath=None, 
-            pcd=None):
+            pcd_bev_binary_mask=None, img_id : str = 'unnamed', input_img_array : np.ndarray = None, pcd=None):
         """ 
-            Given a pointcloud 'pcd' and a (start, goal) pair of points, return a A* path un pixel coordinates
-            in the 'pcd_bev_binary_mask' or 'img_filepath' (which ever is given).
+            Given a pointcloud 'pcd' and a (start, goal) pair of points, return a A* path in pixel coordinates
+            in the 'pcd_bev_binary_mask' or 'input_img_array' (which ever is given).
 
             Args:
             
@@ -39,13 +38,13 @@ class Moloplanner():
             path (ndarray) Format: [[i0, j0], [i1, j1], ...]: The pixel coordinates of the path in 'image_path'.
             
         """
-        if img_filepath is not None:
+        if input_img_array is not None:
             if not (pcd_bev_binary_mask is None and pcd is None):
                 raise ValueError("'img_filepath' is defined, 'pcd' and its bev binary should not be defined in this case")
         
         depth_pipeline = self.depth_pipeline
         if pcd is None:
-            pcd, bev_image_vis, bev_binary_image_uint8, bev_image_binary_inpainted_uint8 = depth_pipeline.process_img(img_filepath)
+            pcd, bev_image_vis, bev_binary_image_uint8, bev_image_binary_inpainted_uint8 = depth_pipeline.process_img(img_id, input_img_array)
 
         # the pixel coordinates of BEV projection of given points in the PCD
         BEV_start, BEV_goal = depth_pipeline.depth_model.get_nearest_point_bev_pixel(pcd, [start_point, goal_point])
@@ -57,7 +56,7 @@ class Moloplanner():
                             goal=np.array([BEV_goal[1], BEV_goal[0]]) if BEV_goal is not None else None,
                             save_output=self.astart_planner_args['save_output'], 
                             output_dir=self.astart_planner_args['outdir'],
-                            filename =filebasename + '_astart_planner')
+                            filename =img_id + '_astart_planner')
         return path, pcd
 
     def tf_next_waypoint_to_pcl_frame(self, next_waypoint_gps, camera_frame_origin_gps, boat_heading_deg):
@@ -215,10 +214,12 @@ class Moloplanner():
         # Visualize
         o3d.visualization.draw_geometries(vis_objects, point_show_normal=False)
     
-    def get_gps_local_astart_path(self, img_filepath, next_waypoint_gps, camera_frame_origin_gps, boat_heading_deg):
+    def get_gps_local_astart_path(self, img_id: str, input_img_array: np.ndarray, next_waypoint_gps, camera_frame_origin_gps, boat_heading_deg):
         """ Given and input image and the pose of the camera's frame w.r.t to world GPS coordinates, return
-         a obstacle-aware A* path from the BEV representation of the image. """
-        img_filename = os.path.splitext(os.path.basename(img_filepath))[0]
+         a obstacle-aware A* path from the BEV representation of the image. 
+        Args:
+            img_id (str): String identifying the input image 
+        """
 
         goal_point = molo_planner.tf_next_waypoint_to_pcl_frame(
             next_waypoint_gps=next_waypoint_gps, 
@@ -228,8 +229,8 @@ class Moloplanner():
         bev_pixel_astart_path, pcd = molo_planner.bev_pixel_astart_path(
             start_point=np.array([0.0, 0.0, 0.0]), goal_point=goal_point, 
             pcd_bev_binary_mask=None, 
-            filebasename=img_filename,
-            img_filepath=img_filepath,
+            img_id=img_id,
+            input_img_array=input_img_array,
             pcd=None)
         
         # Swapt path ([[i, j], ...]  (row, col)) to (col, row)
@@ -242,8 +243,9 @@ class Moloplanner():
             molo_planner.depth_pipeline.depth_model.z_min, 
             molo_planner.depth_pipeline.depth_model.cell_size, 
             molo_planner.depth_pipeline.depth_model.height,
-            save_img_path=True)
-        
+            save_img_path=True,
+            output_dir=self.moloplanner_args['outdir'],
+            img_id=img_id)
         # 3D visualize the pcd and the path
         #molo_planner.plot_path_on_pointcloud(pcl_meters_astart_path[::5], pcd=pcd)
 
@@ -256,7 +258,6 @@ if __name__ == '__main__':
     molo_planner = Moloplanner()
     pipeline_args, config = molo_planner.get_running_args()
     
-    
     astart_planner_args = config['astart_planner']
     moloplanner_args = config['moloplanner']
     
@@ -268,7 +269,10 @@ if __name__ == '__main__':
     
     img_filepath = moloplanner_args['test_img']
     
-    gps_local_astart_path = molo_planner.get_gps_local_astart_path(img_filepath,
+    img_id = os.path.splitext(os.path.basename(img_filepath))[0]
+    input_img_array = cv2.imread(img_filepath)
+
+    gps_local_astart_path = molo_planner.get_gps_local_astart_path(img_id, input_img_array,
                                                                    next_waypoint_gps,
                                                                    camera_frame_origin_gps,
                                                                    boat_heading_deg)

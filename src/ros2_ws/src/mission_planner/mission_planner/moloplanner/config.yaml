@@ -31,4 +31,5 @@ astart_planner:
   save_output: true
 
 moloplanner:
+  outdir: "/workspace/codebase/mini-bream/src/ros2_ws/src/mission_planner/mission_planner/moloplanner/assets/output_dir/moloplanner"
   test_img: "/workspace/codebase/mini-bream/src/ros2_ws/src/mission_planner/mission_planner/moloplanner/assets/input_imgs/frames_output/frame_5.png"

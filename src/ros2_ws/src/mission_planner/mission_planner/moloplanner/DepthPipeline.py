@@ -35,7 +35,7 @@ class DepthModel():
         # BEV projection data
         self.x_min = 0; self.z_min = 0; self.cell_size = 0; self.height = 0
 
-    def get_depth(self, filename, image_input, mask, args):
+    def get_depth(self, img_id : str, image_input, mask, args):
 
         # Read the image using OpenCV
         raw_image = image_input.copy()
@@ -45,11 +45,10 @@ class DepthModel():
         depth_pred = self.depth_anything.infer_image(raw_image, height)
         
         #overlay[mask == 1] = (0.4 * overlay[mask == 1] + 0.6 * color).astype(np.uint8)
-        output_base = os.path.splitext(os.path.basename(filename))[0]
-        pcd = self.as_pcl(depth_pred, args, raw_image, output_base, mask)
-        bev_image_vis, bev_binary_image_uint8, bev_filename, bev_image_binary_inpainted_uint8 = self.pcl_to_BEV(pcd, output_base, args, raw_image)
+        pcd = self.as_pcl(depth_pred, args, raw_image, img_id, mask)
+        bev_image_vis, bev_binary_image_uint8, bev_filename, bev_image_binary_inpainted_uint8 = self.pcl_to_BEV(pcd, img_id, args, raw_image)
         
-        print(f'[{output_base}] [DA2] Estimated depth (min, max): {round(depth_pred.min(), 3)} (m), {round(depth_pred.max(), 3)} (m)')
+        print(f'[{img_id}] [DA2] Estimated depth (min, max): {round(depth_pred.min(), 3)} (m), {round(depth_pred.max(), 3)} (m)')
         
         depth_pred = (depth_pred - depth_pred.min()) / (depth_pred.max() - depth_pred.min()) * 255.0
         depth = depth_pred.astype(np.uint8)
@@ -60,16 +59,15 @@ class DepthModel():
             cmap = matplotlib.colormaps.get_cmap('Spectral')
             depth = (cmap(depth)[:, :, :3] * 255)[:, :, ::-1].astype(np.uint8)
         
-        base_name = os.path.splitext(os.path.basename(filename))[0]
-        depth_filename = base_name + '_depth.png'
-        output_path = os.path.join(args.outdir, base_name, depth_filename)
-        if args.pred_only:
-            if args.write_singles:
+        depth_filename = img_id + '_depth.png'
+        output_path = os.path.join(args.outdir, img_id, depth_filename)
+        
+        if args.pred_only and args.write_singles:
                 cv2.imwrite(output_path, depth)
         else:
-            split_region = np.ones((raw_image.shape[0], 50, 3), dtype=np.uint8) * 255
-            combined_result = cv2.hconcat([raw_image, split_region, depth])
             if args.write_singles:
+                split_region = np.ones((raw_image.shape[0], 50, 3), dtype=np.uint8) * 255
+                combined_result = cv2.hconcat([raw_image, split_region, depth])
                 cv2.imwrite(output_path, combined_result)
 
         return depth_pred, bev_image_vis, bev_binary_image_uint8, bev_filename, bev_image_binary_inpainted_uint8, depth, depth_filename, pcd
@@ -123,7 +121,7 @@ class DepthModel():
         bev_binary_inpainted = cv2.morphologyEx(bev_binary_bool, cv2.MORPH_CLOSE, kernel)
         return bev_binary_inpainted
 
-    def pcl_to_BEV(self, pcd, output_base, args, color_image):
+    def pcl_to_BEV(self, pcd, img_id : str, args, color_image):
         """ bev_image_vis: (h,w,3): Three channel image each channel [0, 255] of the BEV representation of the pcd.
             bev_image_binary: (h, w): Single channel [0, 1] with black foreground."""
         points = np.asarray(pcd.points)
@@ -179,9 +177,9 @@ class DepthModel():
 
         ci_height, ci_width, _ = color_image.shape
         bev_image_vis = (bev_image[:, :, ::-1] * 255).astype(np.uint8)
-        bev_filename = f"{output_base}_bev"
+        bev_filename = f"{img_id}_bev"
         if args.pred_only:
-            output_path = os.path.join(args.outdir, output_base)
+            output_path = os.path.join(args.outdir, img_id)
             
             # Save BEV colored image only
             if args.write_singles:
@@ -198,14 +196,14 @@ class DepthModel():
                 # === 2. SAVE USING OPENCV (for visualization) ===
                 # Convert float32 [0,1] -> uint8 [0,255]
                 bev_binary_image_uint8 = (bev_image_binary * 255).astype(np.uint8)
-                cv2.imwrite(os.path.join(args.outdir, output_base, 
+                cv2.imwrite(os.path.join(args.outdir, img_id, 
                                         f"{bev_binary_filename}.png"), 
                                         bev_binary_image_uint8)
                 
                 # Apply inpainting to reduce depth noise
                 bev_image_binary_inpainted = self.bev_binary_inpainting(bev_image_binary)
                 bev_image_binary_inpainted_uint8 = (bev_image_binary_inpainted * 255).astype(np.uint8)
-                cv2.imwrite(os.path.join(args.outdir, output_base, 
+                cv2.imwrite(os.path.join(args.outdir, img_id, 
                                         f"{bev_binary_filename}_inpainting.png"), 
                                         bev_image_binary_inpainted_uint8)
         else:
@@ -214,12 +212,12 @@ class DepthModel():
             bev_resized = cv2.resize(bev_image_vis, (ci_width, ci_height))
             
             combined = np.hstack((color_image, bev_resized))
-            combined_output_path = os.path.join(args.outdir, output_base, f"{output_base}_bev_comparison.png")
+            combined_output_path = os.path.join(args.outdir, img_id, f"{img_id}_bev_comparison.png")
             if args.write_singles:
                 cv2.imwrite(combined_output_path, combined)
         return bev_image_vis, bev_binary_image_uint8, bev_filename, bev_image_binary_inpainted_uint8
 
-    def bev_pixels_to_meters(self, pixel_coords, x_min, z_min, cell_size, height, save_img_path=False):
+    def bev_pixels_to_meters(self, pixel_coords, x_min, z_min, cell_size, height, save_img_path=False, output_dir: str = None, img_id: str = None):
         """
         Convert BEV pixel coordinates back to (x, z) in meters.
         
@@ -253,10 +251,13 @@ class DepthModel():
         # map back to meters
         x = u * cell_size + x_min
         z = v * cell_size + z_min
-        print(f"[BEV img properties] x_min: {x_min} (m), z_min: {z_min} (m), cell_size: {cell_size} px/m, BEV img height {height} pixels")
+        print(f"[{img_id}] [BEV properties] x_min: {x_min} (m), z_min: {z_min} (m), cell_size: {cell_size} px/m, height: {height} pixels")
         
         # Optional visualization
         if save_img_path:
+            if output_dir is None or img_id is None:
+                raise ValueError("'output_dir' and 'img_id' must be defined in other to save results.")
+            
             # Create a blank image
             # Determine the image size in pixels (scale meters to pixels)
             margin = 50  # pixels around path
@@ -280,8 +281,9 @@ class DepthModel():
                 cv2.line(img, (gx, 0), (gx, img_height), (200, 200, 200), 1)
             for gz in range(0, img_height, grid_spacing):
                 cv2.line(img, (0, gz), (img_width, gz), (200, 200, 200), 1)
-            save_path = '/workspace/codebase/mini-bream/src/ros2_ws/src/mission_planner/mission_planner/moloplanner/assets/output_dir/astart_planner_part3/path_in_meters.png'
-            cv2.imwrite(save_path, img)
+
+            os.makedirs(output_dir, exist_ok=True)
+            cv2.imwrite(os.path.join(output_dir, f'{img_id}_bev_in_meters.png'), img)
         return np.stack((x, z), axis=1)
     
 
@@ -374,7 +376,7 @@ class Sam2Wrapper():
         return overlay
 
 
-    def show_masks(self, image_filename, image, masks, scores, point_coords=None, box_coords=None,
+    def show_masks(self, img_id : str, image, masks, scores, point_coords=None, box_coords=None,
                 input_labels=None, borders=True, save_dir="output_masks", write_singles=False):
         """Generate and save mask visualizations using OpenCV only."""
         os.makedirs(save_dir, exist_ok=True)
@@ -403,14 +405,14 @@ class Sam2Wrapper():
                             0.9, (255, 255, 255), 2, cv2.LINE_AA)
 
             # Save file
-            filename = f"{image_filename}_sam2_mask_{i+1}_score_{score:.3f}.png"
+            filename = f"{img_id}_sam2_mask_{i+1}_score_{score:.3f}.png"
             filepath = os.path.join(save_dir, filename)
             if write_singles:
                 cv2.imwrite(filepath, img_vis)
                 #print(f"Saved: {filepath}")
             return img_vis, filename
 
-    def infer(self, sam2_model, image_filename, image_input, device, display_masks=False, save_dir='output_masks', write_singles=False):
+    def infer(self, sam2_model, img_id: str, image_input, device, display_masks=False, save_dir='output_masks', write_singles=False):
         predictor = sam2_model
         image = image_input.copy()
         predictor.set_image(image)
@@ -434,7 +436,7 @@ class Sam2Wrapper():
             multimask_output=False,
         ) """
         if display_masks:
-            img_masked, filename_img_masked = self.show_masks(image_filename, image, masks, scores, point_coords=input_point, input_labels=input_label, borders=False, save_dir=save_dir, write_singles=write_singles)
+            img_masked, filename_img_masked = self.show_masks(img_id, image, masks, scores, point_coords=input_point, input_labels=input_label, borders=False, save_dir=save_dir, write_singles=write_singles)
         return masks, img_masked, filename_img_masked
 
     def get_sam2_model_predictor(self, device, sam2_checkpoint, model_cfg):
@@ -489,23 +491,21 @@ class DepthPipeline():
             torch.autocast("cuda", dtype=torch.bfloat16).__enter__()
         return device
     
-    def process_img(self, img_path):
-        raw_image0 = cv2.imread(img_path)
-        raw_image = cv2.resize(raw_image0, (720, 480))
+    def process_img(self, img_id: str, input_img_array : np.ndarray):
+        raw_image = cv2.resize(input_img_array, (720, 480))
         raw_image_c = raw_image.copy()
-        image_filename = os.path.splitext(os.path.basename(img_path))[0]
         
         masks, img_sam2_masked, filename_img_masked = self.sam2_wrapper.infer(self.sam2_wrapper.predictor, 
-                                                                            image_filename, 
+                                                                            img_id, 
                                                                             raw_image, 
                                                                             device=self.device, 
                                                                             display_masks=True, 
-                                                                            save_dir=os.path.join(self.args.outdir, image_filename), 
+                                                                            save_dir=os.path.join(self.args.outdir, img_id), 
                                                                             write_singles=self.args.write_singles)
 
         binary_mask = (masks[0] > 0).astype(np.uint8)
         depth_pred, bev_image_vis, bev_binary_image_uint8, bev_filename, bev_image_binary_inpainted_uint8, depth_img, depth_filename, pcd = self.depth_model.get_depth(
-            filename=img_path, 
+            img_id=img_id, 
             image_input=raw_image, 
             mask=binary_mask, 
             args=self.args)
@@ -518,8 +518,8 @@ class DepthPipeline():
         if self.args.plot_summary:
             self.plot_img_summary([raw_image_c, img_sam2_masked, depth_img, bev_image_vis, bev_binary_3ch, bev_inpainted_3ch], 
                                 os.path.join(self.args.outdir, 
-                                            image_filename, 
-                                            image_filename + '_summary.png'))
+                                            img_id, 
+                                            img_id + '_summary.png'))
         return pcd, bev_image_vis, bev_binary_image_uint8, bev_image_binary_inpainted_uint8
 
     def plot_img_summary(self, images, output_path, cell_w=400, cell_h=300, spacing=20):
@@ -614,8 +614,9 @@ def main():
     for k, img_path in enumerate(filenames):
         img_file_name = os.path.splitext(os.path.basename(img_path))[0]
         print(f'Progress {k+1}/{len(filenames)}: {img_file_name}')
-
-        pcd, bev_image_vis, bev_binary_image_uint8, bev_image_binary_inpainted_uint8 = depth_pipeline.process_img(img_path)
+        
+        input_img_array = cv2.imread(img_path)
+        pcd, bev_image_vis, bev_binary_image_uint8, bev_image_binary_inpainted_uint8 = depth_pipeline.process_img(img_file_name, input_img_array)
 
 if __name__ == '__main__':
     main()
