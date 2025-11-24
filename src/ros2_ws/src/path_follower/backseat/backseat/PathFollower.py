@@ -223,13 +223,14 @@ class DubinsPath:
 class PathFollower:
     def declare_parameters(self):
         if not self.node.has_parameter("handover_offs"): self.node.declare_parameter("handover_offs", 1)
-        if not self.node.has_parameter('lookahead_min'): self.node.declare_parameter('lookahead_min', 10) # Meters
-        if not self.node.has_parameter('lookahead_max'): self.node.declare_parameter('lookahead_max', 25) # Meters
+        if not self.node.has_parameter('lookahead_min'): self.node.declare_parameter('lookahead_min', 10.0) # Meters
+        if not self.node.has_parameter('lookahead_max'): self.node.declare_parameter('lookahead_max', 25.0) # Meters
         if not self.node.has_parameter('conv_rate'): self.node.declare_parameter('conv_rate', 8.0)    # >0 constant
         if not self.node.has_parameter('replan_lookahead'): self.node.declare_parameter('replan_lookahead', 20.0)     # Meters (25m works)
         if not self.node.has_parameter("replan_dist"): self.node.declare_parameter("replan_dist", 10.0)   # Meters 300 for ILOS only
         if not self.node.has_parameter("no_of_laps"): self.node.declare_parameter("no_of_laps", 2)     # Number of times to repeat the initial mission
         if not self.node.has_parameter("tgt_ilos_deg"): self.node.declare_parameter("tgt_ilos_deg", 90)
+        if not self.node.has_parameter("gamma"): self.node.declare_parameter("gamma", 0.0)
 
     def __init__(self, node, mission, path_creator, log_data=True, handover_offs=None):
         self.node = node
@@ -304,7 +305,7 @@ class PathFollower:
         distance_to = self.__measure_dist(current_wp, path[current_index])        # calc distance to old point
         #print(hex(id(path[current_index])),hex(id(current_wp)))
         #print('wp1: {}, wp2: {}, current_index: {}'.format(current_wp,path[current_index],current_index))
-        proj_index = min(len(path)-1,current_index+7)                       # Get a point ahead, without exceeding the path length
+        proj_index = min(len(path)-1,current_index)                       # Get a point ahead, without exceeding the path length
         proj_heading = path[proj_index].pose.head                           # pull out old goal yaw at old point
         path_index = current_index                                          # pull out prev index
 
@@ -315,7 +316,7 @@ class PathFollower:
             #node.loginfo(f'c_idx: {current_index}, index: {index}, temp_dist: {temp_dist}')
             if temp_dist < distance_to:                             # if this new point is closer to the vehicle switch to it
                 distance_to = temp_dist                             # save distance to new point
-                proj_heading = path[proj_index].pose.head           # save goal heading at new point
+                proj_heading = path[index].pose.head           # save goal heading at new point
                 path_index = index                                  # save index of new point
 
         # Create distance error sign change for signed error
@@ -325,7 +326,7 @@ class PathFollower:
         xe,ye = np.dot(R, np.array([[(current_wp.pose.utm_x - path[path_index].pose.utm_x)], [(current_wp.pose.utm_y - path[path_index].pose.utm_y)]]))
         return ye[0], proj_heading, path_index
 
-    def ILOS(self, ye, beta_hat, proj_heading, veh_speed, sideslip = None, delta = 6, gamma = 0):
+    def ILOS(self, ye, beta_hat, proj_heading, veh_speed, sideslip = None, delta = None, gamma = 0):
         '''
             Computes the Integral LOS guidance values to make the cross track error converge to 0,
             even in presence of external disturbances.
@@ -340,6 +341,9 @@ class PathFollower:
                 heading     : Desired heading for the vehicle
                 beta_hat    : accumulated beta_hat term after the one step integration.
         '''
+        if delta is None:
+            raise ValueError("'delta' -> Lookahead must be defined. ")
+        
         if sideslip is not None:
             ##[vx, vy] = veh_speed # surge = u, sway = v ([surge_speed, sway_speed])
             ##U = np.linalg.norm(veh_speed)
@@ -352,7 +356,7 @@ class PathFollower:
             heading = des_course_angle - sideslip
             return heading, beta_hat # same beta_hat to prevent runtime errors
         else:
-            U = veh_speed   #vehicle speed
+            U = veh_speed
             beta_hat = beta_hat + (ye*gamma*U*delta)/(np.sqrt(delta**2+(ye+delta*beta_hat)**2))
             heading = np.arctan(-beta_hat-(ye/delta)) + proj_heading
             return heading, beta_hat
@@ -384,6 +388,11 @@ class PathFollower:
         recovery_path.extend(copy.deepcopy(original_path[target_idx:]))
         return recovery_path
 
+    def get_mission(self):
+        '''
+            Get access to the mission waypoints with which the class instance was created
+        '''
+        return self.mission
     def get_generated_paths(self):
         '''
             This function is called from the backseat controller to get access to the current paths.
@@ -394,7 +403,12 @@ class PathFollower:
                 original_path: Path - Path that was generated initially toto meet the original requirements
         '''
         return self.working_path, self.original_path
-    
+    def get_gamma(self):
+        '''
+            Get the adaptation gain used for the Integral part of the ILOS
+        '''
+        return self.node.get_parameter("gamma").value
+
     def get_look_ahead(self,ye):
         '''
             This function is used to compute a variable lookahead distance to prevent overshoot. The idea is to have a
@@ -466,13 +480,15 @@ class PathFollower:
                 self.replan_triggered = False
             # node.logdebug("Working path len is %d, current idx is %d", len(self.working_path), self.work_index)
             self.look_ahead = self.get_look_ahead(self.ye)
+
             # Update controller 
             # node.logwarn(f"ye: {self.ye}")
             self.head, self.beta_hat  = self.ILOS(ye = self.ye,
                                                   beta_hat = self.beta_hat,
                                                   proj_heading = self.proj_head,
                                                   veh_speed = speed,
-                                                  delta=self.look_ahead)
+                                                  delta=self.look_ahead,
+                                                  gamma=self.get_gamma())
             
             """ if self.node.has_param("tgt_ilos_deg"):
                 self.head = self.node.get_parameter("tgt_ilos_deg").value*np.pi/180 """
