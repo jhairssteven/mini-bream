@@ -8,6 +8,7 @@ Panels:
         - /Status1
         - /Grid1
         - /Path1/Topic1
+        - /mission_waypointgs1
       Splitter Ratio: 0.5
     Tree Height: 575
   - Class: rviz_common/Selection
@@ -32,7 +33,7 @@ Visualization Manager:
   Class: ""
   Displays:
     - Alpha: 0.5
-      Cell Size: 4
+      Cell Size: 1
       Class: rviz_default_plugins/Grid
       Color: 160; 160; 164
       Enabled: true
@@ -42,11 +43,11 @@ Visualization Manager:
       Name: Grid
       Normal Cell Count: 0
       Offset:
-        X: 0
-        Y: 0
+        X: -64
+        Y: -142
         Z: 0
       Plane: XY
-      Plane Cell Count: 1000
+      Plane Cell Count: 100
       Reference Frame: <Fixed Frame>
       Value: true
     - Alpha: 1
@@ -264,9 +265,21 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /boat_marker
       Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: mission_waypointgs
+      Namespaces:
+        "": true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /mission_path
+      Value: true
   Enabled: true
   Global Options:
-    Background Color: 48; 48; 48
+    Background Color: 244; 244; 244
     Fixed Frame: world
     Frame Rate: 30
   Name: root
@@ -310,16 +323,16 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 38.98875045776367
+      Distance: 13.512890815734863
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -298.8160095214844
-        Y: 62.76662826538086
-        Z: 1.2906694412231445
+        X: -73.23590087890625
+        Y: -176.40292358398438
+        Z: -0.22968921065330505
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
@@ -346,5 +359,5 @@ Window Geometry:
   Views:
     collapsed: true
   Width: 1200
-  X: 2012
-  Y: 45
+  X: 2132
+  Y: 124

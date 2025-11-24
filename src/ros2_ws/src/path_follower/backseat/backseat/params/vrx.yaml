@@ -3,8 +3,8 @@
     sim_enable: True
     
     # Dubins
-    dubins_radius: 8.0
-    dubins_step_size: 0.5
+    dubins_radius: 0.1
+    dubins_step_size: 0.5 # Max separation of each waypoint for the generated Dubins path
     replan_dist: 26.0
     no_of_laps: 1
 
@@ -12,7 +12,7 @@
     handover_offs: 1 # Meters before the end of the path to handover control of the vehicle
     
     # Linear speed limits
-    max_linear_speed: 0.17 
+    max_linear_speed_pct: 0.1 # Use for heading controller (prefer low speeds for bigger heading errors)
     
     #origin_gps: [40.40229852, -86.84558228] # kepner
     #origin_gps: [40.448417, -86.867750]     # harner
@@ -22,15 +22,15 @@
 
     # Rotational PID gains
     kp : 1.0 # kp makes it faster
-    kd : 7.0 # kd reduces overshoot
-    ki : 0.5 # ki reduces settling error
+    kd : 0.2 # kd reduces overshoot
+    ki : 0.0 # ki reduces settling error
 
     # ILOS
     replan_lookahead: 8.0  # Distance to look ahead to select next target waypoint when in need to replan. It is not replan_lookahead of ILOS.
-    lookahead_min : 3
-    lookahead_max : 20
+    lookahead_min : 1.0
+    lookahead_max : 3.0
     conv_rate     : 8.0
-    gamma         : 0.2 # Integral gain
+    gamma         : 0.0 # Integral gain
 
 
 wtp_follower:
