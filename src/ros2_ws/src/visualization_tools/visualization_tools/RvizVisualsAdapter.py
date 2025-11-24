@@ -106,8 +106,8 @@ class RvizPath(Node):
         while rclpy.ok():
             self.waypts_pub.publish(marker)
 
-    def get_marker_from_waypoints(self, utm_waypts):
-        mkr = markerFromWypt([0,0,0], getMarker([1,1,0,1], type=Marker.LINE_STRIP))
+    def get_marker_from_waypoints(self, utm_waypts, marker_lwh=None):
+        mkr = markerFromWypt([0,0,0], getMarker([1,1,0,1], type=Marker.LINE_STRIP, lwh=marker_lwh))
         pts = []
         xy = self.utm_waypts_to_coordinates(utm_waypts, [self.init_UTM_x, self.init_UTM_y])
         for w in xy:
@@ -160,7 +160,7 @@ class RvizPos(Node):
         # Subscribers
         self.create_subscription(Imu, '/wamv/sensors/imu/imu/data/estimated', self.estimated_imu_callback, qos_best_effort_volatile)
         self.create_subscription(Imu, '/wamv/sensors/imu/imu/data', self.imu_callback, qos_best_effort_volatile)
-        self.create_subscription(NavSatFix, '/wamv/sensors/gps/gps/fix', self.gps_callback, qos_best_effort_volatile)
+        self.create_subscription(NavSatFix, '/wamv/sensors/gps/centered_gps/fix', self.gps_callback, qos_best_effort_volatile)
         #self.create_subscription(Float32, '/compass_bearing_deg', self.heading_callback, 1)
         #self.create_subscription(Telem, '/telemetry', self.telem_callback, 1)
         self.create_subscription(Locg, '/way_gps', self.way_gps_callback, 1)
@@ -171,7 +171,6 @@ class RvizPos(Node):
         self.pidrOutputMarkerPub = self.create_publisher(Marker, "/heading/marker/pidr_output", 2)
         self.currPoseMarkerPub = self.create_publisher(Marker, "/curr_marker", 2)
         self.estimated_currPoseMarkerPub = self.create_publisher(Marker, "/estimated_curr_marker", 2)
-        self.goalPoseMarkerPub = self.create_publisher(Marker, "/goal_marker", 2)
         self.traversedPathPub = self.create_publisher(Path, "/traversed_path", 2)
         self.vis_traversedPathPub = self.create_publisher(Path, "/log/traversed_path", 2)
         
@@ -205,8 +204,8 @@ class RvizPos(Node):
         self.curr_long = msg.longitude
         self.current_pose_pub()
 
-    def build_pose_arrow_marker(self, x, y, orientation, color=[1.0, 0.0, 1.0, 1.0]):
-        marker = getMarker(color, Marker.ARROW)
+    def build_pose_arrow_marker(self, x, y, orientation, color=[1.0, 0.0, 1.0, 1.0], marker_lwh=None):
+        marker = getMarker(color, Marker.ARROW, marker_lwh)
         pose = Pose(position=Point(x=x, y=y, z=0.0), orientation=orientation)
         marker.pose = pose
         return marker, pose
@@ -216,7 +215,7 @@ class RvizPos(Node):
         cx = u[0] - self.init_UTM_x
         cy = u[1] - self.init_UTM_y
 
-        curr_marker, curr_pose = self.build_pose_arrow_marker(cx, cy, self.current_orientation, [0.0, 0.0, 0.0, 1.0])
+        curr_marker, curr_pose = self.build_pose_arrow_marker(cx, cy, self.current_orientation, [0.0, 0.0, 0.0, 1.0], marker_lwh=[0.5, 0.1, 0.2])
         self.currPoseMarkerPub.publish(curr_marker)
         self.estimated_currPoseMarkerPub.publish(self.build_pose_arrow_marker(cx, cy, self.estimated_current_orientation)[0])
 

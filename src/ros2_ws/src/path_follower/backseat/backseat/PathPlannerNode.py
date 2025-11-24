@@ -12,11 +12,14 @@ from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from rclpy.executors import MultiThreadedExecutor
 
 
-from visualization_msgs.msg import Marker
+from visualization_msgs.msg import Marker, MarkerArray
+from geometry_msgs.msg import Point
+from builtin_interfaces.msg import Duration
+
 from geometry_msgs.msg import Vector3Stamped, Pose, PoseStamped
 from sensor_msgs.msg import NavSatFix, Imu
 from std_msgs.msg import Float32, Float64
-from nav_msgs.msg import Path
+from nav_msgs.msg import Path, Odometry
 from backseat_msgs.msg import Locg
 from backseat_msgs.action import DoMission
 
@@ -39,10 +42,10 @@ class PathPlannerNode(Node):
         for h in logger.handlers:
             h.addFilter(DebugOnlyFilter()) """
         
-        self.declare_parameter('max_linear_velocity', 3.0)
-        self.declare_parameter('max_angular_velocity', 0.5)
-        self.declare_parameter('max_linear_speed', 1.0)
-        self.declare_parameter('min_linear_speed', 0.0)
+        self.declare_parameter('max_vehicle_linear_velocity', 3.0) # m/s
+        self.declare_parameter('max_vehicle_angular_velocity', 0.5) # m/s
+        self.declare_parameter('max_linear_speed_pct', 1.0)
+        self.declare_parameter('min_linear_speed_pct', 0.0)
         self.declare_parameter('sim_enable', False)
         self.declare_parameter('goal_lat', 40.448417)
         self.declare_parameter('goal_lon', -86.867750)
@@ -52,14 +55,13 @@ class PathPlannerNode(Node):
         self.declare_parameter('kp', 3.6)
         self.declare_parameter('ki', 2.553)
         self.declare_parameter('kd', 3.381)
-        self.declare_parameter('fw_speed', 0.1)
 
-        self.max_linear_speed = self.get_parameter('max_linear_speed').value
-        self.min_linear_speed = self.get_parameter('min_linear_speed').value
+        self.max_linear_speed_pct = self.get_parameter('max_linear_speed_pct').value
+        self.min_linear_speed = self.get_parameter('min_linear_speed_pct').value
         self.sim_enable = self.get_parameter('sim_enable').value
         self.motor_thrust_scaling_factor = self.get_parameter('motor_thrust_scaling_factor').value
-        self.max_linear_velocity = self.get_parameter('max_linear_velocity').value
-        self.max_angular_velocity = self.get_parameter('max_angular_velocity').value
+        self.max_vehicle_linear_velocity = self.get_parameter('max_vehicle_linear_velocity').value
+        self.max_vehicle_angular_velocity = self.get_parameter('max_vehicle_angular_velocity').value
 
         self.publish_diff_drive = self.get_parameter('publish_diff_drive').get_parameter_value().bool_value
         self.goal_lat = self.get_parameter('goal_lat').value
@@ -123,10 +125,11 @@ class PathPlannerNode(Node):
         self.wk_path_pub = self.create_publisher(Path, '/working_path', qos)
         self.vis_wk_path_pub = self.create_publisher(Path, '/log/working_path', qos)
         self.orig_path_pub = self.create_publisher(Path, '/original_path', qos)
+        self.mission_waypoints_pub = self.create_publisher(MarkerArray, '/mission_path', qos)
 
         if self.sim_enable:
-            self.create_subscription(NavSatFix, '/wamv/sensors/gps/gps/fix', self.__read_position_cbk, qos_best_effort_volatile)
-            self.create_subscription(Vector3Stamped, '/wamv/sensors/gps/gps/fix_velocity', self.__read_speed_cbk, qos_best_effort_volatile)
+            self.create_subscription(NavSatFix, '/wamv/sensors/gps/centered_gps/fix', self.__read_position_cbk, qos_best_effort_volatile)
+            self.create_subscription(Odometry, '/wamv/sensors/position/ground_truth_odometry', self.__read_speed_cbk, qos_best_effort_volatile)
             self.create_subscription(Imu, '/wamv/sensors/imu/imu/data', self.__read_imu_cbk, qos_best_effort_volatile)
             self.create_subscription(Float64, '/vrx/debug/wind/direction', self.__get_wind_dir_cbk, qos)
             self.create_subscription(Float64, '/vrx/debug/wind/speed', self.__get_wind_speed_cbk, qos)
@@ -157,7 +160,9 @@ class PathPlannerNode(Node):
         self.current_vehicle_wp.pose.gps_lon = msg.longitude
 
     def __read_speed_cbk(self, msg):
-        self.current_speed = np.linalg.norm([msg.vector.x, msg.vector.y])
+        self.current_speed = np.linalg.norm([
+            msg.twist.twist.linear.x, 
+            msg.twist.twist.linear.y])
 
     def __get_wind_dir_cbk(self, msg):
         self.wind_dir = np.deg2rad(msg.data)
@@ -178,8 +183,8 @@ class PathPlannerNode(Node):
     def build_thruster_msg(self, thrust_pct):
         """ thrust_pct: a Value between [-1, 1] """
         return Float64(data = self.motor_thrust_scaling_factor*thrust_pct)
-    
-    def to_diff_driv(self, linear_speed, angular_speed, k = 0.1, diff_drive=False):
+
+    def to_diff_driv(self, linear_speed_pct, angular_speed, k = 0.1, diff_drive=False):
         """! Internal call to transfor a speed and direction command to a
          differential drive command for the ASV.
         @param  k       Proportional coefficient to modulate how sharp to turn.
@@ -187,11 +192,11 @@ class PathPlannerNode(Node):
         """
 
         angular_velocity_pct = np.clip(angular_speed, -1, 1)
-        linear_velocity_pct = np.clip(linear_speed, -1, 1)
+        linear_velocity_pct = np.clip(linear_speed_pct, -1, 1)
 
         if (diff_drive):
             left =  linear_velocity_pct - k*angular_velocity_pct
-            right = linear_velocity_pct + k*angular_velocity_pct
+            right =  linear_velocity_pct + k*angular_velocity_pct
             left = np.clip(left, -1, 1)
             right = np.clip(right, -1, 1)
             
@@ -199,11 +204,10 @@ class PathPlannerNode(Node):
             self.right_thruster_publisher.publish(self.build_thruster_msg(right))
             return
 
-        self.max_linear_vel = self.get_parameter('max_linear_velocity').value
-        self.max_angular_vel = self.get_parameter('max_angular_velocity').value
-        self.linear_velocity_pct_pub.publish(Float64(data=self.max_linear_vel*linear_velocity_pct))
-        self.angular_velocity_pct_pub.publish(Float64(data=self.max_angular_vel*angular_velocity_pct))
-        
+        self.max_vehicle_linear_vel = self.get_parameter('max_vehicle_linear_velocity').value
+        self.max_vehicle_angular_vel = self.get_parameter('max_vehicle_angular_velocity').value
+        self.linear_velocity_pct_pub.publish(Float64(data=linear_velocity_pct))
+        self.angular_velocity_pct_pub.publish(Float64(data=angular_velocity_pct))
 
     def __velocity_control_step(self):
         """Compute velocity control commands and publish them to actuators."""
@@ -228,36 +232,98 @@ class PathPlannerNode(Node):
         self.head_prev_error = head_err
         #self.get_logger().info(f'desired head: {self.head_u}, head_error: {self.head_prev_error}')
         
-        linear_speed = self.get_cmd_velocity_from_error_state(head_err)
+        linear_speed_pct = self.get_cmd_velocity_from_error_state(head_err)
 
-        self.to_diff_driv(linear_speed, self.head_u, k=1, diff_drive=self.publish_diff_drive)
+        self.to_diff_driv(linear_speed_pct, self.head_u, k=1, diff_drive=self.publish_diff_drive)
     
     def get_cmd_velocity_from_error_state(self, head_err):
         # Adjust linear speed based on heading error (for bigger error, go slower)
-        # Linear speed range will go from 0 to param 'max_linear_speed' value.
+        # Linear speed range will go from 0 to param 'max_linear_speed' percentage value.
         # The vehicle will have 0.0 linear speed when heading error is too big.
 
-        max_linear_speed = self.get_parameter("max_linear_speed").value
+        max_linear_speed_pct = self.get_parameter("max_linear_speed_pct").value
         min_linear_speed = 0.0
         angle_threshold_fast = 0.15 # rads
         angle_threshold_slow = 0.4  # rads
         
-        m = (max_linear_speed-min_linear_speed)/(angle_threshold_fast-angle_threshold_slow)
-        b = max_linear_speed - m*angle_threshold_fast
+        # correct heading error with low linear speeds
+        m = (max_linear_speed_pct-min_linear_speed)/(angle_threshold_fast-angle_threshold_slow)
+        b = max_linear_speed_pct - m*angle_threshold_fast
         angle_error = np.abs(head_err)
-        linear_speed = m*angle_error + b
+        linear_speed_pct = m*angle_error + b
 
-        linear_speed = np.clip(linear_speed, min_linear_speed, max_linear_speed)
+        linear_speed_pct = np.clip(linear_speed_pct, min_linear_speed, max_linear_speed_pct)
 
-        self.linear_velocity_pct_pub.publish(Float64(data=linear_speed))
-        return linear_speed
+        #self.linear_velocity_pct_pub.publish(Float64(data=linear_speed_pct))
+        return linear_speed_pct
 
 
-    def __publish_paths(self, wk_path, orig_path):
+    def __publish_paths(self, wk_path, orig_path, mission_waypoints_path=None):
         self.vis_wk_path_pub.publish(wk_path)
         self.wk_path_pub.publish(wk_path)
         self.orig_path_pub.publish(orig_path)
+        if mission_waypoints_path is not None:
+            self.mission_waypoints_pub.publish(mission_waypoints_path)
         self.paths_published = True
+
+    def waypoints_to_arrow_markers(self, waypoints, x_ref, y_ref, frame_id='world'):
+        """
+        Convert a list of waypoints into a MarkerArray of arrows.
+
+        :param waypoints: List of waypoints, each with pose.utm_x and pose.utm_y attributes
+        :param x_ref: X reference (offset)
+        :param y_ref: Y reference (offset)
+        :param frame_id: TF frame for markers
+        :return: MarkerArray containing arrow markers
+        """
+        marker_array = MarkerArray()
+        marker_id = 0
+
+        # Fixed sphere color (RGB + alpha)
+        r, g, b, a = 0.0, 0.5, 1.0, 0.9   # Light blue (or whatever you want)
+
+        for wp in waypoints:
+            marker = Marker()
+            marker.header.frame_id = frame_id
+            marker.header.stamp = self.get_clock().now().to_msg()
+
+            #marker.ns = "waypoint_spheres"
+            marker.id = marker_id
+            marker_id += 1
+
+            marker.type = Marker.ARROW
+            marker.action = Marker.ADD
+
+            # Position (relative to reference)
+            marker.pose.position.x = wp.pose.utm_x - x_ref
+            marker.pose.position.y = wp.pose.utm_y - y_ref
+            marker.pose.position.z = 0.0
+
+            # Orientation fixed (unused for spheres)
+            # Orientation from waypoint heading
+            quat = tf.quaternion_from_euler(0, 0, wp.pose.head)
+            marker.pose.orientation.x = quat[0]
+            marker.pose.orientation.y = quat[1]
+            marker.pose.orientation.z = quat[2]
+            marker.pose.orientation.w = quat[3]
+
+            # Arrow size
+            marker.scale.x = 1.0
+            marker.scale.y = 0.2
+            marker.scale.z = 0.2
+
+            # Color
+            marker.color.r = r
+            marker.color.g = g
+            marker.color.b = b
+            marker.color.a = a
+
+            # Optional lifetime (0 = forever)
+            marker.lifetime = Duration(sec=0)
+
+            marker_array.markers.append(marker)
+
+        return marker_array
 
     def waypoints_to_ros_path(self, waypoints, x_ref, y_ref, frame_id='world'):
         """
@@ -286,19 +352,25 @@ class PathPlannerNode(Node):
         
         return path_ros
 
-    def __update_follower(self, new_mission=True):
+    def __update_follower(self, new_mission=True, mission_waypoints=None):
         """! Main loop intended to update the output of the path following algorithm.
-        @param  None.
+        Args:
+            new_mission (True)
+            mission_waypoints: The waypoint list for the commanded mission. (type NavigationTools.Waypoint)
         @return None.
         """
         # Convert wk_path and orig_path from PathFollower into ROS Path messages 
         if new_mission or not self.paths_published or self.path_follower.replan_triggered:
             x_ref, y_ref, _, _ = utm.from_latlon(self.goal_lat, self.goal_lon)
 
+            mission_waypoints_path_ros = None
+            if mission_waypoints:
+                mission_waypoints_path_ros = self.waypoints_to_arrow_markers(mission_waypoints, x_ref, y_ref)
+
             wk_path, orig_path = self.path_follower.get_generated_paths()
             wk_path_ros = self.waypoints_to_ros_path(wk_path, x_ref, y_ref)
             orig_path_ros = self.waypoints_to_ros_path(orig_path, x_ref, y_ref)
-            self.__publish_paths(wk_path_ros, orig_path_ros)
+            self.__publish_paths(wk_path_ros, orig_path_ros, mission_waypoints_path_ros)
             new_mission = False
 
         self.current_vehicle_wp.ToUTM()
@@ -315,22 +387,48 @@ class PathPlannerNode(Node):
             self.__velocity_control_step()
         else:
             # Publish a zero velocity as a last command
-            self.to_diff_driv(linear_speed=0.0, angular_speed=0.0, k=1, diff_drive=self.publish_diff_drive)
+            self.to_diff_driv(linear_speed_pct=0.0, angular_speed=0.0, k=1, diff_drive=self.publish_diff_drive)
         self.mission_complete = mc
 
+    
     def __load_mission(self, mission):
         wps = []
-        for p in mission:
-            quaternion = (p.orientation.x, p.orientation.y, p.orientation.z, p.orientation.w)
-            _, _, head = tf.euler_from_quaternion(quaternion)
-            wp = {'lat': p.position.latitude,
-                  'lon': p.position.longitude,
-                  'depth': 0.0,
-                  'head': head, # [-pi, pi]
-                  'dive_mode': NavigationTools.DiveStyle['NONE'],
-                  'wp_mode': NavigationTools.WayPointMode.REGULAR}
+
+        # Pre-extract lat/lon for clarity
+        lats = [p.position.latitude for p in mission]
+        lons = [p.position.longitude for p in mission]
+
+        N = len(mission)
+        gps_calc = NavigationTools.GpsCalculations()
+
+        for i, p in enumerate(mission):
+
+            # Compute heading from this waypoint to the next
+            if i < N - 1:
+                bearing = gps_calc.initial_bearing(
+                    lats[i], lons[i],
+                    lats[i+1], lons[i+1]
+                )
+            else:
+                # Last waypoint gets same heading as previous
+                bearing = gps_calc.initial_bearing(
+                    lats[-2], lons[-2],
+                    lats[-1], lons[-1]
+                )
             
+            head = gps_calc.convert_2_angle(bearing)
+
+            wp = {
+                'lat': p.position.latitude,
+                'lon': p.position.longitude,
+                'depth': 0.0,
+                'head': head,  # Heading in radians
+                'dive_mode': NavigationTools.DiveStyle['NONE'],
+                'wp_mode': NavigationTools.WayPointMode.REGULAR
+            }
+
             wps.append(copy.deepcopy(wp))
+
         return NavigationTools.Mission(waypoints=wps)
 
     def __run(self, goal_handle):
@@ -353,7 +451,7 @@ class PathPlannerNode(Node):
                 self.get_logger().warn('Cancel requested')
                 return DoMission.Result(mission_complete=False)
             
-            self.__update_follower(new_mission=self.new_mission)
+            self.__update_follower(new_mission=self.new_mission, mission_waypoints=self.mission)
             self.new_mission = False
 
             self._feedback.xt_error = float(abs(self.path_follower.ye))
@@ -398,7 +496,7 @@ class PathPlannerNode(Node):
         p.position.y = y
         p.position.z = 0.0
         p.orientation.x, p.orientation.y, p.orientation.z, p.orientation.w = quat
-        marker = self.getMarker(color=[1.0, 0.5, 1.0, 1.0], type=Marker.ARROW)
+        marker = self.getMarker(color=[1.0, 0.5, 1.0, 1.0], type=Marker.ARROW, lwh=[0.5, 0.1, 0.2])
         marker.pose = p
         self.working_waypoint_pub.publish(marker)
 
