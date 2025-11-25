@@ -73,7 +73,9 @@ class ActionServerClient:
         self.log(f"Mission complete: {self.result.mission_complete}", cancel=bool(not mc))
             
         self.current_goal_handle = None  # Clear handle once result is received
-        self.after_done_callback(self.result)
+        
+        if self.after_done_callback is not None:
+            self.after_done_callback(self.result)
 
     def feedback_cb(self, feedback_msg):
         # feedback = feedback_msg.feedback
@@ -107,7 +109,7 @@ class Pose:
 
 class NavGoalToWaypoint:
     def __init__(self, node: Node, action_client: ActionServerClient):
-        linc_qos = QoSProfile(
+        qos_best_effort_volatile = QoSProfile(
             reliability=QoSReliabilityPolicy.BEST_EFFORT,
             durability=QoSDurabilityPolicy.VOLATILE,
             depth=1
@@ -115,10 +117,13 @@ class NavGoalToWaypoint:
         
         # Subscribers
         self.goal_sub = node.create_subscription(PoseStamped, '/goal_pose', self.goal_callback, 10)
-        self.gps_sub = node.create_subscription(NavSatFix, '/wamv/sensors/gps/gps/fix', self.gps_callback, linc_qos)
-        self.imu_sub = node.create_subscription(Imu, '/wamv/sensors/imu/imu/data', self.imu_callback, linc_qos)
-        self.send_mission_sub = node.create_subscription(Path, '/rviz_path', self.buildMissionFromPoseArray, linc_qos)
+        self.gps_sub = node.create_subscription(NavSatFix, '/wamv/sensors/gps/centered_gps/fix', self.gps_callback, qos_best_effort_volatile)
+        self.imu_sub = node.create_subscription(Imu, '/wamv/sensors/imu/imu/data', self.imu_callback, qos_best_effort_volatile)
+        self.send_mission_sub = node.create_subscription(Path, '/rviz_path', self.buildMissionFromPoseArray, qos_best_effort_volatile)
 
+        # Publishers
+        self.goal_geopose_pub = node.create_publisher(GeoPose, '/goal_geopose', 10)
+        
         self.node = node
         self._action_client = action_client
         self.current_marker = None
@@ -144,6 +149,9 @@ class NavGoalToWaypoint:
         return gp
 
     def __local_to_geo(self, pose):
+        """ 
+        Returns GeoPose: 'Pose' in GPS values
+        """
         self.node.get_logger().info(f"{self.origin_pose.utm_x} + {pose.position.x} /n: {self.origin_pose.utm_y} + {pose.position.y}")
         x_utm = self.origin_pose.utm_x + pose.position.x
         y_utm = self.origin_pose.utm_y + pose.position.y
@@ -161,12 +169,14 @@ class NavGoalToWaypoint:
         return self.buildGeoPose(self.curr_lat, self.curr_long, self.current_orientation)
     
     def goal_callback(self, msg: PoseStamped):
+        goal_geo = self.__local_to_geo(msg.pose)
+        self.goal_geopose_pub.publish(goal_geo)
+        
+        self.node.get_logger().info(f"New goal lat/lon: {goal_geo.position.latitude}, {goal_geo.position.longitude}")
+
         current_geo = self.getCurrentGeoPosition()
         if not current_geo: return
-        goal_geo = self.__local_to_geo(msg.pose)
-
-        self.node.get_logger().info(f"New goal lat/lon: {goal_geo.position.latitude}, {goal_geo.position.longitude}")
-        self.sendMissionToClient([current_geo, goal_geo])
+        #self.sendMissionToClient([current_geo, goal_geo])
 
     def sendMissionToClient(self, mission):
         """ mission: A list of geo waypoints (output of __local_to_geo()) """

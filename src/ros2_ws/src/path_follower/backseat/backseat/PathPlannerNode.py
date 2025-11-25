@@ -45,6 +45,7 @@ class PathPlannerNode(Node):
         self.declare_parameter('max_vehicle_linear_velocity', 3.0) # m/s
         self.declare_parameter('max_vehicle_angular_velocity', 0.5) # m/s
         self.declare_parameter('max_linear_speed_pct', 1.0)
+        self.declare_parameter('max_angular_speed_pct', 1.0)
         self.declare_parameter('min_linear_speed_pct', 0.0)
         self.declare_parameter('sim_enable', False)
         self.declare_parameter('goal_lat', 40.448417)
@@ -57,6 +58,7 @@ class PathPlannerNode(Node):
         self.declare_parameter('kd', 3.381)
 
         self.max_linear_speed_pct = self.get_parameter('max_linear_speed_pct').value
+        self.max_angular_speed_pct = self.get_parameter('max_angular_speed_pct').value
         self.min_linear_speed = self.get_parameter('min_linear_speed_pct').value
         self.sim_enable = self.get_parameter('sim_enable').value
         self.motor_thrust_scaling_factor = self.get_parameter('motor_thrust_scaling_factor').value
@@ -191,7 +193,7 @@ class PathPlannerNode(Node):
         @return None.
         """
 
-        angular_velocity_pct = np.clip(angular_speed, -1, 1)
+        angular_velocity_pct = np.clip(angular_speed, -1, 1)*self.max_angular_speed_pct
         linear_velocity_pct = np.clip(linear_speed_pct, -1, 1)
 
         if (diff_drive):
