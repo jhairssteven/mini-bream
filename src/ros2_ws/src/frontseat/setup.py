@@ -30,6 +30,7 @@ setup(
             'imu_estimation = frontseat.ImuFromGPS:main',
             'dual_antenna = frontseat.DualAntenna:main',
             'moving_base_rtk = frontseat.MovingBaseRTK:main',
+            'gps_center_offset_node = frontseat.GpsCenterOffsetNode:main',
         ],
     },
 )
