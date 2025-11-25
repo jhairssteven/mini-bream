@@ -21,7 +21,11 @@ def generate_launch_description():
                 {"overrides": ["depth_pipeline.max_depth=20"]}
             ],
             remappings=[
-                ('/camera/input_image', '/wamv/sensors/cameras/front_camera_sensor/image_raw')
+                ('/next_waypoint/geo_pose', '/goal_geopose'),
+                ('/camera_origin/gps', '/wamv/sensors/gps/centered_gps/fix'), 
+                ('/heading/imu/data', '/wamv/sensors/imu/imu/data'),
+                ('/camera/input_image', '/wamv/sensors/cameras/front_camera_sensor/image_raw'),
+                #('/camera/image_id', ),
             ]
         ),
     ])

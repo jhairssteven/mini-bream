@@ -247,7 +247,7 @@ class Moloplanner():
         # Swapt path ([[i, j], ...]  (row, col)) to (col, row)
         astart_path = bev_pixel_astart_path[:, [1, 0]]
 
-        
+
         pcl_xz_coordinates = self.depth_pipeline.depth_model.bev_pixels_to_meters(
             astart_path,
             self.depth_pipeline.depth_model.x_min, 
@@ -258,12 +258,11 @@ class Moloplanner():
             output_dir=self.moloplanner_args['outdir'],
             img_id=img_id)
         # 3D visualize the pcd and the path
-        #self.plot_path_on_pointcloud(pcl_meters_astart_path[::5], pcd=pcd)
-
+        #self.plot_path_on_pointcloud(pcl_xz_coordinates, pcd=pcd)
         gps_local_astart_path = self.tf_pcl_coordinates_to_gps(pcl_xz_coordinates, camera_frame_origin_gps, boat_heading_deg)
         
         # Subsample path since the GPS resolution is less than 1m.
-        gps_local_astart_path = gps_local_astart_path[::50]
+        #gps_local_astart_path = gps_local_astart_path[::50]
         return gps_local_astart_path
         
 if __name__ == '__main__':
