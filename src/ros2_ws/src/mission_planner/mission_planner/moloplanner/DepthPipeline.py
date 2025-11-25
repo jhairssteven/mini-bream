@@ -298,6 +298,26 @@ class DepthModel():
         v_img = height - v - 1  # invert Y for image coordinates
         return u, v_img
 
+    def get_point_closest_to_origin(self, pcl_points: np.ndarray):
+        # Find the point closest to the origin that is along the Z-axis
+        # We filter points that are within a small lateral distance (X) from the Z-axis
+        lateral_threshold = 0.05  # 5cm threshold
+        # Filter points where |x| < threshold
+        mask_z_axis = np.abs(pcl_points[:, 0]) < lateral_threshold
+        
+        closest_point_along_z = np.array([0.0, 0.0, 0.0])
+        if np.any(mask_z_axis):
+            candidates = pcl_points[mask_z_axis]
+            # Find the candidate with the smallest Z value (closest to origin)
+            dists = np.linalg.norm(candidates, axis=1)
+            min_idx = np.argmin(dists)
+            closest_point_along_z = candidates[min_idx]
+            #print(f"Closest point along Z-axis: {closest_point_along_z}")
+        else:
+            print(f"No points found along Z-axis within {lateral_threshold} (m), returning origin")
+        
+        return closest_point_along_z
+
     def get_nearest_point_bev_pixel(self, pcd: o3d.geometry.PointCloud, queries: np.ndarray, cell_size: float = 0.01) -> tuple[tuple[int, int], tuple[int, int]]:
         """
         Given a point cloud and a query point, return:
@@ -316,15 +336,16 @@ class DepthModel():
             if query is None:
                 nearest_bev_pixel.append(None)
             else:
-                _, idx, _ = pcd_tree.search_knn_vector_3d(query, 1)
-                nearest_point = points[idx[0]]
+                # Return 1 nearest neighbor to 'query'
+                _, idxs, _ = pcd_tree.search_knn_vector_3d(query, 1)
+                nearest_point = points[idxs[0]]
 
                 # --- Compute BEV bounds ---
                 x_min, x_max = points[:, 0].min(), points[:, 0].max()
                 z_min, z_max = points[:, 2].min(), points[:, 2].max()
                 width = int((x_max - x_min) / cell_size)
                 height = int((z_max - z_min) / cell_size)
-
+                
                 # --- Map query and nearest point to BEV pixels ---
                 u_query, v_query = self.world_to_bev_coords(query, x_min, z_min, cell_size, height)
                 u_nearest, v_nearest = self.world_to_bev_coords(nearest_point, x_min, z_min, cell_size, height)
@@ -494,6 +515,7 @@ class DepthPipeline():
         return device
     
     def process_img(self, img_id: str, input_img_array : np.ndarray):
+        """ Get the pointcloud representation of the given img array and its BEV binary mask inpainted to reduce depth noise """
         raw_image = cv2.resize(input_img_array, (720, 480))
         raw_image_c = raw_image.copy()
         

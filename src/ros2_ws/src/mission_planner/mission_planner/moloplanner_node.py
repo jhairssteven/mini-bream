@@ -152,7 +152,7 @@ class MoloAstarPlannerNode(Node):
 
                 self.get_logger().info(f'New path subsampled at {d_min} (m), Length: {len(subsampled_path)}')
                 self.execute_path(subsampled_path)
-                time.sleep(10)
+                time.sleep(5)
 
             except Exception as e:
                 self.get_logger().error(f"Planner error: {e}")

@@ -12,7 +12,7 @@
     handover_offs: 1 # Meters before the end of the path to handover control of the vehicle
     
     # Linear speed limits
-    max_linear_speed_pct: 0.01 # Use for heading controller (prefer low speeds for bigger heading errors)
+    max_linear_speed_pct: 0.03 # Use for heading controller (prefer low speeds for bigger heading errors)
     max_angular_speed_pct: 0.3 # % Limits the output angular speed commanded to the vehicle
     #origin_gps: [40.40229852, -86.84558228] # kepner
     #origin_gps: [40.448417, -86.867750]     # harner

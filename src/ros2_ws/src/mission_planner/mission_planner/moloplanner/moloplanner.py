@@ -24,7 +24,7 @@ class Moloplanner():
         return self.pipeline_args, self.config
     
     def bev_pixel_astart_path(self, 
-            start_point=np.array([0.0, 0.0, 0.0]), goal_point=None, 
+            start_point=None, goal_point=None, 
             pcd_bev_binary_mask=None, img_id : str = 'unnamed', input_img_array : np.ndarray = None, pcd=None):
         """ 
             Given a pointcloud 'pcd' and a (start, goal) pair of points, return a A* path in pixel coordinates
@@ -49,6 +49,9 @@ class Moloplanner():
         if pcd is None:
             pcd, bev_image_vis, bev_binary_image_uint8, bev_image_binary_inpainted_uint8 = depth_pipeline.process_img(img_id, input_img_array)
 
+        if (start_point == np.array([0.0, 0.0, 0.0])).all():
+            start_point = depth_pipeline.depth_model.get_point_closest_to_origin(np.asarray(pcd.points))
+        
         # the pixel coordinates of BEV projection of given points in the PCD
         BEV_start, BEV_goal = depth_pipeline.depth_model.get_nearest_point_bev_pixel(pcd, [start_point, goal_point])
 
