@@ -1,0 +1,13 @@
+for session in sim rviz other debug; do tmux new -d -s "$session"; done
+
+commands: in vertically stack windows each
+session 'other'
+commands
+ros2 run frontseat twist_to_diff_drive
+ros2 run frontseat gps_center_offset_node
+ros2 launch mission_planner action_client.launch.py
+
+session: rviz2
+command:
+rviz2
+ros2 launch visualization_tools visuals.launch.py

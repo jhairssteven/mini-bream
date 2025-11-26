@@ -31,6 +31,7 @@ setup(
             'dual_antenna = frontseat.DualAntenna:main',
             'moving_base_rtk = frontseat.MovingBaseRTK:main',
             'gps_center_offset_node = frontseat.GpsCenterOffsetNode:main',
+            'twist_to_diff_drive = frontseat.twist_to_diff_drive_node:main',
         ],
     },
 )
