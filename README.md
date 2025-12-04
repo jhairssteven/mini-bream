@@ -50,7 +50,7 @@ cd src/docker
 docker compose up -d --build
 ```
 
-> **Note**: If you encounter a "403 Forbidden" error during the build, visit https://foxglove.dev/download and update the Foxglove download link in the Dockerfile (line 65).
+> **Note**: If you encounter a "403 Forbidden" error during the build, visit https://foxglove.dev/download and update the Foxglove download link in the Dockerfile.
 
 ### 2. Access the Container
 
@@ -87,8 +87,6 @@ cd /workspace/docker
 # Install Python dependencies
 pip install pandas==1.2 utm scipy
 ```
-
-> **TODO**: Python dependencies should be added to the Dockerfile or package dependencies.
 
 ## Usage
 
