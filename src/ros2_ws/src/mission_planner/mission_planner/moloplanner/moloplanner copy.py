@@ -255,8 +255,7 @@ class Moloplanner():
             pcd=None)
         
         # Swapt path ([[i, j], ...]  (row, col)) to (col, row)
-        
-        astart_path = np.asarray(bev_pixel_astart_path)[:, [1, 0]]
+        astart_path = bev_pixel_astart_path[:, [1, 0]]
 
 
         pcl_xz_coordinates = self.depth_pipeline.depth_model.bev_pixels_to_meters(

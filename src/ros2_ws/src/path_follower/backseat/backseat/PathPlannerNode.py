@@ -26,21 +26,124 @@ from backseat_msgs.action import DoMission
 from backseat.NavigationTools import *
 from backseat.PathFollower import *
 from backseat.DataLogger import *
-import logging
 
-class DebugOnlyFilter(logging.Filter):
-    def filter(self, record):
-        return record.levelno == logging.DEBUG
+class WaypointVisualize:
+
+    @staticmethod
+    def waypoints_to_arrow_markers(header_stamp, waypoints, x_ref, y_ref, frame_id='world'):
+        """
+        Convert a list of waypoints into a MarkerArray of arrows.
+
+        :param waypoints: List of waypoints, each with pose.utm_x and pose.utm_y attributes
+        :param x_ref: X reference (offset)
+        :param y_ref: Y reference (offset)
+        :param frame_id: TF frame for markers
+        :return: MarkerArray containing arrow markers
+        """
+        marker_array = MarkerArray()
+        marker_id = 0
+
+        # Fixed sphere color (RGB + alpha)
+        r, g, b, a = 0.0, 0.5, 1.0, 0.9   # Light blue (or whatever you want)
+
+        for wp in waypoints:
+            marker = Marker()
+            marker.header.frame_id = frame_id
+            marker.header.stamp = header_stamp
+
+            #marker.ns = "waypoint_spheres"
+            marker.id = marker_id
+            marker_id += 1
+
+            marker.type = Marker.ARROW
+            marker.action = Marker.ADD
+
+            # Position (relative to reference)
+            marker.pose.position.x = wp.pose.utm_x - x_ref
+            marker.pose.position.y = wp.pose.utm_y - y_ref
+            marker.pose.position.z = 0.0
+
+            # Orientation fixed (unused for spheres)
+            # Orientation from waypoint heading
+            quat = tf.quaternion_from_euler(0, 0, wp.pose.head)
+            marker.pose.orientation.x = quat[0]
+            marker.pose.orientation.y = quat[1]
+            marker.pose.orientation.z = quat[2]
+            marker.pose.orientation.w = quat[3]
+
+            # Arrow size
+            marker.scale.x = 1.0
+            marker.scale.y = 0.2
+            marker.scale.z = 0.2
+
+            # Color
+            marker.color.r = r
+            marker.color.g = g
+            marker.color.b = b
+            marker.color.a = a
+
+            # Optional lifetime (0 = forever)
+            marker.lifetime = Duration(sec=0)
+
+            marker_array.markers.append(marker)
+
+        return marker_array
+    
+    @staticmethod
+    def waypoints_to_ros_path(waypoints, x_ref, y_ref, frame_id='world'):
+        """
+        Convert a list of waypoints to a ROS Path message relative to a reference point.
+        
+        :param waypoints: List of waypoints, each with pose.utm_x and pose.utm_y attributes
+        :param goal_lat: Latitude of the reference goal
+        :param goal_lon: Longitude of the reference goal
+        :param frame_id: Frame ID to set for the Path and poses
+        :return: nav_msgs.msg.Path
+        """
+        path_ros = Path()
+        path_ros.header.frame_id = frame_id
+
+        for wp in waypoints:
+            pose = PoseStamped()
+            pose.header.frame_id = frame_id
+            pose.pose.position.x = wp.pose.utm_x - x_ref
+            pose.pose.position.y = wp.pose.utm_y - y_ref
+            pose.pose.position.z = 0.0
+            pose.pose.orientation.x = 0.0
+            pose.pose.orientation.y = 0.0
+            pose.pose.orientation.z = 0.0
+            pose.pose.orientation.w = 1.0  # Identity quaternion
+            path_ros.poses.append(pose)
+        
+        return path_ros
+    
+    @staticmethod
+    def getMarker(header_stamp, color=[1, 0, 0, 1], type=Marker.ARROW, lwh=None):
+        mkr = Marker()
+        mkr.header.frame_id = "world"
+        mkr.header.stamp = header_stamp
+        mkr.type = type
+        mkr.id = 0
+        if lwh:
+            mkr.scale.x, mkr.scale.y, mkr.scale.z = lwh
+        elif type == Marker.CYLINDER:
+            mkr.scale.x = mkr.scale.y = 0.2
+            mkr.scale.z = 0.1
+        elif type == Marker.ARROW:
+            mkr.scale.x = 2.0
+            mkr.scale.y = mkr.scale.z = 0.2
+        elif type == Marker.LINE_STRIP:
+            mkr.scale.x = mkr.scale.y = mkr.scale.z = 0.1
+        else:
+            mkr.scale.x = mkr.scale.y = 0.5
+            mkr.scale.z = 0.1
+        mkr.color.r, mkr.color.g, mkr.color.b, mkr.color.a = color
+        return mkr
 
 class PathPlannerNode(Node):
     def __init__(self):
         super().__init__('path_planner_node')
         self.get_logger().set_level(rclpy.logging.LoggingSeverity.ERROR)
-        """ # Get node logger
-        logger = self.get_logger()
-        # Clear existing filters
-        for h in logger.handlers:
-            h.addFilter(DebugOnlyFilter()) """
         
         self.declare_parameter('max_vehicle_linear_velocity', 3.0) # m/s
         self.declare_parameter('max_vehicle_angular_velocity', 0.5) # m/s
@@ -260,119 +363,42 @@ class PathPlannerNode(Node):
         return linear_speed_pct
 
 
-    def __publish_paths(self, wk_path, orig_path, mission_waypoints_path=None):
-        self.vis_wk_path_pub.publish(wk_path)
-        self.wk_path_pub.publish(wk_path)
-        self.orig_path_pub.publish(orig_path)
-        if mission_waypoints_path is not None:
-            self.mission_waypoints_pub.publish(mission_waypoints_path)
+    def __publish_paths(self, wk_path=None, orig_path=None, mission_waypoints=None):
+        """ Publishes the paths to the ROS topics
+        Args:
+            wk_path: The working path to publish (ROS Path message)
+            orig_path: The original path to publish (ROS Path message)
+            mission_waypoints: The mission waypoints to publish (Waypoints List)
+        """
+        if wk_path is not None:
+            self.vis_wk_path_pub.publish(wk_path)
+            self.wk_path_pub.publish(wk_path)
+        if orig_path is not None:
+            self.orig_path_pub.publish(orig_path)
+        if mission_waypoints is not None:
+            x_ref, y_ref, _, _ = utm.from_latlon(self.goal_lat, self.goal_lon)
+            mission_waypoints_path_ros = WaypointVisualize.waypoints_to_arrow_markers(
+                    header_stamp=self.get_clock().now().to_msg(),
+                    waypoints=mission_waypoints,
+                    x_ref=x_ref,
+                    y_ref=y_ref)
+            self.mission_waypoints_pub.publish(mission_waypoints_path_ros)
         self.paths_published = True
 
-    def waypoints_to_arrow_markers(self, waypoints, x_ref, y_ref, frame_id='world'):
-        """
-        Convert a list of waypoints into a MarkerArray of arrows.
-
-        :param waypoints: List of waypoints, each with pose.utm_x and pose.utm_y attributes
-        :param x_ref: X reference (offset)
-        :param y_ref: Y reference (offset)
-        :param frame_id: TF frame for markers
-        :return: MarkerArray containing arrow markers
-        """
-        marker_array = MarkerArray()
-        marker_id = 0
-
-        # Fixed sphere color (RGB + alpha)
-        r, g, b, a = 0.0, 0.5, 1.0, 0.9   # Light blue (or whatever you want)
-
-        for wp in waypoints:
-            marker = Marker()
-            marker.header.frame_id = frame_id
-            marker.header.stamp = self.get_clock().now().to_msg()
-
-            #marker.ns = "waypoint_spheres"
-            marker.id = marker_id
-            marker_id += 1
-
-            marker.type = Marker.ARROW
-            marker.action = Marker.ADD
-
-            # Position (relative to reference)
-            marker.pose.position.x = wp.pose.utm_x - x_ref
-            marker.pose.position.y = wp.pose.utm_y - y_ref
-            marker.pose.position.z = 0.0
-
-            # Orientation fixed (unused for spheres)
-            # Orientation from waypoint heading
-            quat = tf.quaternion_from_euler(0, 0, wp.pose.head)
-            marker.pose.orientation.x = quat[0]
-            marker.pose.orientation.y = quat[1]
-            marker.pose.orientation.z = quat[2]
-            marker.pose.orientation.w = quat[3]
-
-            # Arrow size
-            marker.scale.x = 1.0
-            marker.scale.y = 0.2
-            marker.scale.z = 0.2
-
-            # Color
-            marker.color.r = r
-            marker.color.g = g
-            marker.color.b = b
-            marker.color.a = a
-
-            # Optional lifetime (0 = forever)
-            marker.lifetime = Duration(sec=0)
-
-            marker_array.markers.append(marker)
-
-        return marker_array
-
-    def waypoints_to_ros_path(self, waypoints, x_ref, y_ref, frame_id='world'):
-        """
-        Convert a list of waypoints to a ROS Path message relative to a reference point.
-        
-        :param waypoints: List of waypoints, each with pose.utm_x and pose.utm_y attributes
-        :param goal_lat: Latitude of the reference goal
-        :param goal_lon: Longitude of the reference goal
-        :param frame_id: Frame ID to set for the Path and poses
-        :return: nav_msgs.msg.Path
-        """
-        path_ros = Path()
-        path_ros.header.frame_id = frame_id
-
-        for wp in waypoints:
-            pose = PoseStamped()
-            pose.header.frame_id = frame_id
-            pose.pose.position.x = wp.pose.utm_x - x_ref
-            pose.pose.position.y = wp.pose.utm_y - y_ref
-            pose.pose.position.z = 0.0
-            pose.pose.orientation.x = 0.0
-            pose.pose.orientation.y = 0.0
-            pose.pose.orientation.z = 0.0
-            pose.pose.orientation.w = 1.0  # Identity quaternion
-            path_ros.poses.append(pose)
-        
-        return path_ros
-
-    def __update_follower(self, new_mission=True, mission_waypoints=None):
+    def __update_follower(self, new_mission=True):
         """! Main loop intended to update the output of the path following algorithm.
         Args:
             new_mission (True)
-            mission_waypoints: The waypoint list for the commanded mission. (type NavigationTools.Waypoint)
         @return None.
         """
         # Convert wk_path and orig_path from PathFollower into ROS Path messages 
         if new_mission or not self.paths_published or self.path_follower.replan_triggered:
             x_ref, y_ref, _, _ = utm.from_latlon(self.goal_lat, self.goal_lon)
 
-            mission_waypoints_path_ros = None
-            if mission_waypoints:
-                mission_waypoints_path_ros = self.waypoints_to_arrow_markers(mission_waypoints, x_ref, y_ref)
-
             wk_path, orig_path = self.path_follower.get_generated_paths()
-            wk_path_ros = self.waypoints_to_ros_path(wk_path, x_ref, y_ref)
-            orig_path_ros = self.waypoints_to_ros_path(orig_path, x_ref, y_ref)
-            self.__publish_paths(wk_path_ros, orig_path_ros, mission_waypoints_path_ros)
+            wk_path_ros = WaypointVisualize.waypoints_to_ros_path(wk_path, x_ref, y_ref)
+            orig_path_ros = WaypointVisualize.waypoints_to_ros_path(orig_path, x_ref, y_ref)
+            self.__publish_paths(wk_path=wk_path_ros, orig_path=orig_path_ros)
             new_mission = False
 
         self.current_vehicle_wp.ToUTM()
@@ -389,11 +415,16 @@ class PathPlannerNode(Node):
             self.__velocity_control_step()
         else:
             # Publish a zero velocity as a last command
-            self.to_diff_driv(linear_speed_pct=0.0, angular_speed=0.0, k=1, diff_drive=self.publish_diff_drive)
+            self.fixed_velocity(linear_speed_pct=0.0, angular_speed=0.0)
         self.mission_complete = mc
 
-    
+    def fixed_velocity(self, linear_speed_pct=0.0, angular_speed=0.0):
+        self.to_diff_driv(linear_speed_pct=linear_speed_pct, angular_speed=angular_speed, k=1, diff_drive=self.publish_diff_drive)
+        
     def __load_mission(self, mission):
+        """ Args:
+            mission: Minimum 2-waypoint mission
+        """
         wps = []
 
         # Pre-extract lat/lon for clarity
@@ -443,6 +474,7 @@ class PathPlannerNode(Node):
             self.get_logger().error('No valid mission source provided.')
             return DoMission.Result(mission_complete=False)
 
+        self.__publish_paths(mission_waypoints=self.mission)
         self.path_follower = PathFollower(self, mission=self.mission, path_creator=DubinsPath)
         self.new_mission = True
         self.mission_complete = False
@@ -453,38 +485,18 @@ class PathPlannerNode(Node):
                 self.get_logger().warn('Cancel requested')
                 return DoMission.Result(mission_complete=False)
             
-            self.__update_follower(new_mission=self.new_mission, mission_waypoints=self.mission)
+            self.__update_follower(new_mission=self.new_mission)
             self.new_mission = False
 
             self._feedback.xt_error = float(abs(self.path_follower.ye))
             goal_handle.publish_feedback(self._feedback)
+            time.sleep(0.1)
 
         goal_handle.succeed()
         self.get_logger().info("Mission completed")
         
         return DoMission.Result(mission_complete=True)
 
-    def getMarker(self, color=[1, 0, 0, 1], type=Marker.ARROW, lwh=None):
-        mkr = Marker()
-        mkr.header.frame_id = "world"
-        mkr.header.stamp = self.get_clock().now().to_msg()
-        mkr.type = type
-        mkr.id = 0
-        if lwh:
-            mkr.scale.x, mkr.scale.y, mkr.scale.z = lwh
-        elif type == Marker.CYLINDER:
-            mkr.scale.x = mkr.scale.y = 0.2
-            mkr.scale.z = 0.1
-        elif type == Marker.ARROW:
-            mkr.scale.x = 2.0
-            mkr.scale.y = mkr.scale.z = 0.2
-        elif type == Marker.LINE_STRIP:
-            mkr.scale.x = mkr.scale.y = mkr.scale.z = 0.1
-        else:
-            mkr.scale.x = mkr.scale.y = 0.5
-            mkr.scale.z = 0.1
-        mkr.color.r, mkr.color.g, mkr.color.b, mkr.color.a = color
-        return mkr
 
     def publishWorkingWypt(self, waypoint):
         x_ref, y_ref, _, _ = utm.from_latlon(self.get_parameter('goal_lat').value,
@@ -498,7 +510,12 @@ class PathPlannerNode(Node):
         p.position.y = y
         p.position.z = 0.0
         p.orientation.x, p.orientation.y, p.orientation.z, p.orientation.w = quat
-        marker = self.getMarker(color=[1.0, 0.5, 1.0, 1.0], type=Marker.ARROW, lwh=[0.5, 0.1, 0.2])
+        marker = WaypointVisualize.getMarker(
+            header_stamp=self.get_clock().now().to_msg(), 
+            color=[1.0, 0.5, 1.0, 1.0], 
+            type=Marker.ARROW, 
+            lwh=[0.5, 0.1, 0.2])
+            
         marker.pose = p
         self.working_waypoint_pub.publish(marker)
 

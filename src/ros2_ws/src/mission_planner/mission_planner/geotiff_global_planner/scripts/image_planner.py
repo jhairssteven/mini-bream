@@ -376,12 +376,80 @@ import imageio
 import time
 import pyastar2d
 
+from mission_planner.geotiff_global_planner.scripts.RRT_start.rrt_star import RRTStarPlanner
+
 class AStartPlanner():
     def __init__(self, save_output=True, output_dir='./', filename='img_with_path'):
         self.save_output = save_output
         self.output_dir = output_dir
 
-    def plan(self, image_path=None, image_array=None, start=None, goal=None, save_output=True, output_dir=None, filename='img_with_path'):
+    def inflate(self, grid, maze, inflate_radius_pxls=20):
+        """ Inflate the maze and grid by a given inflation radius in pixels
+        Args:
+            grid : np.ndarray (dtype=float32, shape=(H, W))
+                A 2D float32 cost grid where:
+                    - grid[y, x] = 1.0   → traversable (white pixel)
+                    - grid[y, x] = inf   → non-traversable (black pixel)
+
+            maze : np.ndarray (dtype=uint8, shape=(H, W))
+                The grayscale 2D uint8 image (0-255), after conversion and binarization.
+        Returns:
+            grid : np.ndarray (dtype=float32, shape=(H, W))
+                The inflated maze grid."""
+        
+        from scipy.ndimage import distance_transform_edt
+        
+        # 1. Create a binary mask where obstacles are 0 and free space is 1
+        # grid has inf for obstacles, 1 for free space
+        mask = (grid != np.inf).astype(int)
+        
+        # 2. Compute Euclidean distance from nearest obstacle (0 in mask)
+        # distance_transform_edt computes distance to nearest zero
+        dist_grid = distance_transform_edt(mask)
+        
+        # 3. Apply inflation cost
+        # We want higher cost closer to obstacles (low distance)
+        # Only affect pixels within radius
+        inflation_mask = (dist_grid < inflate_radius_pxls) & (dist_grid > 0)
+        
+        # Max added cost at distance 0 (next to obstacle)
+        max_inflation_cost = 100.0 
+        
+        # Linear decay: Cost = Max * (1 - d/R)
+        added_cost = max_inflation_cost * (1.0 - dist_grid[inflation_mask] / inflate_radius_pxls)
+        
+        grid[inflation_mask] += added_cost
+        
+        # 4. Update maze for visualization
+        # Mark inflated areas with a gradient:
+        # Closer to obstacle (higher cost) -> Red (255, 0, 0)
+        # Farther from obstacle (lower cost) -> White (255, 255, 255)
+        
+        # Convert maze to RGB if it isn't already
+        if maze.ndim == 2:
+            maze = np.stack((maze,) * 3, axis=-1)
+        
+        # Create a boolean mask for visualization updates
+        vis_mask = inflation_mask
+        
+        # Calculate intensity: 0 at dist=0, 1 at dist=radius
+        normalized_dist = dist_grid[vis_mask] / inflate_radius_pxls
+        
+        # Create colors for masked pixels
+        # Interpolate between Orange (255, 140, 0) at dist=0 and White (255, 255, 255) at dist=1
+        colors = np.zeros((normalized_dist.size, 3), dtype=np.uint8)
+        
+        # Define color endpoints
+        far_from_obstacle = np.array([255, 255, 255], dtype=np.uint8)
+        close_to_obstacle = np.array([255, 140, 0], dtype=np.uint8)
+        nd = normalized_dist[:, np.newaxis]
+        color_costmap = (close_to_obstacle * (1 - nd) + far_from_obstacle * nd).astype(np.uint8)
+        
+        maze[vis_mask] = color_costmap
+        
+        return grid, maze
+
+    def plan(self, image_path=None, image_array=None, start=None, goal=None, save_output=True, output_dir=None, filename='img_with_path', inflate_radius_pxls=20):
         """ 
         image_path: A .tiff or .png or .jpg image. Traversable pixels are white, non traversable pixels are black
         start: Pixel to start path. Pixel coordinates (x, y) of a valid traversable pixel
@@ -391,26 +459,34 @@ class AStartPlanner():
         """
 
         grid, maze = self.read_img_as_grid(image_path=image_path, image_array=image_array)
+        grid, maze = self.inflate(grid, maze, inflate_radius_pxls=inflate_radius_pxls)
         start, goal = self.get_start_and_goal(grid, start, goal)
 
-        print(f"[A* Planner] Using grid with shape {grid.shape}. Start: {start}, Goal: {goal}")
-        t0 = time.time()
+        print(f"[Planner] Using grid with shape {grid.shape}. Start: {start}, Goal: {goal}")
+        planner = RRTStarPlanner(mask_img_path=maze, grid=grid)
+        path = planner.plan(start_pixel=(start[1], start[0]), goal_pixel=(goal[1], goal[0]), visualize=True)
+
+        """ t0 = time.perf_counter()
         path = pyastar2d.astar_path(grid, start, goal, allow_diagonal=False)
-        dur = time.time() - t0
+        dur = time.perf_counter() - t0
         print(f"[A* Planner] Found path of length {path.shape[0]} elements in {dur:.6f}s")
 
         if path.shape[0] > 0:
             if save_output:
                 self.save_path_to_img(path, maze, output_dir, filename=filename)
         else:
-            print("[A* Planner] No path found")
+            print("[A* Planner] No path found") """
 
         return path
 
     def save_path_to_img(self, path, maze, output_dir, filename='img_with_path'):
         
-        #maze = maze.astype(np.int8) * 255
-        maze = np.stack((maze.astype(np.uint8),) * 3, axis=-1) # convert to 3 channel
+        # Ensure maze is 3-channel RGB
+        if maze.ndim == 2:
+            maze = np.stack((maze.astype(np.uint8),) * 3, axis=-1)
+        else:
+            maze = maze.astype(np.uint8)
+
         # Update path pixels to red color
         maze[path[:, 0], path[:, 1]] = (255, 0, 0)
 
@@ -428,7 +504,7 @@ class AStartPlanner():
         """
 
         # Get all valid traversable points
-        valid_points = np.argwhere(grid == 1)
+        valid_points = np.argwhere(grid != np.inf)
 
         def find_nearest_valid(point):
             """Return the nearest valid cell to 'point' using Euclidean distance."""
@@ -442,7 +518,7 @@ class AStartPlanner():
             """Check if a point is inside grid and traversable."""
             r, c = point
             if 0 <= r < grid.shape[0] and 0 <= c < grid.shape[1]:
-                return grid[r, c] == 1
+                return grid[r, c] != np.inf
             return False
 
         if start is not None and goal is not None:
@@ -461,15 +537,15 @@ class AStartPlanner():
             # if not start, goal is provided, find some automatically
             if start is None:
                 # start is the first index in the bottom-most row that has a 1
-                rows_with_ones = np.where(np.any(grid == 1, axis=1))[0]
+                rows_with_ones = np.where(np.any(grid != np.inf, axis=1))[0]
                 last_row_idx = rows_with_ones[-1]
-                start_j, = np.where(grid[last_row_idx, :] == 1)
+                start_j, = np.where(grid[last_row_idx, :] != np.inf)
                 start = np.array([last_row_idx, start_j[0]])
             if goal is None:
                 # end is the last index in the top-most row that has a 1
-                rows_with_ones = np.where(np.any(grid == 1, axis=1))[0]
+                rows_with_ones = np.where(np.any(grid != np.inf, axis=1))[0]
                 first_row_idx = rows_with_ones[0]  # last row that has a 1
-                end_i, = np.where(grid[first_row_idx, :] == 1)
+                end_i, = np.where(grid[first_row_idx, :] != np.inf)
                 goal = np.array([first_row_idx, end_i[-1]])
         
         return start, goal
@@ -536,11 +612,11 @@ def parse_args():
         "An example of using pyastar2d to find the solution to a maze"
     )
     parser.add_argument(
-        "--input", type=str, default="/workspace/codebase/mini-bream/src/ros2_ws/src/mission_planner/mission_planner/geotiff_global_planner/assets/global_map/river_map.png",
+        "--input", type=str, default="/workspace/codebase/mini-bream/src/ros2_ws/src/mission_planner/mission_planner/moloplanner/assets/output_dir/astart_planner/frame_1764638009_astart_planner.png",
         help="Path to the black-and-white image to be used as input.",
     )
     parser.add_argument(
-        "--output", type=str, default="/workspace/codebase/mini-bream/src/ros2_ws/src/mission_planner/mission_planner/geotiff_global_planner/assets/output/river_map.png", 
+        "--output", type=str, default="/workspace/codebase/mini-bream/src/ros2_ws/src/mission_planner/mission_planner/moloplanner/assets/output_dir/inflation_radius", 
         help="Path to where the output will be written",
     )
 
@@ -551,23 +627,24 @@ if __name__ == '__main__':
     #python_motion_planning_lib_main()
     args = parse_args()
 
-    data = np.load('/workspace/codebase/mini-bream/src/ros2_ws/src/mission_planner/mission_planner/depth_bev_data.npz')
-    BEV_start=data['BEV_start']
-    BEV_goal=data['BEV_goal']
-    bev_image_vis=data['bev_image_vis']
-    
-    print('BEV_start', BEV_start)
-    print('BEV_goal', BEV_goal[1], BEV_goal[0])
-    print("bev_image_vis.shape", bev_image_vis.shape)
-    
-    maze_inv = np.copy(bev_image_vis)
-    maze_inv[np.where(bev_image_vis < 250)] = 255
-    maze_inv[np.where(bev_image_vis > 250)] = 0
+    #data = np.load('/workspace/codebase/mini-bream/src/ros2_ws/src/mission_planner/mission_planner/depth_bev_data.npz')
+    #BEV_start=data['BEV_start']
+    #BEV_goal=data['BEV_goal']
+    #bev_image_vis=data['bev_image_vis']
+    #
+    #print('BEV_start', BEV_start)
+    #print('BEV_goal', BEV_goal[1], BEV_goal[0])
+    #print("bev_image_vis.shape", bev_image_vis.shape)
+    #
+    #maze_inv = np.copy(bev_image_vis)
+    #maze_inv[np.where(bev_image_vis < 250)] = 255
+    #maze_inv[np.where(bev_image_vis > 250)] = 0
 
     astart_planner = AStartPlanner(save_output=True, output_dir=args.output)
     path = astart_planner.plan(image_path=args.input, 
-                               image_array=maze_inv, 
-                               start=np.array([BEV_start[1], BEV_start[0]]),
-                               goal=np.array([BEV_goal[1], BEV_goal[0]]),
+                               image_array=None, 
+                               start=np.array([1000, 0]),
+                               goal=np.array([20, 100]),
                                save_output=True, 
-                               output_dir=args.output)
+                               output_dir=args.output,
+                               inflate_radius_pxls=50)

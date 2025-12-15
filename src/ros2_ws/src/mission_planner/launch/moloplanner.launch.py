@@ -4,6 +4,17 @@ from launch_ros.actions import Node
 def generate_launch_description():
 
     return LaunchDescription([
+        Node(
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            name='world_to_map_broadcaster',
+            arguments=[
+                '0', '0', '0',          # translation x y z
+                '0', '0', '0',          # rotation roll pitch yaw
+                'world',                # parent frame
+                'map'                   # child frame
+            ]
+        ),
         # Data mocking
         Node(
             package='mission_planner',

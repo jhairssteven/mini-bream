@@ -38,6 +38,14 @@ class ActionServerClient:
         self._client.wait_for_server()
 
         self.log("Sending new mission...", enable_logs=True)
+        
+        # Cancel current goal being executed BEFORE sending new one
+        if self.current_goal_handle is not None:
+            #self.log("Cancelling previous goal before sending new one...")
+            self.current_goal_handle.cancel_goal_async()
+            # We don't wait for the callback here to keep it snappy, 
+            # but the server should handle the cancel request shortly.
+        
         send_future = self._client.send_goal_async(
             goal_msg, 
             feedback_callback=self.feedback_cb
@@ -53,15 +61,14 @@ class ActionServerClient:
         # Set what to do if goal was accepted
         new_goal_handle.get_result_async().add_done_callback(self.process_result)
 
-        # Cancel current goal being executed
-        if self.current_goal_handle is not None:
-            self.current_goal_handle.cancel_goal_async().add_done_callback(self.goal_cancelled)
-        self.current_goal_handle = new_goal_handle # Update rgoal eference
+        # Update reference (Old goal was already cancelled in send_goal)
+        self.current_goal_handle = new_goal_handle
 
     def goal_cancelled(self, future):
         cancel_response = future.result()
         if len(cancel_response.goals_canceling) > 0:
-            self.log('Goal successfully canceled', cancel=True)
+            #self.log('Goal successfully canceled', cancel=True)
+            pass
         else:
             self.log('Goal failed to cancel', cancel=True)
 
