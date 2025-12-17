@@ -447,9 +447,13 @@ class Sam2Wrapper():
 
     def infer(self, sam2_model, img_id: str, image_input, device, display_masks=False, save_dir='output_masks', write_singles=False):
         predictor = sam2_model
+        
+        start = time.perf_counter()
         image = image_input.copy()
         predictor.set_image(image) # 200 ms
-        
+        end = time.perf_counter()
+        print(f'[SAM2]: Predictor setting took: {(end-start)*1000:.3f} ms')
+
         height, width, channels =  image.shape
         input_point = np.array([[width/2, height*0.95]]) # prompt the center, bottom pixel (closer to the camera frame)
         input_label = np.array([1]) # 1 for foreground
