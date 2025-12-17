@@ -464,7 +464,8 @@ class AStartPlanner():
 
         print(f"[Planner] Using grid with shape {grid.shape}. Start: {start}, Goal: {goal}")
         planner = RRTStarPlanner(mask_img_path=maze, grid=grid)
-        path = planner.plan(start_pixel=(start[1], start[0]), goal_pixel=(goal[1], goal[0]), visualize=True)
+        
+        path = planner.plan(start_pixel=(start[1], start[0]), goal_pixel=(goal[1], goal[0]), visualize=False)
 
         """ t0 = time.perf_counter()
         path = pyastar2d.astar_path(grid, start, goal, allow_diagonal=False)

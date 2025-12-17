@@ -4,12 +4,20 @@ from PIL import Image, ImageDraw
 import numpy as np, math, os, random, heapq
 from typing import List, Tuple, Optional
 import time
-import ctypes
-from ctypes import POINTER, c_int, c_double, c_void_p, c_ubyte
 
+# ---------------- RRT* PARAMETERS (kept together for easy tuning) ----------------
+RRT_MAX_ITERS = 20000           # maximum number of sampling iterations
+RRT_STEP = 12                   # step length in pixels when steering toward sample
+RRT_GOAL_SAMPLE_RATE = 0.07     # probability of sampling the goal directly
+RRT_REWIRE_RADIUS = 40.0        # neighbourhood radius for rewiring (pixels)
+RRT_GOAL_TOL = 10               # distance tolerance (pixels) to consider goal reached
+RRT_COLLISION_SAMPLES = 6       # number of intermediate checks along an edge
+RRT_MIN_DISTANCE_BETWEEN_NODES = 1.0  # avoid duplicate nodes near each other
+# -------------------------------------------------------------------------------
 
+FOOTPRINT_LENGTH = 200
+FOOTPRINT_WIDTH = 250
 OUTPUT_DIR = "/workspace/codebase/mini-bream/src/ros2_ws/src/mission_planner/mission_planner/moloplanner/assets/output_dir/hybrid_a_start"
-# OUTPUT_DIR = "./rrt_star_output"
 class Pose:
     def __init__(self, x: float, y: float, theta: float):
         self.x = x
@@ -25,114 +33,45 @@ class RRTNode:
         self.parent = parent
         self.idx = None
 
+import numpy as np
+import math
+import random
+from scipy.spatial import cKDTree
+
 class RRTStarPlanner:
     def __init__(self, mask_img_path: str, grid=None):
         self.mask_img_path = mask_img_path
         _, self.occupancy, self.width, self.height = self.__read_image(mask_img_path, grid)
-        self.expanded_nodes = []   # store all nodes visited for search tree-expansion visualization
+        self.expanded_nodes = []   # nodes for visualization
+        self.node_xy = np.empty((0, 2), dtype=np.float32)  # positions for KD-tree
+        self.kdtree = None
         print(f"[RRT*] Occupancy grid(w, h): {self.width, self.height}")
 
-        # Load C++ library
-        lib_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "librrt_star.so")
-        self.lib = ctypes.CDLL(lib_path)
-        
-        # Define argument types
-        self.lib.RRTStar_new.argtypes = [POINTER(c_ubyte), c_int, c_int]
-        self.lib.RRTStar_new.restype = c_void_p
-        
-        self.lib.RRTStar_delete.argtypes = [c_void_p]
-        self.lib.RRTStar_delete.restype = None
-        
-        self.lib.RRTStar_plan.argtypes = [c_void_p, c_double, c_double, c_double, c_double, 
-                                          POINTER(c_int), POINTER(POINTER(c_int)), POINTER(POINTER(c_int))]
-        self.lib.RRTStar_plan.restype = None
-        
-        self.lib.RRTStar_free_path.argtypes = [POINTER(c_int), POINTER(c_int)]
-        self.lib.RRTStar_free_path.restype = None
-        
-        self.lib.RRTStar_get_footprint_dims.argtypes = [c_void_p, POINTER(c_double), POINTER(c_double)]
-        self.lib.RRTStar_get_footprint_dims.restype = None
-
-        self.lib.RRTStar_get_tree.argtypes = [c_void_p, POINTER(c_int), 
-                                              POINTER(POINTER(c_double)), POINTER(POINTER(c_double)), 
-                                              POINTER(POINTER(c_double)), POINTER(POINTER(c_int))]
-        self.lib.RRTStar_get_tree.restype = None
-
-        self.lib.RRTStar_free_tree.argtypes = [POINTER(c_double), POINTER(c_double), POINTER(c_double), POINTER(c_int)]
-        self.lib.RRTStar_free_tree.restype = None
-
-        # Create C++ object
-        # Ensure occupancy is contiguous and correct type
-        self.occupancy_flat = self.occupancy.flatten().astype(np.uint8)
-        self.occupancy_ptr = self.occupancy_flat.ctypes.data_as(POINTER(c_ubyte))
-        self.cpp_obj = self.lib.RRTStar_new(self.occupancy_ptr, self.width, self.height)
-
-        # Get footprint dims from C++
-        c_len = c_double(0)
-        c_wid = c_double(0)
-        self.lib.RRTStar_get_footprint_dims(self.cpp_obj, ctypes.byref(c_len), ctypes.byref(c_wid))
-        self.footprint_length = c_len.value
-        self.footprint_width = c_wid.value
-
-        # Precompute footprint offsets for vectorized collision checking
-        L = self.footprint_length
-        W = self.footprint_width
-        halfL = L/2.0
-        halfW = W/2.0
-        # Vertices
-        verts = [ ( halfL,  halfW), ( halfL, -halfW), (-halfL, -halfW), (-halfL,  halfW) ]
-        # Midpoints
-        mids = []
-        n = len(verts)
-        for i in range(n):
-            x0, y0 = verts[i]
-            x1, y1 = verts[(i+1)%n]
-            mids.append(((x0+x1)/2.0, (y0+y1)/2.0))
-        # Center
-        center = [(0.0, 0.0)]
-        # Combine: 4 verts + 4 mids + 1 center
-        self.footprint_offsets = np.array(verts + mids + center, dtype=np.float32)
-
-    def __del__(self):
-        if hasattr(self, 'lib') and hasattr(self, 'cpp_obj'):
-            self.lib.RRTStar_delete(self.cpp_obj)
-
+    # ------------------ Image loading ------------------
     def __read_image(self, path: str, grid=None):
-        """ 
-            Args:
-                Path: str: path to image map or numpy arr 
-        """
-        # Case 1: path is a string or Path → load from disk
         if isinstance(path, str):
+            from PIL import Image
             im = Image.open(path).convert("L")
             img_arr = np.array(im)
-
-        # Case 2: path is already a NumPy array
         elif isinstance(path, np.ndarray):
             img_arr = path
             if img_arr.ndim == 3:
-                # Convert RGB → grayscale if needed
                 img_arr = img_arr.mean(axis=2)
-
         else:
-            raise TypeError(
-                f"Unsupported type for path: {type(path)}. "
-                "Expected str or numpy.ndarray."
-            )
-        
+            raise TypeError(f"Unsupported type for path: {type(path)}")
         free = (img_arr > 250) if grid is None else (grid != np.inf)
         h,w = free.shape
         return img_arr, free, w, h
-        
+
+    # ------------------ Collision checks ------------------
+    def _is_free_point(self, x: int, y: int, footprint: bool = False) -> bool:
         if x < 0 or y < 0 or x >= self.width or y >= self.height:
-            if footprint: # footprint polygon can be outside map size
-                return True
-            return False
+            return footprint  # allow footprint outside
         return bool(self.occupancy[y, x])
 
     def _footprint_polygon(self, pose: Pose) -> List[Tuple[float,float]]:
-        L = self.footprint_length
-        W = self.footprint_width
+        L = FOOTPRINT_LENGTH
+        W = FOOTPRINT_WIDTH
         halfL = L/2.0
         halfW = W/2.0
         verts = [ ( halfL,  halfW),
@@ -147,68 +86,269 @@ class RRTStarPlanner:
             wy = pose.y + sin_t*vx + cos_t*vy
             world.append((wx, wy))
         return world
+    
+    # ------------------ Node insertion ------------------
+    def _push_node(self, nodes, pose, cost, parent_idx):
+        idx = len(nodes)
+        node = RRTNode(pose, cost, parent_idx)
+        node.idx = idx
+        nodes.append(node)
+        self.expanded_nodes.append((pose.x, pose.y))
+        # update KD-tree
+        self.node_xy = np.vstack((self.node_xy, [pose.x, pose.y]))
+        self.kdtree = cKDTree(self.node_xy)
+        return idx
 
-    # ------------------ RRT* main planner ------------------
-    def plan(self, start_pixel: Tuple[int,int], goal_pixel: Tuple[int,int], visualize: bool=True) -> List[Tuple[int,int]]:
-        """ 
-            Args:
-                start_pixel: (x, y)
-                goal_pixel: (x, y)
-        """
+    # ------------------ Nearest neighbor using KD-tree ------------------
+    def _nearest_node_idx(self, point):
+        if self.kdtree is None:
+            raise RuntimeError("KD-tree not initialized")
+        _, idx = self.kdtree.query(point)
+        return idx
+
+    # ------------------ Nearby nodes within radius ------------------
+    def _nearby_nodes(self, idx: int, radius: float) -> list[int]:
+        if self.kdtree is None:
+            return []
+        point = self.node_xy[idx]
+        indices = self.kdtree.query_ball_point(point, radius)
+        return indices
+
+    # ------------------ Check if too close to existing node ------------------
+    def _near_existing_node(self, pose, min_dist: float) -> bool:
+        if self.kdtree is None or len(self.node_xy) == 0:
+            return False
+        # squared distance check for speed
+        idxs = self.kdtree.query_ball_point([pose.x, pose.y], r=min_dist)
+        return len(idxs) > 0
+
+    # ------------------ Steer towards target ------------------
+    def _steer_towards(self, from_pose: Pose, to_point: tuple[int,int], step: float) -> Pose:
+        dx = to_point[0] - from_pose.x
+        dy = to_point[1] - from_pose.y
+        dist = math.hypot(dx, dy)
+        if dist < 1e-6:
+            return Pose(from_pose.x, from_pose.y, from_pose.theta)
+        scale = min(step / dist, 1.0)
+        nx = from_pose.x + dx * scale
+        ny = from_pose.y + dy * scale
+        theta = math.atan2(dy, dx)
+        return Pose(nx, ny, theta)
+
+    def _polygon_is_collision_free(self, polygon: list[tuple[float,float]]) -> bool:
+        """Vectorized collision check for a polygon using midpoint + center + vertices"""
+
+        polygon = np.array(polygon)  # shape (N,2)
+        n = len(polygon)
+
+        # --- midpoints ---
+        next_idx = np.roll(np.arange(n), -1)
+        midpoints = (polygon + polygon[next_idx]) / 2.0  # shape (N,2)
+
+        # --- center ---
+        center = polygon.mean(axis=0, keepdims=True)  # shape (1,2)
+
+        # --- all points to test ---
+        test_points = np.vstack([polygon, midpoints, center])  # shape (N*2+1, 2)
+        ix = np.clip(np.round(test_points[:,0]).astype(int), 0, self.width-1)
+        iy = np.clip(np.round(test_points[:,1]).astype(int), 0, self.height-1)
+
+        # occupancy check in one go
+        free = self.occupancy[iy, ix]
+
+        # If any test point is not free, collision!
+        if not free.all():
+            return False
+
+        # final center check (must be strictly inside map)
+        cx, cy = int(round(center[0,0])), int(round(center[0,1]))
+        if not self._is_free_point(cx, cy, footprint=False):
+            return False
+
+        return True
+
+    def _edge_collision_free(self, a: Pose, b: Pose, samples: int = RRT_COLLISION_SAMPLES) -> bool:
+        """Vectorized edge collision check"""
+        if samples <= 0:
+            return True
+
+        # --- linear interpolation ---
+        ts = np.linspace(0, 1, samples+1)[1:]  # skip t=0 (already a)
+        xs = a.x + (b.x - a.x) * ts
+        ys = a.y + (b.y - a.y) * ts
+
+        # Compute headings along edge
+        dx = b.x - a.x
+        dy = b.y - a.y
+        thetas = np.arctan2(dy, dx) * np.ones_like(xs)
+
+        # --- batch check each pose ---
+        for x, y, theta in zip(xs, ys, thetas):
+            p = Pose(x, y, theta)
+            poly = self._footprint_polygon(p)
+            if not self._polygon_is_collision_free(poly):
+                return False
+
+        return True
+    
+    def _reconstruct_path_pixels(self, nodes: List[RRTNode], last_idx: int) -> List[Tuple[int,int]]:
+            pts = []
+            cur = last_idx
+            while cur is not None:
+                n = nodes[cur]
+                pts.append((int(round(n.pose.x)), int(round(n.pose.y))))
+                cur = n.parent
+            pts.reverse()
+            return pts
+    
+    def plan(self, start_pixel: Tuple[int,int], goal_pixel: Tuple[int,int], visualize: bool=True) -> list[tuple[int,int]]:
+        """RRT* planner with KD-tree optimization for nearest neighbor search"""
+        import time
         start_time = time.perf_counter()
-        print(f"[RRT*] start and goal pixels {start_pixel, goal_pixel}")
+        
         sx, sy = start_pixel
         gx, gy = goal_pixel
+        start_theta = math.atan2(gy - sy, gx - sx)
+        start_pose = Pose(float(sx), float(sy), start_theta)
+        goal_theta = start_theta - math.pi/4
+        goal_pose = Pose(float(gx), float(gy), goal_theta)
 
-        # Call C++ planner
-        out_len = c_int(0)
-        out_x = POINTER(c_int)()
-        out_y = POINTER(c_int)()
-        
-        self.lib.RRTStar_plan(self.cpp_obj, float(sx), float(sy), float(gx), float(gy),
-                              ctypes.byref(out_len), ctypes.byref(out_x), ctypes.byref(out_y))
-        
-        path_pixels = []
-        length = out_len.value
-        if length > 0:
-            for i in range(length):
-                path_pixels.append((out_x[i], out_y[i]))
-            
-            # Free C++ memory for path arrays
-            self.lib.RRTStar_free_path(out_x, out_y)
-        
+        # Check start and goal are free
+        if not self._is_free_point(sx, sy):
+            raise RuntimeError("Start pixel is on an obstacle")
+        if not self._is_free_point(gx, gy):
+            raise RuntimeError("Goal pixel is on an obstacle")
+
+        nodes: list[RRTNode] = []
+
+        # Node insertion function
+        def push_node(pose: Pose, cost: float, parent_idx: int | None) -> int:
+            return self._push_node(nodes, pose, cost, parent_idx)
+
+        # Insert start node
+        start_idx = push_node(start_pose, 0.0, None)
+        closest_idx = start_idx
+        closest_dist = math.hypot(start_pose.x - gx, start_pose.y - gy)
+        reached_goal = False
+        goal_node_idx = None
+
+        for it in range(RRT_MAX_ITERS):
+            # ------------------ Sample ------------------
+            if random.random() < RRT_GOAL_SAMPLE_RATE:
+                rx, ry = gx, gy
+            else:
+                rx = random.randint(0, self.width-1)
+                ry = random.randint(0, self.height-1)
+
+            if not self._is_free_point(rx, ry):
+                continue
+
+            # ------------------ Nearest node ------------------
+            nearest_idx = self._nearest_node_idx((rx, ry))
+            nearest = nodes[nearest_idx]
+
+            # ------------------ Steer ------------------
+            new_pose = self._steer_towards(nearest.pose, (rx, ry), RRT_STEP)
+
+            # Skip if too close to existing nodes
+            if self._near_existing_node(new_pose, RRT_MIN_DISTANCE_BETWEEN_NODES):
+                continue
+
+            # ------------------ Collision check ------------------
+            if not self._edge_collision_free(nearest.pose, new_pose, samples=RRT_COLLISION_SAMPLES):
+                continue
+
+            new_cost = nearest.cost + math.hypot(new_pose.x - nearest.pose.x, new_pose.y - nearest.pose.y)
+            new_idx = push_node(new_pose, new_cost, nearest_idx)
+
+            # ------------------ Rewiring ------------------
+            neighbor_idxs = self._nearby_nodes(new_idx, RRT_REWIRE_RADIUS)
+            best_parent = nodes[new_idx].parent
+            best_cost = nodes[new_idx].cost
+
+            # Find best parent among neighbors
+            for ni in neighbor_idxs:
+                if ni == new_idx:
+                    continue
+                nnode = nodes[ni]
+                d = math.hypot(new_pose.x - nnode.pose.x, new_pose.y - nnode.pose.y)
+                candidate_cost = nnode.cost + d
+                if candidate_cost + 1e-8 < best_cost:
+                    if self._edge_collision_free(nnode.pose, new_pose, samples=RRT_COLLISION_SAMPLES):
+                        best_cost = candidate_cost
+                        best_parent = ni
+
+            nodes[new_idx].parent = best_parent
+            nodes[new_idx].cost = best_cost
+
+            # Rewire neighbors to use new node if shorter
+            for ni in neighbor_idxs:
+                if ni == new_idx:
+                    continue
+                nnode = nodes[ni]
+                d = math.hypot(nnode.pose.x - new_pose.x, nnode.pose.y - new_pose.y)
+                candidate_cost = nodes[new_idx].cost + d
+                if candidate_cost + 1e-8 < nnode.cost:
+                    if self._edge_collision_free(new_pose, nnode.pose, samples=RRT_COLLISION_SAMPLES):
+                        nnode.parent = new_idx
+                        nnode.cost = candidate_cost
+
+            # ------------------ Update closest node to goal ------------------
+            dist_to_goal = math.hypot(new_pose.x - gx, new_pose.y - gy)
+            if dist_to_goal < closest_dist:
+                closest_dist = dist_to_goal
+                closest_idx = new_idx
+
+            # ------------------ Check if goal reached ------------------
+            if dist_to_goal <= RRT_GOAL_TOL:
+                goal_connect_pose = Pose(float(gx), float(gy), math.atan2(gy - new_pose.y, gx - new_pose.x))
+                if self._edge_collision_free(new_pose, goal_connect_pose, samples=RRT_COLLISION_SAMPLES):
+                    goal_idx = push_node(goal_connect_pose, nodes[new_idx].cost + dist_to_goal, new_idx)
+                    reached_goal = True
+                    goal_node_idx = goal_idx
+                    print(f"[RRT*] Goal reached in {it+1} iterations (nodes: {len(nodes)})")
+                    break
+
+        # ------------------ Reconstruct path ------------------
+        if reached_goal and goal_node_idx is not None:
+            path_pixels = self._reconstruct_path_pixels(nodes, goal_node_idx)
+            path_last_node_idx = goal_node_idx
+        else:
+            print(f"[RRT*] Did not reach exact goal, returning path to closest node")
+            path_pixels = self._reconstruct_path_pixels(nodes, closest_idx)
+            path_last_node_idx = closest_idx
+
         end_time = time.perf_counter()
-        print(f'[RRT*] Path found in: {(end_time-start_time)*1000:.3f} ms')
+        print(f"[RRT*] Path found in {(end_time - start_time)*1000:.2f} ms")
 
+        # ------------------ Visualization ------------------
         if visualize:
-            # Retrieve full tree from C++
-            tree_len = c_int(0)
-            t_x = POINTER(c_double)()
-            t_y = POINTER(c_double)()
-            t_th = POINTER(c_double)()
-            t_parent = POINTER(c_int)()
-            
-            self.lib.RRTStar_get_tree(self.cpp_obj, ctypes.byref(tree_len), 
-                                      ctypes.byref(t_x), ctypes.byref(t_y), ctypes.byref(t_th), ctypes.byref(t_parent))
-            
-            nodes = []
-            num_nodes = tree_len.value
-            if num_nodes > 0:
-                for i in range(num_nodes):
-                    p = Pose(t_x[i], t_y[i], t_th[i])
-                    parent_idx = t_parent[i] if t_parent[i] != -1 else None
-                    node = RRTNode(p, 0.0, parent_idx) # cost not strictly needed for viz
-                    node.idx = i
-                    nodes.append(node)
-                
-                self.lib.RRTStar_free_tree(t_x, t_y, t_th, t_parent)
+            self._visualize(
+                path_pixels,
+                start_pixel,
+                goal_pixel,
+                nodes,
+                path_last_node_idx=path_last_node_idx,
+                visualize_tree=True,
+                create_growth_gif=True
+            )
 
-            self._visualize(path_pixels, start_pixel, goal_pixel, nodes=nodes, path_last_node_idx=None,
-                            visualize_tree=True, create_growth_gif=False)
-            
         return path_pixels
 
+    
     # ------------------- Visualization helpers (copied & adapted from original) -------------------
+    def subsample_path(self, path_pixels, num_points):
+        """
+        Returns a list of num_points evenly spaced along path_pixels.
+        """
+        if len(path_pixels) <= num_points:
+            # If path is short, just return the whole path
+            return path_pixels
+
+        # Evenly spaced indices along the path
+        indices = np.linspace(0, len(path_pixels) - 1, num_points, dtype=int)
+        subsampled = [path_pixels[i] for i in indices]
+        return subsampled
 
     def _draw_tree_static(self, im: Image.Image, nodes: List[RRTNode], highlight_path_idxs: Optional[List[int]] = None):
         """
@@ -418,6 +558,35 @@ class RRTStarPlanner:
             if frame_paths:
                 print(f"Saved {len(frame_paths)} growth frames to {OUTPUT_DIR}")
 
+    def visualize_tree(self, path_pixels, out_path="rrtstar_tree_expansion.png"):
+        """
+        Draw:
+        - Greyscale map
+        - Blue: all expanded nodes
+        - Yellow: final planned path
+        - Green: start
+        - Red: goal
+        """
+        img = Image.fromarray((self.occupancy * 255).astype(np.uint8)).convert("RGB")
+        draw = ImageDraw.Draw(img)
+
+        # Draw expanded nodes
+        for (x, y) in self.expanded_nodes:
+            draw.point((x, y), fill=(80, 80, 255))  # blue
+
+        # Draw path
+        for i in range(len(path_pixels) - 1):
+            draw.line([path_pixels[i], path_pixels[i+1]], fill=(255, 255, 0), width=2)
+
+        # Start, Goal
+        if len(path_pixels) > 0:
+            draw.ellipse([path_pixels[0][0]-3, path_pixels[0][1]-3,
+                        path_pixels[0][0]+3, path_pixels[0][1]+3], fill=(0,255,0))
+            draw.ellipse([path_pixels[-1][0]-3, path_pixels[-1][1]-3,
+                        path_pixels[-1][0]+3, path_pixels[-1][1]+3], fill=(255,0,0))
+
+        img.save(out_path)
+        print(f"Tree expansion visualization saved to {out_path}")
 
 # --------------- Public entry point that mirrors your original style ----------------
 def rrtStarPlan(binaryMaskPngImage: str, start_pixel: Tuple[int,int], goal_pixel: Tuple[int,int], visualize: bool=True) -> List[Tuple[int,int]]:
@@ -478,15 +647,12 @@ def get_start_goal_interactive(img_path):
 
 
 if __name__ == "__main__":
+    #demo_path = _create_demo_map(path="/workspace/codebase/mini-bream/src/ros2_ws/src/mission_planner/mission_planner/moloplanner/assets/output_dir/astart_planner/frame_1764638009_astart_planner.png")
     demo_path = "/workspace/codebase/mini-bream/src/ros2_ws/src/mission_planner/mission_planner/moloplanner/assets/output_dir/depth_pipeline/frame_2/frame_2_bev_binary_inpainting.png"
-    # demo_path = "demo_map.png"
-    # _create_demo_map(demo_path)
 
     print(f"Opening interactive selection for {demo_path}...")
     try:
         start, goal = get_start_goal_interactive(demo_path)
-        # start = (20, 20)
-        # goal = (180, 180)
         print(f"Selected Start: {start}, Goal: {goal}")
         
         print("Running RRT* on demo map... (fast-mode)")

@@ -344,11 +344,15 @@ if __name__ == '__main__':
     
     img_id = os.path.splitext(os.path.basename(img_filepath))[0]
     input_img_array = cv2.imread(img_filepath)
-
+    import time
+    start = time.perf_counter()
+    
     gps_local_astart_path = molo_planner.get_gps_local_astart_path(img_id, input_img_array,
                                                                    next_waypoint_gps,
                                                                    camera_frame_origin_gps,
                                                                    boat_heading_deg)
+    end = time.perf_counter()
+    print(f'total execution time moloplanner: {(end-start):.6f} s')
     """ 
      Usage:
      python3 -m moloplanner.moloplanner --config config.yaml --override depth_pipeline.max_depth=15 

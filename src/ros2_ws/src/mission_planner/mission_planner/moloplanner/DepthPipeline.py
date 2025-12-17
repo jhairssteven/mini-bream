@@ -1,4 +1,5 @@
 import os
+import time
 import numpy as np
 import torch
 from PIL import Image
@@ -16,9 +17,15 @@ import torch
 import matplotlib
 
 from metric_depth.depth_anything_v2.dpt import DepthAnythingV2
+#from line_profiler import LineProfiler
 
 class DepthModel():
     def __init__(self, args):
+        #self.lp = LineProfiler()
+        #self.lp.add_function(DepthModel.pcl_to_BEV)
+        #self.lp.enable()
+        #self.lp.disable()
+        #self.lp.print_stats()
         DEVICE = 'cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'
     
         model_configs = {
@@ -42,10 +49,15 @@ class DepthModel():
         height, _, _ = raw_image.shape
         raw_image[mask == 0] = [255.0, 255.0, 255.0]
 
+        start = time.perf_counter()
+
         depth_pred = self.depth_anything.infer_image(raw_image, height)
-        
+        end = time.perf_counter()
+        print(f'[DA2]: Inference time: {(end-start)*1000:.3f} ms')
+
         #overlay[mask == 1] = (0.4 * overlay[mask == 1] + 0.6 * color).astype(np.uint8)
         pcd = self.as_pcl(depth_pred, args, raw_image, img_id, mask)
+
         bev_image_vis, bev_binary_image_uint8, bev_filename, bev_image_binary_inpainted_uint8 = self.pcl_to_BEV(pcd, img_id, args, raw_image)
         
         print(f'[{img_id}] [DA2] Estimated depth (min, max): {round(depth_pred.min(), 3)} (m), {round(depth_pred.max(), 3)} (m)')
@@ -155,7 +167,7 @@ class DepthModel():
         self.x_min = x_min; self.z_min = z_min; self.cell_size = cell_size; self.height = height
         
         bev_bgr_color = 1.0 # White
-        bev_image = np.ones((height, width, 3), dtype=np.float32) * bev_bgr_color
+        bev_image = np.full((height, width, 3), bev_bgr_color, dtype=np.float32)
         
         bev_bgr_color_binary = 0.0 # Black
         bev_image_binary = np.zeros((height, width), dtype=np.float32) * bev_bgr_color_binary
@@ -164,19 +176,22 @@ class DepthModel():
         u = ((x - x_min) / cell_size).astype(np.int32)
         v = ((z - z_min) / cell_size).astype(np.int32)
 
-        # Fill pixels (color map)
-        for i in range(len(u)):
-            # check if u[i] and v[i] are not pixels for x_max and z_max respectively
-            if 0 <= u[i] < width and 0 <= v[i] < height:
-                #water_color = [1.0, 1.0, 1.0] if args.bev_as_binary_mask else colors[i]
-                bev_image[height - v[i] - 1, u[i], :] = colors[i]
-                bev_image_binary[height - v[i] - 1, u[i]] = 1.0 # White color for traversable pixels
+        # Fill pixels (color map). Extract original colors for pixels withing new range (width, height) -> (x_max, z_max)
+        valid = (u >= 0) & (u < width) & (v >= 0) & (v < height)
 
-        # --- Optional smoothing ---
-        bev_image = cv2.GaussianBlur(bev_image, (3, 3), 0)
+        uu = u[valid]
+        vv = v[valid]
+        cc = colors[valid]
+
+        rows = height - vv - 1
+        cols = uu
+
+        bev_image[rows, cols, :] = cc # Use original pcl colors
+        bev_image_binary[rows, cols] = 1.0 # White color for traversable pixels
 
         ci_height, ci_width, _ = color_image.shape
-        bev_image_vis = (bev_image[:, :, ::-1] * 255).astype(np.uint8)
+        bev_image_vis = cv2.cvtColor((bev_image * 255).astype(np.uint8), cv2.COLOR_RGB2BGR)
+
         bev_filename = f"{img_id}_bev"
         
         
@@ -185,11 +200,6 @@ class DepthModel():
             
         # Saving the binary mask as .npy and image
         bev_binary_filename = f'{bev_filename}_binary'
-
-        npy_outdir = os.path.join(args.outdir, 'bev_binary_as_npy')
-        os.makedirs(npy_outdir, exist_ok=True)
-        saving_path = os.path.join(npy_outdir, f"{bev_binary_filename}.npy")
-        np.save(saving_path, bev_image_binary)
 
         # === 2. SAVE USING OPENCV (for visualization) ===
         # Convert float32 [0,1] -> uint8 [0,255]
@@ -438,18 +448,20 @@ class Sam2Wrapper():
     def infer(self, sam2_model, img_id: str, image_input, device, display_masks=False, save_dir='output_masks', write_singles=False):
         predictor = sam2_model
         image = image_input.copy()
-        predictor.set_image(image)
+        predictor.set_image(image) # 200 ms
         
         height, width, channels =  image.shape
         input_point = np.array([[width/2, height*0.95]]) # prompt the center, bottom pixel (closer to the camera frame)
         input_label = np.array([1]) # 1 for foreground
-
+        
+        start = time.perf_counter()
         masks, scores, logits = predictor.predict(
             point_coords=input_point,
             point_labels=input_label,
             multimask_output=False,
         )
-
+        end = time.perf_counter()
+        print(f'[SAM2]: Inference time: {(end-start)*1000:.3f} ms')
         # Propagate the mask for future iterations
         """ mask_input = logits[np.argmax(scores), :, :]  # Choose the model's best mask
         masks, scores, _ = predictor.predict(
