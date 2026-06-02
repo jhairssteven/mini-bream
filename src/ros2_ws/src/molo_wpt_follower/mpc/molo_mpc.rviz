@@ -1,0 +1,46 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+    Property Tree Widget:
+      Expanded:
+        - /Grid1
+        - /Reference Path1
+        - /Traversed Path1
+        - /Predicted Path1
+    Tree Height: 500
+Visualization Manager:
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Reference Frame: world
+      Value: true
+    - Alpha: 1
+      Class: rviz_default_plugins/Path
+      Color: 25; 255; 0
+      Name: Reference Path
+      Topic:
+        Value: /molo_mpc/ref_path
+      Value: true
+    - Alpha: 1
+      Class: rviz_default_plugins/Path
+      Color: 255; 0; 0
+      Name: Traversed Path
+      Topic:
+        Value: /molo_mpc/traversed_path
+      Value: true
+    - Alpha: 1
+      Class: rviz_default_plugins/Path
+      Color: 0; 120; 255
+      Name: Predicted Path
+      Topic:
+        Value: /molo_mpc/pred_path
+      Value: true
+    - Class: rviz_default_plugins/Pose
+      Color: 255; 25; 0
+      Name: Vehicle Pose
+      Topic:
+        Value: /molo_mpc/vehicle_pose
+      Value: true
+  Global Options:
+    Fixed Frame: world
+  Name: root

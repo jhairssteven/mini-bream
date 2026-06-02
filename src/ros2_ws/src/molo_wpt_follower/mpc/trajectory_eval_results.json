@@ -1,0 +1,30 @@
+{
+  "target_rmse_m": 0.1,
+  "passed": 1,
+  "total": 3,
+  "worst_rmse_m": 0.48719,
+  "all_pass": false,
+  "trajectories": [
+    {
+      "name": "lemniscate",
+      "rmse": 0.48719,
+      "n": 0,
+      "pass": false,
+      "target_rmse_m": 0.1
+    },
+    {
+      "name": "circle",
+      "rmse": 0.290897,
+      "n": 0,
+      "pass": false,
+      "target_rmse_m": 0.1
+    },
+    {
+      "name": "line_east",
+      "rmse": 0.00506,
+      "n": 0,
+      "pass": true,
+      "target_rmse_m": 0.1
+    }
+  ]
+}

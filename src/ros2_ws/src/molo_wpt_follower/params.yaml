@@ -1,0 +1,89 @@
+# molo_wpt_follower parameters (tuned on Gazebo lemniscate, lake_harner)
+# World frame origin — GPS->local conversion only at ROS boundary
+origin:
+  lat: 40.448417
+  lon: -86.867750
+
+frame_id: world
+sim_enable: true
+control_rate_hz: 10.0
+
+# ilos: Dubins + ILOS + PID  |  polar: sequential proportional waypoints
+control_mode: polar
+
+# Lemniscate (figure-8) test path, 16 points, 10 m scale, relative to first GPS fix
+waypoints:
+  relative_to_start: true
+  points:
+    - {x: 10.0,  y: 0.0,    heading: null}
+    - {x: 20.0,  y: 10.0,    heading: null}
+    - {x: -20.0,  y: 10.0,    heading: null}
+    # - {x: 8.059, y: 3.084,  heading: null}
+    # - {x: 4.714, y: 3.333,  heading: null}
+    # - {x: 2.065, y: 1.907,  heading: null}
+    # - {x: 0.0,   y: 0.0,    heading: null}
+    # - {x: -2.065,y: -1.907, heading: null}
+    # - {x: -4.714,y: -3.333, heading: null}
+    # - {x: -8.059,y: -3.084, heading: null}
+    # - {x: -10.0, y: 0.0,    heading: null}
+    # - {x: -8.059,y: 3.084,  heading: null}
+    # - {x: -4.714,y: 3.333,  heading: null}
+    # - {x: -2.065,y: 1.907,  heading: null}
+    # - {x: 0.0,   y: 0.0,    heading: null}
+    # - {x: 2.065, y: -1.907, heading: null}
+    # - {x: 4.714, y: -3.333, heading: null}
+    # - {x: 8.059, y: -3.084, heading: null}
+
+# Polar controller — tuned Gazebo lemniscate (RMSE path error ~7.1 m)
+polar:
+  arrival_radius_m: 2.0
+  kr: 0.07
+  ka: 0.8
+  kb: 0.1
+  max_linear: 0.5
+  max_angular: 0.2
+
+# ILOS stack — tuned Gazebo lemniscate (RMSE path error ~0.51 m)
+dubins:
+  turning_radius_m: 5.5       # vrx 0.1; increased for smoother figure-8 turns
+  step_size_m: 0.5
+
+ilos:
+  lookahead_min_m: 1.2
+  lookahead_max_m: 4.0
+  conv_rate: 8.0
+  gamma: 0.0
+  replan_dist_m: 26.0
+  replan_lookahead_m: 8.0
+  handover_offset: 1
+  no_of_laps: 1
+
+pid:
+  kp: 1.0
+  ki: 0.0
+  kd: 0.35                      # raised from vrx 0.2 for tighter heading tracking
+  integral_limit: 0.1
+
+speed:
+  max_linear_pct: 0.03
+  max_angular_pct: 0.3
+  angle_threshold_fast_rad: 0.15
+  angle_threshold_slow_rad: 0.4
+
+trajectory:
+  min_distance_m: 0.3
+
+topics:
+  gps: /wamv/sensors/gps/gps/fix
+  imu: /wamv/sensors/imu/imu/data
+  odometry: /wamv/sensors/position/ground_truth_odometry
+  goal_pose: /goal_pose
+  left_thrust: /wamv/thrusters/left/thrust
+  right_thrust: /wamv/thrusters/right/thrust
+  path: /molo_wpt/path
+  mission_path: /molo_wpt/mission_path
+  traversed_path: /molo_wpt/traversed_path
+  vehicle_pose: /molo_wpt/vehicle_pose
+  target_heading: /molo_wpt/target_heading
+  cross_track_error: /molo_wpt/cross_track_error
+  heading_error_deg: /molo_wpt/heading_error_deg
