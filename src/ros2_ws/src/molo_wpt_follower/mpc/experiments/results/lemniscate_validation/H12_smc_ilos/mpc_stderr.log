@@ -1,0 +1,14 @@
+[INFO] [1780682896.875370533] [molo_mpc_follower]: molo_mpc_follower ready (mode=velocity, approach=smc_ilos)
+[INFO] [1780682899.266896942] [molo_mpc_follower]: MPC path loaded (77 samples, closed=True)
+Traceback (most recent call last):
+  File "/workspace/codebase/mini-bream/src/ros2_ws/src/molo_wpt_follower/mpc/mpc.py", line 445, in <module>
+    main()
+  File "/workspace/codebase/mini-bream/src/ros2_ws/src/molo_wpt_follower/mpc/mpc.py", line 441, in main
+    rclpy.shutdown()
+  File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/__init__.py", line 130, in shutdown
+    _shutdown(context=context)
+  File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/utilities.py", line 58, in shutdown
+    return context.shutdown()
+  File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/context.py", line 102, in shutdown
+    self.__context.shutdown()
+rclpy._rclpy_pybind11.RCLError: failed to shutdown: rcl_shutdown already called on the given context, at ./src/rcl/init.c:241

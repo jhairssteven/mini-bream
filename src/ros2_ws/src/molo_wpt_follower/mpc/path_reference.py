@@ -15,6 +15,7 @@ class PathSample:
     y: float
     psi: float
     u_ref: float
+    kappa: float = 0.0
 
 
 def _wrap(a: float) -> float:
@@ -149,7 +150,81 @@ def resample_polyline(
         else:
             psi = out[-1].psi if out else 0.0
         out.append(PathSample(x, y, psi, cruise_u))
+    attach_curvature(out, closed)
     return out
+
+
+def attach_curvature(path: List[PathSample], closed: bool) -> None:
+    """In-place curvature kappa = d(psi)/ds along polyline."""
+    n = len(path)
+    if n < 2:
+        return
+    for i in range(n):
+        j = (i + 1) % n if closed else min(i + 1, n - 1)
+        ds = math.hypot(path[j].x - path[i].x, path[j].y - path[i].y)
+        dpsi = _wrap(path[j].psi - path[i].psi)
+        path[i].kappa = dpsi / ds if ds > 1e-6 else 0.0
+    if not closed:
+        path[-1].kappa = path[-2].kappa if n > 1 else 0.0
+
+
+def path_curvature(path: Sequence[PathSample], idx: int, closed: bool) -> float:
+    if not path:
+        return 0.0
+    idx = max(0, min(idx, len(path) - 1))
+    return float(path[idx].kappa)
+
+
+def advance_path_index(
+    path: Sequence[PathSample],
+    idx: int,
+    advance: int,
+    closed: bool,
+) -> int:
+    n = len(path)
+    if n == 0:
+        return 0
+    if closed:
+        return (idx + advance) % n
+    return min(idx + advance, n - 1)
+
+
+def velocity_horizon_reference(
+    path: Sequence[PathSample],
+    start_idx: int,
+    horizon: int,
+    dt: float,
+    step_m: float,
+    cruise: float,
+    closed: bool,
+    max_r: float,
+) -> np.ndarray:
+    """(horizon+1, 3) references [u, v, r] with curvature feedforward r = u*kappa."""
+    ref = np.zeros((horizon + 1, 3))
+    if not path:
+        return ref
+    idx = start_idx
+    n = len(path)
+    for k in range(horizon + 1):
+        p = path[idx]
+        kappa = path_curvature(path, idx, closed)
+        u = cruise / (1.0 + 2.0 * abs(kappa))
+        u = max(0.12, u)
+        r = float(np.clip(u * kappa, -max_r, max_r))
+        ref[k] = [u, 0.0, r]
+        advance = max(1, int(max(u, 0.15) * dt / step_m))
+        idx = advance_path_index(path, idx, advance, closed)
+    return ref
+
+
+def rotate_path_to_index(path: List[PathSample], idx: int) -> List[PathSample]:
+    """Rotate closed/open polyline so index `idx` becomes the first sample."""
+    if not path or idx <= 0:
+        return path
+    idx = idx % len(path)
+    if idx == 0:
+        return path
+    return path[idx:] + path[:idx]
 
 
 def closest_index(path: Sequence[PathSample], x: float, y: float) -> int:

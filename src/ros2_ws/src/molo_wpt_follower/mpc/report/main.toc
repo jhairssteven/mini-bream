@@ -1,0 +1,27 @@
+\contentsline {section}{\numberline {1}Introduction}{3}{section.1}%
+\contentsline {section}{\numberline {2}System Description}{3}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Vessel and plant model}{3}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Control architectures}{3}{subsection.2.2}%
+\contentsline {subsection}{\numberline {2.3}Simulation environment}{3}{subsection.2.3}%
+\contentsline {section}{\numberline {3}Methodology}{3}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Scientific workflow}{3}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}Performance metric}{4}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}Bayesian optimization setup}{4}{subsection.3.3}%
+\contentsline {subsection}{\numberline {3.4}Fixed reference path (validation)}{4}{subsection.3.4}%
+\contentsline {section}{\numberline {4}Approaches Under Test}{4}{section.4}%
+\contentsline {section}{\numberline {5}Mathematical Formulation of Control Approaches}{5}{section.5}%
+\contentsline {subsection}{\numberline {5.1}Path geometry and shared quantities}{5}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}Integral LOS (ILOS) and heading PID}{5}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}Inner-loop MPC (common to H0--H10, H12--H16)}{5}{subsection.5.3}%
+\contentsline {subsection}{\numberline {5.4}Outer-loop guidance laws}{6}{subsection.5.4}%
+\contentsline {subsection}{\numberline {5.5}Spatial MPC (H11)}{6}{subsection.5.5}%
+\contentsline {section}{\numberline {6}Bayesian Optimization Campaign}{6}{section.6}%
+\contentsline {section}{\numberline {7}Results: Lemniscate Validation (Fixed Reference)}{7}{section.7}%
+\contentsline {section}{\numberline {8}Discussion}{9}{section.8}%
+\contentsline {subsection}{\numberline {8.1}Why velocity MPC + curvature FF succeeded}{9}{subsection.8.1}%
+\contentsline {subsection}{\numberline {8.2}Why lower-ranked approaches failed after BO}{9}{subsection.8.2}%
+\contentsline {subsection}{\numberline {8.3}Diagnostic logging}{9}{subsection.8.3}%
+\contentsline {section}{\numberline {9}Conclusions}{9}{section.9}%
+\contentsline {section}{\numberline {10}Future Work}{9}{section.10}%
+\contentsline {section}{\numberline {A}Reproduction}{10}{appendix.A}%
+\contentsline {section}{\numberline {B}Hypothesis registry}{10}{appendix.B}%

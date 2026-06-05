@@ -1,0 +1,14 @@
+# Non-learning control approaches (control.approach) — benchmark registry
+approaches:
+  baseline_ilos_velocity: "ILOS heading PID + constant [u,0,r] horizon"
+  curvature_ff_ilos: "κ feedforward + ILOS + velocity horizon preview"
+  stanley: "Stanley lateral steering + κ blend"
+  aggressive_ff: "High-gain CTE + lateral v + ILOS"
+  geometric_ff: "Path tangent CTE yaw + lateral v"
+  pure_pursuit: "Lookahead bearing + κ FF"
+  smc_ilos: "Boundary-layer SMC on e_y, ψ with ILOS heading"
+  smc_geometric: "SMC + LOS on path tangent"
+  frenet_ff: "Frenet e_d, ψ_e + κ feedforward"
+  backstepping: "Cascaded backstepping-style heading + κ FF"
+  contouring: "Contouring e_d, ė_d + κ feedforward"
+  spatial_mpc: "Full-state spatial MPC (mpc.mode: spatial)"

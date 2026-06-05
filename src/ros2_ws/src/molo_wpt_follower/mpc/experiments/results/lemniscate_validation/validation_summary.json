@@ -1,0 +1,285 @@
+{
+  "timestamp": "2026-06-05T18:26:30.495640+00:00",
+  "reference_hypothesis": "H9_slow_tight",
+  "reference_path": {
+    "waypoints": {
+      "relative_to_start": true,
+      "trajectory": {
+        "type": "lemniscate",
+        "scale_m": 7.0,
+        "num_points": 32
+      }
+    },
+    "path": {
+      "resample_step_m": 0.3958010892129231,
+      "closed": true,
+      "smooth_dubins": true,
+      "monotonic_progress": false
+    },
+    "dubins": {
+      "turning_radius_m": 5.705838163404552,
+      "step_size_m": 1.25
+    }
+  },
+  "target_rmse_m": 0.1,
+  "runs": [
+    {
+      "hypothesis_id": "H0_baseline",
+      "approach": "baseline_ilos_velocity",
+      "mpc_mode": "velocity",
+      "path_points": 77,
+      "cruise_speed_mps": 0.14,
+      "source_config": "/workspace/codebase/mini-bream/src/ros2_ws/src/molo_wpt_follower/mpc/experiments/results/tune_lemniscate_full/H0_baseline/best_config.yaml",
+      "rmse": 0.230717,
+      "pass": false,
+      "target_rmse_m": 0.1
+    },
+    {
+      "hypothesis_id": "H10_lateral_vel",
+      "approach": "curvature_ff_ilos",
+      "mpc_mode": "velocity",
+      "path_points": 77,
+      "cruise_speed_mps": 0.1659680614675534,
+      "source_config": "/workspace/codebase/mini-bream/src/ros2_ws/src/molo_wpt_follower/mpc/experiments/results/tune_lemniscate_full/H10_lateral_vel/best_config.yaml",
+      "rmse": 0.507002,
+      "pass": false,
+      "target_rmse_m": 0.1
+    },
+    {
+      "hypothesis_id": "H11_spatial_mpc",
+      "approach": "curvature_ff_ilos",
+      "mpc_mode": "spatial",
+      "path_points": 77,
+      "cruise_speed_mps": 0.283377737634842,
+      "source_config": "/workspace/codebase/mini-bream/src/ros2_ws/src/molo_wpt_follower/mpc/experiments/results/tune_lemniscate_full/H11_spatial_mpc/best_config.yaml",
+      "rmse": 121.165319,
+      "pass": false,
+      "target_rmse_m": 0.1
+    },
+    {
+      "hypothesis_id": "H12_smc_ilos",
+      "approach": "smc_ilos",
+      "mpc_mode": "velocity",
+      "path_points": 77,
+      "cruise_speed_mps": 0.3273375837867712,
+      "source_config": "/workspace/codebase/mini-bream/src/ros2_ws/src/molo_wpt_follower/mpc/experiments/results/tune_lemniscate_full/H12_smc_ilos/best_config.yaml",
+      "rmse": 27.634783,
+      "pass": false,
+      "target_rmse_m": 0.1
+    },
+    {
+      "hypothesis_id": "H13_smc_geometric",
+      "approach": "smc_geometric",
+      "mpc_mode": "velocity",
+      "path_points": 77,
+      "cruise_speed_mps": 0.19139152551911526,
+      "source_config": "/workspace/codebase/mini-bream/src/ros2_ws/src/molo_wpt_follower/mpc/experiments/results/tune_lemniscate_full/H13_smc_geometric/best_config.yaml",
+      "rmse": 31.615622,
+      "pass": false,
+      "target_rmse_m": 0.1
+    },
+    {
+      "hypothesis_id": "H14_frenet_ff",
+      "approach": "frenet_ff",
+      "mpc_mode": "velocity",
+      "path_points": 77,
+      "cruise_speed_mps": 0.2778801092359684,
+      "source_config": "/workspace/codebase/mini-bream/src/ros2_ws/src/molo_wpt_follower/mpc/experiments/results/tune_lemniscate_full/H14_frenet_ff/best_config.yaml",
+      "rmse": 33.895275,
+      "pass": false,
+      "target_rmse_m": 0.1
+    },
+    {
+      "hypothesis_id": "H15_backstepping",
+      "approach": "backstepping",
+      "mpc_mode": "velocity",
+      "path_points": 77,
+      "cruise_speed_mps": 0.23009985039390862,
+      "source_config": "/workspace/codebase/mini-bream/src/ros2_ws/src/molo_wpt_follower/mpc/experiments/results/tune_lemniscate_full/H15_backstepping/best_config.yaml",
+      "rmse": 27.652753,
+      "pass": false,
+      "target_rmse_m": 0.1
+    },
+    {
+      "hypothesis_id": "H16_contouring",
+      "approach": "contouring",
+      "mpc_mode": "velocity",
+      "path_points": 77,
+      "cruise_speed_mps": 0.14,
+      "source_config": "/workspace/codebase/mini-bream/src/ros2_ws/src/molo_wpt_follower/mpc/experiments/results/tune_lemniscate_full/H16_contouring/best_config.yaml",
+      "rmse": 30.862611,
+      "pass": false,
+      "target_rmse_m": 0.1
+    },
+    {
+      "hypothesis_id": "H1_curvature_ff",
+      "approach": "curvature_ff_ilos",
+      "mpc_mode": "velocity",
+      "path_points": 77,
+      "cruise_speed_mps": 0.14,
+      "source_config": "/workspace/codebase/mini-bream/src/ros2_ws/src/molo_wpt_follower/mpc/experiments/results/tune_lemniscate_full/H1_curvature_ff/best_config.yaml",
+      "rmse": 0.238038,
+      "pass": false,
+      "target_rmse_m": 0.1
+    },
+    {
+      "hypothesis_id": "H1b_tuned_ff",
+      "approach": "curvature_ff_ilos",
+      "mpc_mode": "velocity",
+      "path_points": 77,
+      "cruise_speed_mps": 0.14,
+      "source_config": "/workspace/codebase/mini-bream/src/ros2_ws/src/molo_wpt_follower/mpc/experiments/results/tune_lemniscate_full/H1b_tuned_ff/best_config.yaml",
+      "rmse": 0.290049,
+      "pass": false,
+      "target_rmse_m": 0.1
+    },
+    {
+      "hypothesis_id": "H2_stanley",
+      "approach": "stanley",
+      "mpc_mode": "velocity",
+      "path_points": 77,
+      "cruise_speed_mps": 0.34,
+      "source_config": "/workspace/codebase/mini-bream/src/ros2_ws/src/molo_wpt_follower/mpc/experiments/results/tune_lemniscate_full/H2_stanley/best_config.yaml",
+      "rmse": 29.583208,
+      "pass": false,
+      "target_rmse_m": 0.1
+    },
+    {
+      "hypothesis_id": "H3_aggressive_ff",
+      "approach": "aggressive_ff",
+      "mpc_mode": "velocity",
+      "path_points": 77,
+      "cruise_speed_mps": 0.14711269683958914,
+      "source_config": "/workspace/codebase/mini-bream/src/ros2_ws/src/molo_wpt_follower/mpc/experiments/results/tune_lemniscate_full/H3_aggressive_ff/best_config.yaml",
+      "rmse": 32.861104,
+      "pass": false,
+      "target_rmse_m": 0.1
+    },
+    {
+      "hypothesis_id": "H5_geometric_ff",
+      "approach": "geometric_ff",
+      "mpc_mode": "velocity",
+      "path_points": 77,
+      "cruise_speed_mps": 0.14752037929008469,
+      "source_config": "/workspace/codebase/mini-bream/src/ros2_ws/src/molo_wpt_follower/mpc/experiments/results/tune_lemniscate_full/H5_geometric_ff/best_config.yaml",
+      "rmse": 0.930593,
+      "pass": false,
+      "target_rmse_m": 0.1
+    },
+    {
+      "hypothesis_id": "H8_pure_pursuit",
+      "approach": "pure_pursuit",
+      "mpc_mode": "velocity",
+      "path_points": 77,
+      "cruise_speed_mps": 0.25853934477587875,
+      "source_config": "/workspace/codebase/mini-bream/src/ros2_ws/src/molo_wpt_follower/mpc/experiments/results/tune_lemniscate_full/H8_pure_pursuit/best_config.yaml",
+      "rmse": 23.307989,
+      "pass": false,
+      "target_rmse_m": 0.1
+    },
+    {
+      "hypothesis_id": "H9_slow_tight",
+      "approach": "curvature_ff_ilos",
+      "mpc_mode": "velocity",
+      "path_points": 77,
+      "cruise_speed_mps": 0.14,
+      "source_config": "/workspace/codebase/mini-bream/src/ros2_ws/src/molo_wpt_follower/mpc/experiments/results/tune_lemniscate_full/H9_slow_tight/best_config.yaml",
+      "rmse": 0.374794,
+      "pass": false,
+      "target_rmse_m": 0.1
+    }
+  ],
+  "ranked": [
+    {
+      "hypothesis_id": "H0_baseline",
+      "approach": "baseline_ilos_velocity",
+      "validation_rmse": 0.230717,
+      "path_points": 77
+    },
+    {
+      "hypothesis_id": "H1_curvature_ff",
+      "approach": "curvature_ff_ilos",
+      "validation_rmse": 0.238038,
+      "path_points": 77
+    },
+    {
+      "hypothesis_id": "H1b_tuned_ff",
+      "approach": "curvature_ff_ilos",
+      "validation_rmse": 0.290049,
+      "path_points": 77
+    },
+    {
+      "hypothesis_id": "H9_slow_tight",
+      "approach": "curvature_ff_ilos",
+      "validation_rmse": 0.374794,
+      "path_points": 77
+    },
+    {
+      "hypothesis_id": "H10_lateral_vel",
+      "approach": "curvature_ff_ilos",
+      "validation_rmse": 0.507002,
+      "path_points": 77
+    },
+    {
+      "hypothesis_id": "H5_geometric_ff",
+      "approach": "geometric_ff",
+      "validation_rmse": 0.930593,
+      "path_points": 77
+    },
+    {
+      "hypothesis_id": "H8_pure_pursuit",
+      "approach": "pure_pursuit",
+      "validation_rmse": 23.307989,
+      "path_points": 77
+    },
+    {
+      "hypothesis_id": "H12_smc_ilos",
+      "approach": "smc_ilos",
+      "validation_rmse": 27.634783,
+      "path_points": 77
+    },
+    {
+      "hypothesis_id": "H15_backstepping",
+      "approach": "backstepping",
+      "validation_rmse": 27.652753,
+      "path_points": 77
+    },
+    {
+      "hypothesis_id": "H2_stanley",
+      "approach": "stanley",
+      "validation_rmse": 29.583208,
+      "path_points": 77
+    },
+    {
+      "hypothesis_id": "H16_contouring",
+      "approach": "contouring",
+      "validation_rmse": 30.862611,
+      "path_points": 77
+    },
+    {
+      "hypothesis_id": "H13_smc_geometric",
+      "approach": "smc_geometric",
+      "validation_rmse": 31.615622,
+      "path_points": 77
+    },
+    {
+      "hypothesis_id": "H3_aggressive_ff",
+      "approach": "aggressive_ff",
+      "validation_rmse": 32.861104,
+      "path_points": 77
+    },
+    {
+      "hypothesis_id": "H14_frenet_ff",
+      "approach": "frenet_ff",
+      "validation_rmse": 33.895275,
+      "path_points": 77
+    },
+    {
+      "hypothesis_id": "H11_spatial_mpc",
+      "approach": "curvature_ff_ilos",
+      "validation_rmse": 121.165319,
+      "path_points": 77
+    }
+  ],
+  "best": "H0_baseline"
+}

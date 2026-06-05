@@ -1,0 +1,55 @@
+Reference path from: H9_slow_tight
+  trajectory={'type': 'lemniscate', 'scale_m': 7.0, 'num_points': 32}
+  resample=0.3958 m
+  dubins R=5.706 m, step=1.250 m
+  [H0_baseline] path_points=77  approach=baseline_ilos_velocity
+=== Running H0_baseline ===
+  [H0_baseline] rmse=0.2307 m  FAIL
+  [H10_lateral_vel] path_points=77  approach=curvature_ff_ilos
+=== Running H10_lateral_vel ===
+  [H10_lateral_vel] rmse=0.5070 m  FAIL
+  [H11_spatial_mpc] path_points=77  approach=curvature_ff_ilos
+=== Running H11_spatial_mpc ===
+  [H11_spatial_mpc] rmse=121.1653 m  FAIL
+  [H12_smc_ilos] path_points=77  approach=smc_ilos
+=== Running H12_smc_ilos ===
+  [H12_smc_ilos] rmse=27.6348 m  FAIL
+  [H13_smc_geometric] path_points=77  approach=smc_geometric
+=== Running H13_smc_geometric ===
+  [H13_smc_geometric] rmse=31.6156 m  FAIL
+  [H14_frenet_ff] path_points=77  approach=frenet_ff
+=== Running H14_frenet_ff ===
+  [H14_frenet_ff] rmse=33.8953 m  FAIL
+  [H15_backstepping] path_points=77  approach=backstepping
+=== Running H15_backstepping ===
+  [H15_backstepping] rmse=27.6528 m  FAIL
+  [H16_contouring] path_points=77  approach=contouring
+=== Running H16_contouring ===
+  [H16_contouring] rmse=30.8626 m  FAIL
+  [H1_curvature_ff] path_points=77  approach=curvature_ff_ilos
+=== Running H1_curvature_ff ===
+  [H1_curvature_ff] rmse=0.2380 m  FAIL
+  [H1b_tuned_ff] path_points=77  approach=curvature_ff_ilos
+=== Running H1b_tuned_ff ===
+  [H1b_tuned_ff] rmse=0.2900 m  FAIL
+  [H2_stanley] path_points=77  approach=stanley
+=== Running H2_stanley ===
+  [H2_stanley] rmse=29.5832 m  FAIL
+  [H3_aggressive_ff] path_points=77  approach=aggressive_ff
+=== Running H3_aggressive_ff ===
+  [H3_aggressive_ff] rmse=32.8611 m  FAIL
+  [H5_geometric_ff] path_points=77  approach=geometric_ff
+=== Running H5_geometric_ff ===
+  [H5_geometric_ff] rmse=0.9306 m  FAIL
+  [H8_pure_pursuit] path_points=77  approach=pure_pursuit
+=== Running H8_pure_pursuit ===
+  [H8_pure_pursuit] rmse=23.3080 m  FAIL
+  [H9_slow_tight] path_points=77  approach=curvature_ff_ilos
+=== Running H9_slow_tight ===
+  [H9_slow_tight] rmse=0.3748 m  FAIL
+
+Done: /workspace/codebase/mini-bream/src/ros2_ws/src/molo_wpt_follower/mpc/experiments/results/lemniscate_validation
+Top 3:
+  H0_baseline: 0.2307 m
+  H1_curvature_ff: 0.2380 m
+  H1b_tuned_ff: 0.2900 m

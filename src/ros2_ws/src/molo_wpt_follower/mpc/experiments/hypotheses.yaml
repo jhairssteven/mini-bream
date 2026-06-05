@@ -1,0 +1,153 @@
+# Benchmark suite: circle + lemniscate only, target XTE RMSE < 0.1 m
+target_rmse_m: 0.1
+warmup_s: 20.0
+evaluate_s: 55.0
+skip_initial_s: 20.0
+
+curved_trajectories:
+  - circle
+  - lemniscate
+
+hypotheses:
+  # --- Legacy / baseline ---
+  - id: H0_baseline
+    hypothesis: "ILOS heading + constant velocity MPC references."
+    prediction: "RMSE > 0.3 m on curves."
+    config_patch:
+      control: {approach: baseline_ilos_velocity}
+      guidance: {max_yaw_rate_rad_s: 0.45}
+
+  # --- Best prior (includes lemniscate re-test) ---
+  - id: H1_curvature_ff
+    hypothesis: "Curvature feedforward r=u*kappa + ILOS + velocity horizon preview."
+    prediction: "Best overall; circle ~0.22 m, lemniscate ~0.35 m."
+    config_patch:
+      control: {approach: curvature_ff_ilos, use_ilos_heading: true}
+      guidance:
+        max_yaw_rate_rad_s: 0.65
+        kappa_ff_gain: 1.15
+        kappa_speed_scale: 2.5
+
+  - id: H1b_tuned_ff
+    hypothesis: "Slower cruise + stronger yaw MPC + higher kappa FF."
+    prediction: "Circle < 0.15 m."
+    config_patch:
+      control: {approach: curvature_ff_ilos}
+      path: {cruise_speed_mps: 0.22, resample_step_m: 0.28}
+      guidance: {max_yaw_rate_rad_s: 0.7, kappa_ff_gain: 1.2, kappa_speed_scale: 3.5}
+      mpc: {horizon: 18, Q_vel_diag: [34.0, 4.0, 210.0]}
+      pid: {kp: 2.1, kd: 0.72}
+
+  - id: H2_stanley
+    hypothesis: "Stanley steering + curvature blend."
+    config_patch:
+      control: {approach: stanley, use_ilos_heading: false}
+      guidance: {max_yaw_rate_rad_s: 0.7, stanley_k: 1.4}
+
+  - id: H3_aggressive_ff
+    hypothesis: "High-gain lateral v + ILOS."
+    config_patch:
+      control: {approach: aggressive_ff}
+      guidance: {max_yaw_rate_rad_s: 0.85, stanley_k: 1.8, kappa_speed_scale: 3.0}
+      mpc: {Q_vel_diag: [25.0, 2.0, 150.0]}
+
+  - id: H5_geometric_ff
+    hypothesis: "Path-tangent + CTE yaw (no ILOS)."
+    config_patch:
+      control: {approach: geometric_ff, use_ilos_heading: false}
+      guidance: {max_yaw_rate_rad_s: 0.75, stanley_k: 1.6}
+      mpc: {Q_vel_diag: [28.0, 8.0, 160.0]}
+
+  - id: H8_pure_pursuit
+    hypothesis: "Pure pursuit + curvature FF."
+    config_patch:
+      control: {approach: pure_pursuit}
+      guidance: {pure_pursuit_steps: 4, kappa_ff_gain: 1.15}
+      path: {cruise_speed_mps: 0.24}
+
+  - id: H9_slow_tight
+    hypothesis: "Very low cruise for tight tracking."
+    config_patch:
+      control: {approach: curvature_ff_ilos}
+      path: {cruise_speed_mps: 0.16, resample_step_m: 0.25}
+      guidance: {kappa_ff_gain: 1.25, kappa_speed_scale: 4.0, max_yaw_rate_rad_s: 0.55}
+      mpc: {Q_vel_diag: [40.0, 6.0, 240.0]}
+
+  - id: H10_lateral_vel
+    hypothesis: "Lateral v_ref in velocity MPC."
+    config_patch:
+      control: {approach: curvature_ff_ilos, lateral_v_gain: 1.1}
+      guidance: {lateral_v_gain: 1.1, kappa_ff_gain: 1.15}
+      mpc: {Q_vel_diag: [32.0, 12.0, 190.0]}
+      path: {cruise_speed_mps: 0.23}
+
+  - id: H11_spatial_mpc
+    hypothesis: "Spatial pose MPC with monotonic path index."
+    config_patch:
+      mpc:
+        mode: spatial
+        horizon: 16
+        Q_spatial_diag: [900.0, 900.0, 200.0, 5.0, 5.0, 70.0]
+      path: {cruise_speed_mps: 0.24, monotonic_progress: true}
+
+  # --- New non-learning approaches ---
+  - id: H12_smc_ilos
+    hypothesis: "Boundary-layer SMC on e_y and psi with ILOS heading."
+    prediction: "Competitive with H1; robust to bias."
+    config_patch:
+      control: {approach: smc_ilos, use_ilos_heading: true}
+      guidance:
+        smc_k_r: 1.0
+        smc_k_v: 0.7
+        smc_phi: 0.15
+        smc_lambda_i: 0.3
+        kappa_ff_gain: 1.15
+        max_yaw_rate_rad_s: 0.72
+      mpc: {Q_vel_diag: [30.0, 10.0, 180.0]}
+
+  - id: H13_smc_geometric
+    hypothesis: "SMC with LOS on path tangent (no ILOS lag)."
+    config_patch:
+      control: {approach: smc_geometric, use_ilos_heading: false}
+      guidance:
+        smc_k_r: 1.1
+        smc_k_v: 0.75
+        smc_phi: 0.15
+        los_delta_m: 1.8
+        kappa_ff_gain: 1.2
+        max_yaw_rate_rad_s: 0.75
+      mpc: {Q_vel_diag: [30.0, 12.0, 190.0]}
+
+  - id: H14_frenet_ff
+    hypothesis: "Frenet-frame CTE + heading error + curvature FF."
+    config_patch:
+      control: {approach: frenet_ff, use_ilos_heading: false}
+      guidance:
+        frenet_k_y: 1.1
+        frenet_k_psi: 1.4
+        kappa_ff_gain: 1.15
+        max_yaw_rate_rad_s: 0.7
+      mpc: {Q_vel_diag: [32.0, 14.0, 200.0]}
+
+  - id: H15_backstepping
+    hypothesis: "Cascaded backstepping-style heading law + curvature FF."
+    config_patch:
+      control: {approach: backstepping, use_ilos_heading: false}
+      guidance:
+        backstep_k1: 1.2
+        backstep_k2: 2.2
+        los_delta_m: 2.0
+        kappa_ff_gain: 1.15
+        max_yaw_rate_rad_s: 0.7
+      mpc: {Q_vel_diag: [30.0, 10.0, 185.0]}
+
+  - id: H16_contouring
+    hypothesis: "Contouring (e_d, e_d_dot) + curvature FF."
+    config_patch:
+      control: {approach: contouring, use_ilos_heading: false}
+      guidance:
+        contour_k_d: 1.4
+        contour_k_dd: 0.6
+        kappa_ff_gain: 1.15
+        max_yaw_rate_rad_s: 0.72
+      mpc: {Q_vel_diag: [32.0, 15.0, 195.0]}

@@ -1,0 +1,14 @@
+waypoints:
+  relative_to_start: true
+  trajectory:
+    type: lemniscate
+    scale_m: 7.0
+    num_points: 32
+path:
+  resample_step_m: 0.3958010892129231
+  closed: true
+  smooth_dubins: true
+  monotonic_progress: false
+dubins:
+  turning_radius_m: 5.705838163404552
+  step_size_m: 1.25

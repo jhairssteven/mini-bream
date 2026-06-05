@@ -1,0 +1,105 @@
+origin:
+  lat: 40.448417
+  lon: -86.86775
+frame_id: world
+sim_enable: true
+control_rate_hz: 10.0
+feedback:
+  use_ground_truth_pose: true
+waypoints:
+  relative_to_start: true
+  trajectory:
+    type: lemniscate
+    scale_m: 7.0
+    num_points: 32
+path:
+  resample_step_m: 0.3958010892129231
+  cruise_speed_mps: 0.1659680614675534
+  closed: true
+  smooth_dubins: true
+  monotonic_progress: false
+control:
+  approach: curvature_ff_ilos
+  use_ilos_heading: true
+  lateral_v_gain: 1.3
+mpc:
+  horizon: 12
+  dt: 0.1
+  Q_vel_diag:
+  - 36.44547254806656
+  - 15.036022365593194
+  - 132.4346035028517
+  R_diag:
+  - 0.045
+  - 0.045
+  Q_terminal_scale: 11.557897502417177
+  mode: velocity
+dubins:
+  turning_radius_m: 5.705838163404552
+  step_size_m: 1.25
+ilos:
+  lookahead_min_m: 1.0452848621149917
+  lookahead_max_m: 1.8489560992024816
+  conv_rate: 12.882334420246973
+  gamma: 0.0
+  replan_dist_m: 26.0
+  replan_lookahead_m: 8.0
+  handover_offset: 1
+  no_of_laps: 50
+pid:
+  kp: 2.6
+  ki: 0.0
+  kd: 0.38091982671522684
+  integral_limit: 0.2
+guidance:
+  max_yaw_rate_rad_s: 0.4
+  stanley_k: 2.1022896651008534
+  lateral_v_gain: 1.3
+  kappa_ff_gain: 0.9065375093302896
+  kappa_speed_scale: 3.8228845492740153
+  smc_k_r: 0.8447414714404304
+  smc_k_v: 0.8422696184718288
+  smc_phi: 0.1338005932608175
+  frenet_k_y: 0.9416661854746318
+  frenet_k_psi: 0.8609730097055617
+  backstep_k1: 2.0
+  backstep_k2: 1.0
+  contour_k_d: 0.6866423175710591
+  contour_k_dd: 0.1
+  pure_pursuit_steps: 8
+  los_delta_m: 2.3926882378446384
+boat:
+  mass_kg: 320.4012
+  yaw_inertia_kgm2: 570.4965
+  cg_x_m: 0.0
+  cg_y_m: 0.0
+  added_mass_surge_kg: 21.5914
+  added_mass_sway_kg: 43.1522
+  added_mass_yaw_kgm2: 5.556
+  added_mass_y_r_kgm: 8.0
+  added_mass_n_v_kgm: 10.0
+  damp_surge_Ns_per_m: 124.8553
+  damp_sway_Ns_per_m: 138.1975
+  damp_yaw_Nms_per_rad: 789.8261
+  damp_surge_quad_Ns2_per_m2: 144.4452
+  damp_sway_quad_Ns2_per_m2: 119.0375
+  damp_yaw_quad_Nms2_per_rad2: 243.6211
+  thruster_arm_m: 0.7562
+  thruster_eff_left: 1.0
+  thruster_eff_right: 1.0
+  max_thrust_N: 250.0
+trajectory:
+  min_distance_m: 0.2
+topics:
+  gps: /wamv/sensors/gps/gps/fix
+  imu: /wamv/sensors/imu/imu/data
+  odometry: /wamv/sensors/position/ground_truth_odometry
+  left_thrust: /wamv/thrusters/left/thrust
+  right_thrust: /wamv/thrusters/right/thrust
+  ref_path: /molo_mpc/ref_path
+  pred_path: /molo_mpc/pred_path
+  traversed_path: /molo_mpc/traversed_path
+  vehicle_pose: /molo_mpc/vehicle_pose
+  cross_track_error: /molo_mpc/cross_track_error
+experiment:
+  log_csv: /workspace/codebase/mini-bream/src/ros2_ws/src/molo_wpt_follower/mpc/experiments/results/lemniscate_validation/H10_lateral_vel/log.csv

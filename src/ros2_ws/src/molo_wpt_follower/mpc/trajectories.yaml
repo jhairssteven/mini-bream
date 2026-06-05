@@ -2,7 +2,7 @@
 target_rmse_m: 0.1
 warmup_s: 20.0
 evaluate_s: 60.0
-skip_initial_s: 15.0
+skip_initial_s: 20.0
 
 trajectories:
   - name: lemniscate

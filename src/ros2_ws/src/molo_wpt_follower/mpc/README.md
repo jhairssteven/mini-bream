@@ -1,14 +1,17 @@
 # MPC trajectory follower (WAMV-16)
 
-ILOS path guidance + velocity MPC thrust allocation (Fossen 3-DOF hydrodynamics from LINC `NominalMPC`).
+Pluggable guidance (`control_law.py`) + velocity MPC (default) or spatial MPC (`mpc.mode: spatial`).
 
 ## Architecture
 
-- **Guidance**: ILOS (`algorithms.py`) — cross-track error and desired heading
-- **Control**: velocity MPC on `[u, v, r]` with inputs `[T_left, T_right]` (N)
-- **Paths**: lemniscate, circle, rectangle, triangle, line, sine (see `trajectories.yaml`)
+- **Guidance**: ILOS + curvature feedforward / Stanley / pure pursuit (`control.approach`)
+- **Control**: velocity MPC on `[u, v, r]` (default) or spatial MPC on `[x,y,ψ,u,v,r]`
+- **Paths**: lemniscate, circle, rectangle, triangle, line, sine (`trajectories.yaml`)
+- **Experiments**: hypothesis → test → log/plot → refine (`experiments/`)
 
-Spatial pose MPC (`spatial_mpc.py`) is kept for reference; `mpc.py` uses `velocity_mpc.py`.
+See `experiments/README.md` for the scientific campaign workflow.
+
+**Full technical report (LaTeX/PDF):** `report/main.tex` — build with `cd report && make pdf`.
 
 ## Open-water world
 
@@ -27,6 +30,7 @@ World file: `open_water_harner.sdf` (no shore/dock collisions). Rebuild after ed
 ```bash
 cd .../molo_wpt_follower/mpc
 python3 mpc.py
+python3 wind_viz.py   # wind arrow field from /vrx/debug/wind/*
 rviz2 -d molo_mpc.rviz
 ```
 
@@ -50,18 +54,19 @@ python3 evaluate_trajectories.py --names circle sine line_east
 Suite definition: `trajectories.yaml`. Results: `trajectory_eval_results.json`.  
 Pass criterion: XTE RMSE **< 0.1 m** (configurable via `target_rmse_m`).
 
-### Latest open-water results (GT pose, `use_ground_truth_pose: true`)
+### Latest clean benchmark (`benchmark_clean_v2`, circle + lemniscate)
 
-| Trajectory   | XTE RMSE (m) | Pass (< 0.1 m) |
-|-------------|--------------|----------------|
-| line_east   | ~0.002       | yes            |
-| circle      | ~0.29–0.34   | no             |
-| sine        | ~0.33        | no             |
-| lemniscate  | ~0.37–0.50   | no             |
-| rectangle   | ~0.59        | no             |
-| triangle    | ~0.73–0.94   | no             |
+| Hypothesis | Circle RMSE | Lemniscate RMSE | Mean |
+|------------|-------------|-----------------|------|
+| **H1b_tuned_ff** | **0.217 m** | 0.532 m | 0.375 |
+| **H1_curvature_ff** | **0.223 m** | **0.504 m** | 0.363 |
+| H9_slow_tight | 0.225 m | **0.447 m** | **0.336** |
 
-Straight and gentle curves meet the target; tight corners need slower speeds or larger Dubins radius (per-trajectory overrides in `trajectories.yaml`).
+**None pass < 0.1 m.** H1 remains best general-purpose; H1b best on circle.
+
+```bash
+python3 experiments/summarize_results.py experiments/results/benchmark_clean_v2
+```
 
 ## Tune
 

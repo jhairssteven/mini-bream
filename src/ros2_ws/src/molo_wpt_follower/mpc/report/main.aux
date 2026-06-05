@@ -1,0 +1,72 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyperFirstAtBeginDocument{\AtBeginDocument}
+\HyperFirstAtBeginDocument{\ifx\hyper@anchor\@undefined
+\global\let\oldcontentsline\contentsline
+\gdef\contentsline#1#2#3#4{\oldcontentsline{#1}{#2}{#3}}
+\global\let\oldnewlabel\newlabel
+\gdef\newlabel#1#2{\newlabelxx{#1}#2}
+\gdef\newlabelxx#1#2#3#4#5#6{\oldnewlabel{#1}{{#2}{#3}}}
+\AtEndDocument{\ifx\hyper@anchor\@undefined
+\let\contentsline\oldcontentsline
+\let\newlabel\oldnewlabel
+\fi}
+\fi}
+\global\let\hyper@last\relax 
+\gdef\HyperFirstAtBeginDocument#1{#1}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\citation{osqp}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{3}{section.1}\protected@file@percent }
+\newlabel{sec:intro}{{1}{3}{Introduction}{section.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {2}System Description}{3}{section.2}\protected@file@percent }
+\newlabel{sec:system}{{2}{3}{System Description}{section.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Vessel and plant model}{3}{subsection.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Control architectures}{3}{subsection.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Simulation environment}{3}{subsection.2.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3}Methodology}{3}{section.3}\protected@file@percent }
+\newlabel{sec:method}{{3}{3}{Methodology}{section.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Scientific workflow}{3}{subsection.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Performance metric}{4}{subsection.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Bayesian optimization setup}{4}{subsection.3.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Fixed reference path (validation)}{4}{subsection.3.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4}Approaches Under Test}{4}{section.4}\protected@file@percent }
+\newlabel{sec:approaches}{{4}{4}{Approaches Under Test}{section.4}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Implemented guidance / MPC combinations (hypothesis IDs).\relax }}{4}{table.caption.2}\protected@file@percent }
+\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
+\newlabel{tab:approaches}{{1}{4}{Implemented guidance / MPC combinations (hypothesis IDs).\relax }{table.caption.2}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5}Mathematical Formulation of Control Approaches}{5}{section.5}\protected@file@percent }
+\newlabel{sec:theory}{{5}{5}{Mathematical Formulation of Control Approaches}{section.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Path geometry and shared quantities}{5}{subsection.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Integral LOS (ILOS) and heading PID}{5}{subsection.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Inner-loop MPC (common to H0--H10, H12--H16)}{5}{subsection.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}Outer-loop guidance laws}{6}{subsection.5.4}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Mathematical structure of each guidance law (references passed to velocity MPC).\relax }}{6}{table.caption.3}\protected@file@percent }
+\newlabel{tab:theory}{{2}{6}{Mathematical structure of each guidance law (references passed to velocity MPC).\relax }{table.caption.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.5}Spatial MPC (H11)}{6}{subsection.5.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6}Bayesian Optimization Campaign}{6}{section.6}\protected@file@percent }
+\newlabel{sec:bo}{{6}{6}{Bayesian Optimization Campaign}{section.6}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {7}Results: Lemniscate Validation (Fixed Reference)}{7}{section.7}\protected@file@percent }
+\newlabel{sec:results}{{7}{7}{Results: Lemniscate Validation (Fixed Reference)}{section.7}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Top six approaches: lemniscate validation RMSE with fixed reference path. Data: \texttt  {lemniscate\_validation/validation\_summary.json}. Target $< \SI {0.1}{\meter }$.\relax }}{7}{table.caption.4}\protected@file@percent }
+\newlabel{tab:val_top6}{{3}{7}{Top six approaches: lemniscate validation RMSE with fixed reference path. Data: \texttt {lemniscate\_validation/validation\_summary.json}. Target $< \SI {0.1}{\meter }$.\relax }{table.caption.4}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Top six approaches: XTE RMSE on the fixed lemniscate reference (\texttt  {lemniscate\_validation}). Dashed line: \SI {0.1}{\meter } target.\relax }}{7}{figure.caption.5}\protected@file@percent }
+\newlabel{fig:val_bar}{{1}{7}{Top six approaches: XTE RMSE on the fixed lemniscate reference (\texttt {lemniscate\_validation}). Dashed line: \SI {0.1}{\meter } target.\relax }{figure.caption.5}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Best approach H0\_baseline on the fixed lemniscate: trajectory, XTE, velocity MPC tracking ($u,v,r$ vs.\ \texttt  {nu\_horizon[0]}), and thruster commands with saturation limits ($\pm $\SI {250}{\newton }).\relax }}{8}{figure.caption.6}\protected@file@percent }
+\newlabel{fig:best}{{2}{8}{Best approach H0\_baseline on the fixed lemniscate: trajectory, XTE, velocity MPC tracking ($u,v,r$ vs.\ \texttt {nu\_horizon[0]}), and thruster commands with saturation limits ($\pm $\SI {250}{\newton }).\relax }{figure.caption.6}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Runner-up diagnostics and cross-approach XTE comparison.\relax }}{8}{figure.caption.7}\protected@file@percent }
+\newlabel{fig:compare}{{3}{8}{Runner-up diagnostics and cross-approach XTE comparison.\relax }{figure.caption.7}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {8}Discussion}{9}{section.8}\protected@file@percent }
+\newlabel{sec:discussion}{{8}{9}{Discussion}{section.8}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {8.1}Why velocity MPC + curvature FF succeeded}{9}{subsection.8.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {8.2}Why lower-ranked approaches failed after BO}{9}{subsection.8.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {8.3}Diagnostic logging}{9}{subsection.8.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {9}Conclusions}{9}{section.9}\protected@file@percent }
+\newlabel{sec:conclusions}{{9}{9}{Conclusions}{section.9}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {10}Future Work}{9}{section.10}\protected@file@percent }
+\newlabel{sec:future}{{10}{9}{Future Work}{section.10}{}}
+\bibcite{osqp}{1}
+\@writefile{toc}{\contentsline {section}{\numberline {A}Reproduction}{10}{appendix.A}\protected@file@percent }
+\newlabel{app:repro}{{A}{10}{Reproduction}{appendix.A}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {B}Hypothesis registry}{10}{appendix.B}\protected@file@percent }
+\gdef \@abspage@last{10}

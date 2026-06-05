@@ -1,0 +1,11 @@
+{
+  "hypothesis_id": "H11_spatial_mpc",
+  "approach": "curvature_ff_ilos",
+  "mpc_mode": "spatial",
+  "path_points": 77,
+  "cruise_speed_mps": 0.283377737634842,
+  "source_config": "/workspace/codebase/mini-bream/src/ros2_ws/src/molo_wpt_follower/mpc/experiments/results/tune_lemniscate_full/H11_spatial_mpc/best_config.yaml",
+  "rmse": 121.165319,
+  "pass": false,
+  "target_rmse_m": 0.1
+}

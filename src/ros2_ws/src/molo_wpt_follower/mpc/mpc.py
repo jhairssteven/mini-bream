@@ -27,12 +27,18 @@ if str(MPC_DIR) not in sys.path:
     sys.path.insert(0, str(MPC_DIR))
 
 from boat_model import BoatParameters
+from control_law import ControlLaw
 from path_reference import (
     PathSample,
+    attach_curvature,
     closest_index,
     generate_raw_points,
+    horizon_reference,
     resample_polyline,
+    rotate_path_to_index,
+    signed_cross_track_error,
 )
+from spatial_mpc import SpatialMPC
 from velocity_mpc import VelocityMPC
 from viz import MpcVisualizer
 
@@ -85,6 +91,7 @@ def build_mission_path(cfg: dict, origin_xy: Tuple[float, float]) -> Tuple[List[
         samples = [PathSample(p.x, p.y, p.heading, cruise) for p in smooth]
     for s in samples:
         s.u_ref = cruise
+    attach_curvature(samples, closed)
     return samples, closed
 
 
@@ -108,14 +115,35 @@ class MpcFollowerNode(Node):
 
         boat = BoatParameters.from_dict(config.get("boat", {}))
         mpc_cfg = config.get("mpc", {})
-        self.mpc = VelocityMPC(
-            boat,
-            horizon=int(mpc_cfg.get("horizon", 12)),
-            dt=float(mpc_cfg.get("dt", 0.1)),
-            Q_diag=np.array(mpc_cfg.get("Q_vel_diag", mpc_cfg.get("Q_diag", [12, 0.5, 80])), dtype=float),
-            R_diag=np.array(mpc_cfg.get("R_diag", [0.02, 0.02]), dtype=float),
-            Q_terminal_scale=float(mpc_cfg.get("Q_terminal_scale", 5.0)),
-        )
+        self._mpc_mode = str(mpc_cfg.get("mode", "velocity")).lower()
+        self._mpc_dt = float(mpc_cfg.get("dt", 0.1))
+        self._path_idx = 0
+        if self._mpc_mode == "spatial":
+            self.mpc = SpatialMPC(
+                boat,
+                horizon=int(mpc_cfg.get("horizon", 16)),
+                dt=self._mpc_dt,
+                Q_diag=np.array(
+                    mpc_cfg.get("Q_spatial_diag", [800.0, 800.0, 180.0, 4.0, 4.0, 60.0]),
+                    dtype=float,
+                ),
+                R_diag=np.array(mpc_cfg.get("R_diag", [0.04, 0.04]), dtype=float),
+                Q_terminal_scale=float(mpc_cfg.get("Q_terminal_scale", 6.0)),
+            )
+            self._velocity_mpc = None
+        else:
+            self.mpc = VelocityMPC(
+                boat,
+                horizon=int(mpc_cfg.get("horizon", 12)),
+                dt=self._mpc_dt,
+                Q_diag=np.array(
+                    mpc_cfg.get("Q_vel_diag", mpc_cfg.get("Q_diag", [12, 0.5, 80])),
+                    dtype=float,
+                ),
+                R_diag=np.array(mpc_cfg.get("R_diag", [0.02, 0.02]), dtype=float),
+                Q_terminal_scale=float(mpc_cfg.get("Q_terminal_scale", 5.0)),
+            )
+            self._velocity_mpc = self.mpc
         self._thrust_max = boat.max_thrust_N
         self._sim_scale = 1000.0 if self.sim_enable else 1.0
 
@@ -143,6 +171,19 @@ class MpcFollowerNode(Node):
             float(pid_cfg.get("integral_limit", 0.15)),
         )
         self._max_r = float(config.get("guidance", {}).get("max_yaw_rate_rad_s", 0.45))
+        self._path_closed = True
+        self._control_law: Optional[ControlLaw] = None
+        exp = config.get("experiment", {})
+        self._log_path = exp.get("log_csv") if exp else None
+        self._log_file = None
+        self._t0 = None
+        if self._log_path:
+            Path(self._log_path).parent.mkdir(parents=True, exist_ok=True)
+            self._log_file = open(self._log_path, "w", encoding="utf-8")
+            self._log_file.write(
+                "t,x,y,psi,u,v,r,xte,u_cmd,r_ref,v_ref,kappa,approach,"
+                "u_mpc_ref,v_mpc_ref,r_mpc_ref,thrust_l_N,thrust_r_N\n"
+            )
 
         qos_s = QoSProfile(
             reliability=QoSReliabilityPolicy.BEST_EFFORT,
@@ -189,9 +230,12 @@ class MpcFollowerNode(Node):
         fb = config.get("feedback", {})
         self._use_gt_pose = bool(fb.get("use_ground_truth_pose", False))
 
-        rate = float(config.get("control_rate_hz", 10.0))
-        self.create_timer(1.0 / rate, self._control_loop)
-        self.get_logger().info("molo_mpc_follower ready (ILOS + velocity MPC)")
+        self._rate = float(config.get("control_rate_hz", 10.0))
+        self.create_timer(1.0 / self._rate, self._control_loop)
+        approach = config.get("control", {}).get("approach", "curvature_ff_ilos")
+        self.get_logger().info(
+            f"molo_mpc_follower ready (mode={self._mpc_mode}, approach={approach})"
+        )
 
     def _yaw_from_imu(self, msg: Imu) -> float:
         q = (msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w)
@@ -231,11 +275,19 @@ class MpcFollowerNode(Node):
         self._activate_path(origin_xy)
 
     def _activate_path(self, origin_xy: Tuple[float, float]) -> None:
-        self._path, closed = build_mission_path(self.cfg, origin_xy)
+        self._path, self._path_closed = build_mission_path(self.cfg, origin_xy)
+        idx0 = closest_index(self._path, origin_xy[0], origin_xy[1])
+        self._path = rotate_path_to_index(self._path, idx0)
         self._path_ready = len(self._path) > 2
         self._pending_origin = False
+        if self._log_path:
+            origin_file = Path(self._log_path).parent / "origin.json"
+            import json
+
+            with open(origin_file, "w", encoding="utf-8") as f:
+                json.dump({"x": origin_xy[0], "y": origin_xy[1]}, f)
         ilos_kw = dict(self._ilos_kwargs)
-        if closed:
+        if self._path_closed:
             ilos_kw["no_of_laps"] = max(ilos_kw.get("no_of_laps", 1), 50)
         points = path_to_ilos_points(self._path)
         self._ilos = ILOSFollower(points, dubins_planner=self._dubins, **ilos_kw)
@@ -243,9 +295,20 @@ class MpcFollowerNode(Node):
         self._ilos.work_index = idx
         self._ilos.orig_index = idx
         self._heading_pid.reset()
+        mpc_cfg = self.cfg.get("mpc", {})
+        self._control_law = ControlLaw(
+            self.cfg,
+            self._path,
+            self._path_closed,
+            float(mpc_cfg.get("dt", 0.1)),
+            int(mpc_cfg.get("horizon", 12)),
+        )
+        self._control_law.attach_ilos(self._ilos, self._heading_pid)
+        self._control_law.reset_index(idx)
+        self._path_idx = idx
         self.viz.publish_ref(self._path)
         self.get_logger().info(
-            f"MPC path loaded ({len(self._path)} samples, closed={closed})"
+            f"MPC path loaded ({len(self._path)} samples, closed={self._path_closed})"
         )
 
     def _publish_thrust(self, thrust: np.ndarray) -> None:
@@ -256,50 +319,99 @@ class MpcFollowerNode(Node):
         self._right_pub.publish(t(data=tr))
 
     def _control_loop(self) -> None:
-        if self._x is None or self._psi is None or not self._path_ready or self._ilos is None:
+        if (
+            self._x is None
+            or self._psi is None
+            or not self._path_ready
+            or self._ilos is None
+            or self._control_law is None
+        ):
             return
+
+        if self._t0 is None:
+            self._t0 = self.get_clock().now().nanoseconds * 1e-9
 
         pose = Pose2D(self._x, self._y, self._psi)
         path_cfg = self.cfg.get("path", {})
         cruise = float(path_cfg.get("cruise_speed_mps", 0.45))
         complete = self._ilos.update(pose, cruise)
-        xte = abs(self._ilos.ye)
-        # Slow down when far from path to improve corner tracking
-        speed_scale = float(np.exp(-2.5 * min(xte, 1.5)))
-        u_cmd = cruise * max(0.35, speed_scale)
-
-        r_ref = float(
-            np.clip(
-                self._heading_pid.step(self._ilos.desired_heading, self._psi),
-                -self._max_r,
-                self._max_r,
-            )
-        )
-        nu_ref = np.array([u_cmd, 0.0, r_ref])
-        nu_horizon = np.tile(nu_ref, (self.mpc.N + 1, 1))
 
         z = np.array([self._x, self._y, self._psi, self._u, self._v, self._r])
-        thrust, pred = self.mpc.solve(z, nu_horizon)
+        step_m = float(path_cfg.get("resample_step_m", 0.4))
+        u_cmd = r_ref = v_ref = kappa = 0.0
+        u_mpc_ref = v_mpc_ref = r_mpc_ref = 0.0
+        app = self.cfg.get("control", {}).get("approach", "")
+
+        if self._mpc_mode == "spatial":
+            idx_c = closest_index(self._path, self._x, self._y)
+            if path_cfg.get("monotonic_progress", False) or self._path_closed:
+                self._path_idx = max(self._path_idx, idx_c)
+            else:
+                self._path_idx = idx_c
+            z_ref = horizon_reference(
+                self._path,
+                self._path_idx,
+                self.mpc.N,
+                self._mpc_dt,
+                step_m,
+                closed=self._path_closed,
+            )
+            thrust, _, pred = self.mpc.solve(z, z_ref)
+            xte = abs(signed_cross_track_error(self._path, self._x, self._y))
+            if self._path:
+                p = self._path[self._path_idx]
+                u_cmd = float(p.u_ref)
+                kappa = float(p.kappa)
+            u_mpc_ref, v_mpc_ref, r_mpc_ref = (
+                float(z_ref[0, 3]),
+                float(z_ref[0, 4]),
+                float(z_ref[0, 5]),
+            )
+        else:
+            out = self._control_law.compute(
+                self._x, self._y, self._psi, path_cfg, ilos_heading=self._ilos.desired_heading
+            )
+            xte = out.xte
+            u_cmd, r_ref, v_ref, kappa = out.u_cmd, out.r_ref, out.v_ref, out.kappa
+            u_mpc_ref, v_mpc_ref, r_mpc_ref = (
+                float(out.nu_horizon[0, 0]),
+                float(out.nu_horizon[0, 1]),
+                float(out.nu_horizon[0, 2]),
+            )
+            thrust, pred = self.mpc.solve(z, out.nu_horizon)
 
         if complete:
             thrust = np.zeros(2)
 
         self._publish_thrust(thrust)
 
+        if self._log_file:
+            t = self.get_clock().now().nanoseconds * 1e-9 - self._t0
+            self._log_file.write(
+                f"{t:.4f},{self._x:.5f},{self._y:.5f},{self._psi:.5f},"
+                f"{self._u:.4f},{self._v:.4f},{self._r:.4f},{xte:.5f},"
+                f"{u_cmd:.4f},{r_ref:.4f},{v_ref:.4f},{kappa:.5f},{app},"
+                f"{u_mpc_ref:.4f},{v_mpc_ref:.4f},{r_mpc_ref:.4f},"
+                f"{thrust[0]:.2f},{thrust[1]:.2f}\n"
+            )
+            self._log_file.flush()
+
         self.viz.publish_pose(self._x, self._y, self._psi)
         self.viz.publish_xte(xte)
         self.viz.publish_traversed(self._x, self._y, self._psi, self._traj_step)
         if pred is not None and len(pred) > 1 and self._path:
-            # Map predicted velocities to coarse world-frame preview
-            pred_xy = np.zeros((len(pred), 3))
-            px, py, ps = self._x, self._y, self._psi
-            dt = self.mpc.dt
-            for k in range(len(pred)):
-                u, v, r = pred[k]
-                ps = ps + r * dt
-                px += (u * math.cos(ps) - v * math.sin(ps)) * dt
-                py += (u * math.sin(ps) + v * math.cos(ps)) * dt
-                pred_xy[k] = [px, py, ps]
+            if pred.shape[1] >= 3:
+                pred_xy = pred[:, :3]
+            else:
+                pred_xy = np.zeros((len(pred), 3))
+                px, py, ps = self._x, self._y, self._psi
+                dt = self._mpc_dt
+                for k in range(len(pred)):
+                    u, v, r = pred[k]
+                    ps = ps + r * dt
+                    px += (u * math.cos(ps) - v * math.sin(ps)) * dt
+                    py += (u * math.sin(ps) + v * math.cos(ps)) * dt
+                    pred_xy[k] = [px, py, ps]
             self.viz.publish_pred(pred_xy)
 
 
@@ -323,6 +435,8 @@ def main() -> None:
     except KeyboardInterrupt:
         pass
     finally:
+        if node._log_file:
+            node._log_file.close()
         node.destroy_node()
         rclpy.shutdown()
 

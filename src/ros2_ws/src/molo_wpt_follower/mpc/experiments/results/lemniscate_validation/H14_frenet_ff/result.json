@@ -1,0 +1,11 @@
+{
+  "hypothesis_id": "H14_frenet_ff",
+  "approach": "frenet_ff",
+  "mpc_mode": "velocity",
+  "path_points": 77,
+  "cruise_speed_mps": 0.2778801092359684,
+  "source_config": "/workspace/codebase/mini-bream/src/ros2_ws/src/molo_wpt_follower/mpc/experiments/results/tune_lemniscate_full/H14_frenet_ff/best_config.yaml",
+  "rmse": 33.895275,
+  "pass": false,
+  "target_rmse_m": 0.1
+}

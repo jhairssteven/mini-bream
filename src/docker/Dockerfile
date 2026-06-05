@@ -29,6 +29,11 @@ RUN apt-get update && apt-get install -y \
     nano \
     git
 
+
+# Dubin's planner dependencies
+RUN apt install -y ros-humble-geographic-msgs
+RUN pip install git+https://github.com/rdesc/pydubins.git@58c4b68d9ddf972dfd32afea295c3195da648cf2
+
 #tmux config
 RUN echo "set -g mouse on" >> ~/.tmux.conf
 
@@ -39,3 +44,5 @@ RUN echo "PS1='\\[\\033[01;34m\\] (Docker)\\[\\033[0m\\] \${debian_chroot:+(\$de
 ENV DEBIAN_FRONTEND=dialog
 # Set entry point
 CMD ["bash"]
+
+

@@ -1,0 +1,11 @@
+{
+  "hypothesis_id": "H3_aggressive_ff",
+  "approach": "aggressive_ff",
+  "mpc_mode": "velocity",
+  "path_points": 77,
+  "cruise_speed_mps": 0.14711269683958914,
+  "source_config": "/workspace/codebase/mini-bream/src/ros2_ws/src/molo_wpt_follower/mpc/experiments/results/tune_lemniscate_full/H3_aggressive_ff/best_config.yaml",
+  "rmse": 32.861104,
+  "pass": false,
+  "target_rmse_m": 0.1
+}

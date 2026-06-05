@@ -18,6 +18,9 @@ install(DIRECTORY
   worlds
   DESTINATION share/${PROJECT_NAME})
 
+ament_environment_hooks("hooks/resource_paths.dsv.in")
+ament_environment_hooks("hooks/resource_paths.sh")
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights

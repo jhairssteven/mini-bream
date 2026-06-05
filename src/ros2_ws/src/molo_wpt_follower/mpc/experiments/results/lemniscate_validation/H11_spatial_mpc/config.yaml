@@ -1,0 +1,100 @@
+origin:
+  lat: 40.448417
+  lon: -86.86775
+frame_id: world
+sim_enable: true
+control_rate_hz: 10.0
+feedback:
+  use_ground_truth_pose: true
+waypoints:
+  relative_to_start: true
+  trajectory:
+    type: lemniscate
+    scale_m: 7.0
+    num_points: 32
+path:
+  resample_step_m: 0.3958010892129231
+  cruise_speed_mps: 0.283377737634842
+  closed: true
+  smooth_dubins: true
+  monotonic_progress: false
+control:
+  approach: curvature_ff_ilos
+  use_ilos_heading: true
+mpc:
+  horizon: 15
+  dt: 0.1
+  Q_vel_diag:
+  - 28.0
+  - 8.0
+  - 160.0
+  R_diag:
+  - 0.02004672595046086
+  - 0.02004672595046086
+  Q_terminal_scale: 9.953269355747306
+  mode: spatial
+  Q_spatial_diag:
+  - 628.5869086751053
+  - 628.5869086751053
+  - 255.7398876961903
+  - 2.5641157902710026
+  - 9.219987722668249
+  - 114.46974381141753
+dubins:
+  turning_radius_m: 5.705838163404552
+  step_size_m: 1.25
+ilos:
+  lookahead_min_m: 0.8289578399255526
+  lookahead_max_m: 1.1599598653088048
+  conv_rate: 9.673991135726938
+  gamma: 0.0
+  replan_dist_m: 26.0
+  replan_lookahead_m: 8.0
+  handover_offset: 1
+  no_of_laps: 50
+pid:
+  kp: 1.6
+  ki: 0.0
+  kd: 0.55
+  integral_limit: 0.2
+guidance:
+  max_yaw_rate_rad_s: 0.65
+  stanley_k: 1.1
+  lateral_v_gain: 0.0
+  kappa_ff_gain: 1.15
+  kappa_speed_scale: 2.8
+boat:
+  mass_kg: 320.4012
+  yaw_inertia_kgm2: 570.4965
+  cg_x_m: 0.0
+  cg_y_m: 0.0
+  added_mass_surge_kg: 21.5914
+  added_mass_sway_kg: 43.1522
+  added_mass_yaw_kgm2: 5.556
+  added_mass_y_r_kgm: 8.0
+  added_mass_n_v_kgm: 10.0
+  damp_surge_Ns_per_m: 124.8553
+  damp_sway_Ns_per_m: 138.1975
+  damp_yaw_Nms_per_rad: 789.8261
+  damp_surge_quad_Ns2_per_m2: 144.4452
+  damp_sway_quad_Ns2_per_m2: 119.0375
+  damp_yaw_quad_Nms2_per_rad2: 243.6211
+  thruster_arm_m: 0.7562
+  thruster_eff_left: 1.0
+  thruster_eff_right: 1.0
+  max_thrust_N: 250.0
+trajectory:
+  min_distance_m: 0.2
+topics:
+  gps: /wamv/sensors/gps/gps/fix
+  imu: /wamv/sensors/imu/imu/data
+  odometry: /wamv/sensors/position/ground_truth_odometry
+  left_thrust: /wamv/thrusters/left/thrust
+  right_thrust: /wamv/thrusters/right/thrust
+  ref_path: /molo_mpc/ref_path
+  pred_path: /molo_mpc/pred_path
+  traversed_path: /molo_mpc/traversed_path
+  vehicle_pose: /molo_mpc/vehicle_pose
+  cross_track_error: /molo_mpc/cross_track_error
+experiment:
+  log_csv: /workspace/codebase/mini-bream/src/ros2_ws/src/molo_wpt_follower/mpc/experiments/results/lemniscate_validation/H11_spatial_mpc/log.csv

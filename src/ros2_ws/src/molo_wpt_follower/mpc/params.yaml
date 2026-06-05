@@ -1,4 +1,4 @@
-# MPC trajectory follower — ILOS guidance + velocity MPC (open-water benchmark target < 0.1 m XTE)
+# MPC — default: curvature feedforward + ILOS (see experiments/hypotheses.yaml)
 
 origin:
   lat: 40.448417
@@ -11,47 +11,40 @@ control_rate_hz: 10.0
 feedback:
   use_ground_truth_pose: true
 
-#waypoints:
-#  relative_to_start: true
-#  trajectory:
-#    type: sine
-#    length_m: 40.0
-#    amplitude_m: 5.0
-#    waves: 2.0
-#path:
-#  closed: false
-#  monotonic_progress: true
-
 waypoints:
   relative_to_start: true
   trajectory:
-    type: lemniscate
-    scale_m: 8.0
-    num_points: 32
+    type: circle
+    radius_m: 5.0
+    num_points: 48
   points: []
 
 path:
-  resample_step_m: 0.4
-  cruise_speed_mps: 0.30
+  resample_step_m: 0.35
+  cruise_speed_mps: 0.28
   closed: true
   smooth_dubins: true
   monotonic_progress: false
 
+control:
+  approach: curvature_ff_ilos
+  use_ilos_heading: true
+
 mpc:
-  horizon: 14
+  horizon: 16
   dt: 0.1
-  Q_vel_diag: [20.0, 1.0, 120.0]
-  R_diag: [0.02, 0.02]
+  Q_vel_diag: [28.0, 8.0, 160.0]
+  R_diag: [0.018, 0.018]
   Q_terminal_scale: 8.0
 
 dubins:
-  turning_radius_m: 4.0
-  step_size_m: 0.4
+  turning_radius_m: 3.5
+  step_size_m: 0.35
 
 ilos:
-  lookahead_min_m: 0.9
-  lookahead_max_m: 2.5
-  conv_rate: 8.0
+  lookahead_min_m: 0.65
+  lookahead_max_m: 1.6
+  conv_rate: 11.0
   gamma: 0.0
   replan_dist_m: 26.0
   replan_lookahead_m: 8.0
@@ -59,13 +52,17 @@ ilos:
   no_of_laps: 50
 
 pid:
-  kp: 1.8
+  kp: 1.6
   ki: 0.0
-  kd: 0.65
-  integral_limit: 0.15
+  kd: 0.55
+  integral_limit: 0.2
 
 guidance:
-  max_yaw_rate_rad_s: 0.45
+  max_yaw_rate_rad_s: 0.65
+  stanley_k: 1.1
+  lateral_v_gain: 0.0
+  kappa_ff_gain: 1.15
+  kappa_speed_scale: 2.8
 
 boat:
   mass_kg: 320.4012
@@ -89,7 +86,7 @@ boat:
   max_thrust_N: 250.0
 
 trajectory:
-  min_distance_m: 0.25
+  min_distance_m: 0.2
 
 topics:
   gps: /wamv/sensors/gps/gps/fix
@@ -102,3 +99,5 @@ topics:
   traversed_path: /molo_mpc/traversed_path
   vehicle_pose: /molo_mpc/vehicle_pose
   cross_track_error: /molo_mpc/cross_track_error
+
+experiment: {}

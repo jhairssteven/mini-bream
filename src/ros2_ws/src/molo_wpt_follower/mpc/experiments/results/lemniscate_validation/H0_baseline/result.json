@@ -1,0 +1,11 @@
+{
+  "hypothesis_id": "H0_baseline",
+  "approach": "baseline_ilos_velocity",
+  "mpc_mode": "velocity",
+  "path_points": 77,
+  "cruise_speed_mps": 0.14,
+  "source_config": "/workspace/codebase/mini-bream/src/ros2_ws/src/molo_wpt_follower/mpc/experiments/results/tune_lemniscate_full/H0_baseline/best_config.yaml",
+  "rmse": 0.230717,
+  "pass": false,
+  "target_rmse_m": 0.1
+}
