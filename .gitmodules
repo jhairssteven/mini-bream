@@ -5,3 +5,9 @@
 	path = src/ros2_ws/src/ublox
 	url = git@github.com:KumarRobotics/ublox.git
 	branch = ros2
+[submodule "src/ros2_ws/src/rslidar_sdk"]
+	path = src/ros2_ws/src/rslidar_sdk
+	url = git@github.com:RoboSense-LiDAR/rslidar_sdk.git
+[submodule "src/ros2_ws/src/rslidar_msg"]
+	path = src/ros2_ws/src/rslidar_msg
+	url = git@github.com:RoboSense-LiDAR/rslidar_msg.git
