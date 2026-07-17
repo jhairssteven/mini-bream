@@ -15,7 +15,8 @@ def get_gps_node_launcher(gps_params, fix_topic='/fix1'):
             gps_params,            
         ],
         remappings=[
-            ("/ublox_gps_node/fix", fix_topic)
+            ("/ublox_gps_node/fix", fix_topic),  # source-built driver (>=2.3.0, node-private topics)
+            ("fix", fix_topic)                   # apt driver 2.3.0 (publishes on plain /fix)
         ]
     )
 

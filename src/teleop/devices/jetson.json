@@ -1,0 +1,11 @@
+{
+  "name": "jetson",
+  "backend": "jetson",
+  "left_pin": 33,
+  "right_pin": 32,
+  "radio_timeout_s": 0.25,
+  "ros_timeout_s": 0.5,
+  "daemon_host": "127.0.0.1",
+  "daemon_port": 5600,
+  "notes": "Jetson Orin Mini-Bream BOARD pin numbers (matches legacy MotorControllerNode)."
+}

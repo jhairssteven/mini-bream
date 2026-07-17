@@ -22,7 +22,8 @@ def generate_launch_description():
             {'rate': 19.0}
         ],
         remappings=[
-            ("/ublox_gps_node/fix", "/wamv/sensors/gps/gps/fix")
+            ("/ublox_gps_node/fix", "/wamv/sensors/gps/gps/fix"),  # source-built driver (>=2.3.0, node-private topics)
+            ("fix", "/wamv/sensors/gps/gps/fix")                   # apt driver 2.3.0 (publishes on plain /fix)
         ]
     )
     

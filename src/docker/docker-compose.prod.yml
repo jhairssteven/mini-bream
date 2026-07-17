@@ -1,0 +1,89 @@
+name: mini-bream-prod
+
+# Robot stack. Start with:
+#   docker compose -f docker-compose.prod.yml up -d pwm_daemon radio_rx
+#   docker compose -f docker-compose.prod.yml up frontseat
+#
+# Device profile: set DEVICE_CONFIG=rpi|jetson (see ../teleop/devices/)
+# See ../teleop/README.md for roles, SiK port discovery, and data flow.
+
+services:
+  pwm_daemon:
+    container_name: mini_bream_pwm_daemon
+    image: mini-bream:teleop
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.teleop
+    network_mode: host
+    init: true
+    restart: unless-stopped
+    privileged: true
+    environment:
+      - DEVICE_CONFIG=${DEVICE_CONFIG:-rpi}
+      # Optional: force dry_run without editing the device JSON
+      - PWM_BACKEND_OVERRIDE=${PWM_BACKEND_OVERRIDE:-}
+      - PWM_DAEMON_HOST=127.0.0.1
+      - PWM_DAEMON_PORT=5600
+    volumes:
+      - ../teleop:/opt/teleop
+      - /dev:/dev
+    command: >
+      bash -c '
+        EXTRA=""
+        if [ -n "$$PWM_BACKEND_OVERRIDE" ]; then EXTRA="--backend $$PWM_BACKEND_OVERRIDE"; fi
+        exec python3 /opt/teleop/pwm_daemon.py --device "$$DEVICE_CONFIG" $$EXTRA
+      '
+
+  radio_rx:
+    container_name: mini_bream_radio_rx
+    image: mini-bream:teleop
+    network_mode: host
+    init: true
+    restart: unless-stopped
+    privileged: true
+    depends_on:
+      - pwm_daemon
+    environment:
+      # Prefer stable by-id path for SiK (FTDI FT231X). See README.
+      - RADIO_SERIAL_PORT=${RADIO_SERIAL_PORT:-/dev/serial/by-id/usb-FTDI_FT231X_USB_UART_D30GKEF6-if00-port0}
+      - RADIO_BAUD=${RADIO_BAUD:-57600}
+      - PWM_DAEMON_HOST=127.0.0.1
+      - PWM_DAEMON_PORT=5600
+    volumes:
+      - ../teleop:/opt/teleop
+      - /dev:/dev
+    command: >
+      python3 /opt/teleop/radio_rx.py
+        --port ${RADIO_SERIAL_PORT:-/dev/serial/by-id/usb-FTDI_FT231X_USB_UART_D30GKEF6-if00-port0}
+        --baud ${RADIO_BAUD:-57600}
+
+  frontseat:
+    container_name: mini_bream_prod
+    image: mini-bream:prod
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.prod
+    network_mode: host
+    init: true
+    depends_on:
+      - pwm_daemon
+    privileged: true
+    environment:
+      - TELEOP_PATH=/opt/teleop
+      - PWM_DAEMON_HOST=127.0.0.1
+      - PWM_DAEMON_PORT=5600
+    volumes:
+      - ../ros2_ws:/workspace/ros2_ws
+      - ../teleop:/opt/teleop
+      - /dev:/dev
+    working_dir: /workspace/ros2_ws
+    stdin_open: true
+    tty: true
+    command: >
+      bash -c "
+        source /opt/ros/humble/setup.bash &&
+        colcon build --packages-select frontseat joystick_control --symlink-install &&
+        grep -qxF 'source /workspace/ros2_ws/install/setup.bash' ~/.bashrc ||
+          echo 'source /workspace/ros2_ws/install/setup.bash' >> ~/.bashrc &&
+        exec bash
+      "

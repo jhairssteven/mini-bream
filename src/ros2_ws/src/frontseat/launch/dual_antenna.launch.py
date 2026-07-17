@@ -20,7 +20,8 @@ def get_gps_node_launcher(gps_params, publish_rate=19.0, device='/dev/ttyACM0', 
             
         ],
         remappings=[
-            ("/ublox_gps_node/fix", output_topic)
+            ("/ublox_gps_node/fix", output_topic),  # source-built driver (>=2.3.0, node-private topics)
+            ("fix", output_topic)                   # apt driver 2.3.0 (publishes on plain /fix)
         ]
     )
 

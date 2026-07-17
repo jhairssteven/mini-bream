@@ -1,0 +1,10 @@
+# python:3.11-slim — no ROS. Used by pwm_daemon + radio_rx.
+FROM python:3.11-slim-bookworm
+
+WORKDIR /opt/teleop
+
+RUN pip install --no-cache-dir pyserial pigpio
+
+COPY teleop/ /opt/teleop/
+
+CMD ["python3", "/opt/teleop/pwm_daemon.py", "--backend", "dry_run"]

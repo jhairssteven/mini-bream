@@ -1,0 +1,34 @@
+name: mini-bream-ground
+
+# Ground station: local joystick → telemetry radio serial.
+# Does NOT use host networking. Bind-mount input + radio devices.
+#
+#   docker compose -f docker-compose.ground.yml up --build
+#
+# Env overrides:
+#   RADIO_SERIAL_PORT=/dev/serial/by-id/usb-FTDI_FT231X_USB_UART_<SERIAL>-if00-port0
+#   RADIO_BAUD=57600
+#   JOY_DEVICE=/dev/input/js0
+# See ../teleop/README.md for identifying the SiK radio.
+
+services:
+  ground_station:
+    container_name: mini_bream_ground
+    image: mini-bream:ground
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.ground
+    init: true
+    restart: unless-stopped
+    privileged: true
+    environment:
+      - RADIO_SERIAL_PORT=${RADIO_SERIAL_PORT:-/dev/ttyUSB0}
+      - RADIO_BAUD=${RADIO_BAUD:-57600}
+    volumes:
+      - ../teleop:/opt/teleop
+      - /dev:/dev
+    devices:
+      - ${JOY_DEVICE:-/dev/input/js0}:${JOY_DEVICE:-/dev/input/js0}
+      - ${RADIO_SERIAL_PORT:-/dev/ttyUSB0}:${RADIO_SERIAL_PORT:-/dev/ttyUSB0}
+    stdin_open: true
+    tty: true

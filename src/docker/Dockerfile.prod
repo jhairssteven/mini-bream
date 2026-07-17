@@ -1,0 +1,31 @@
+# Production image: bare minimum to run the frontseat and joystick_control packages.
+FROM ros:humble-ros-base
+
+SHELL ["/bin/bash", "-c"]
+ENV DEBIAN_FRONTEND=noninteractive
+
+# colcon to build the mounted workspace + runtime ROS deps:
+#   joy               -> joy_node used by both launch files
+#   tf-transformations -> imu_estimation, dual_antenna, moving_base_rtk
+#   ublox-gps/msgs    -> GPS launch files and NavRELPOSNED9 messages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3-pip \
+    python3-colcon-common-extensions \
+    python3-numpy \
+    ros-humble-joy \
+    ros-humble-tf-transformations \
+    ros-humble-ublox-gps \
+    ros-humble-ublox-msgs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python-only deps: utm (GPS coordinate conversion), PWM backends for the motor driver
+RUN pip install --no-cache-dir utm pigpio Jetson.GPIO
+
+# Dev tools
+RUN apt-get update && apt-get install -y nano tmux
+
+RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
+
+ENV DEBIAN_FRONTEND=dialog
+WORKDIR /workspace/ros2_ws
+CMD ["bash"]
