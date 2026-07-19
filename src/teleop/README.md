@@ -10,9 +10,9 @@ ROS autonomy can run normally; radio teleop **overrides** it when armed.
 | Service | Where | Compose file | Role |
 |---------|-------|--------------|------|
 | `ground_station` | Ground PC | `docker-compose.ground.yml` | Linux `js*` reader + `joy_to_serial` → telemetry radio |
-| `pwm_daemon` | Robot | `docker-compose.prod.yml` | **Only** process that writes motor PWM; mux + failsafe |
-| `radio_rx` | Robot | `docker-compose.prod.yml` | Serial from radio → UDP to daemon (no ROS) |
-| `frontseat` | Robot | `docker-compose.prod.yml` | ROS stack; `motor_controller` sends thrust to daemon over UDP |
+| `pwm_daemon` | Robot | `docker-compose.frontseat.yml` | **Only** process that writes motor PWM; mux + failsafe |
+| `radio_rx` | Robot | `docker-compose.frontseat.yml` | Serial from radio → UDP to daemon (no ROS) |
+| `frontseat` | Robot | `docker-compose.frontseat.yml` | ROS stack; `motor_controller` sends thrust to daemon over UDP |
 
 ### Ground station isolation (by design)
 
@@ -72,15 +72,15 @@ Defaults live in JSON, not scattered env vars:
 Select with `DEVICE_CONFIG`:
 
 ```bash
-DEVICE_CONFIG=rpi docker compose -f docker-compose.prod.yml up -d pwm_daemon
-DEVICE_CONFIG=jetson docker compose -f docker-compose.prod.yml up -d pwm_daemon
+DEVICE_CONFIG=rpi docker compose -f docker-compose.frontseat.yml up -d pwm_daemon
+DEVICE_CONFIG=jetson docker compose -f docker-compose.frontseat.yml up -d pwm_daemon
 ```
 
 Safe bring-up without moving motors (override backend only):
 
 ```bash
 DEVICE_CONFIG=rpi PWM_BACKEND_OVERRIDE=dry_run \
-  docker compose -f docker-compose.prod.yml up -d pwm_daemon
+  docker compose -f docker-compose.frontseat.yml up -d pwm_daemon
 ```
 
 ## Finding the SiK telemetry radio serial port
@@ -181,13 +181,13 @@ cd <repo>/src/docker
 # Safe bring-up (logs thrust, does not drive ESCs)
 DEVICE_CONFIG=rpi PWM_BACKEND_OVERRIDE=dry_run \
 RADIO_SERIAL_PORT=/dev/serial/by-id/usb-FTDI_FT231X_USB_UART_<ROBOT_SERIAL>-if00-port0 \
-  docker compose -f docker-compose.prod.yml up -d --build pwm_daemon radio_rx
+  docker compose -f docker-compose.frontseat.yml up -d --build pwm_daemon radio_rx
 
 # When ready for real motors, omit PWM_BACKEND_OVERRIDE (uses devices/rpi.json → pigpio hw PWM)
-# DEVICE_CONFIG=rpi RADIO_SERIAL_PORT=... docker compose -f docker-compose.prod.yml up -d pwm_daemon radio_rx
+# DEVICE_CONFIG=rpi RADIO_SERIAL_PORT=... docker compose -f docker-compose.frontseat.yml up -d pwm_daemon radio_rx
 
 # Optional: ROS autonomy / frontseat (separate; not required for radio override)
-docker compose -f docker-compose.prod.yml up --build frontseat
+docker compose -f docker-compose.frontseat.yml up --build frontseat
 ```
 
 Watch robot logs:
@@ -226,7 +226,7 @@ Hold **button[5]** → log `Deadman ARMED`; release → `disarmed` / robot falls
 ### Order summary
 
 1. Power radios + Xbox receiver  
-2. On **Pi**: `pwm_daemon` + `radio_rx` (`docker-compose.prod.yml`)  
+2. On **Pi**: `pwm_daemon` + `radio_rx` (`docker-compose.frontseat.yml`)  
 3. On **ground PC**: `ground_station` (`docker-compose.ground.yml`)  
 4. Hold deadman (**button[5]**), move **axis[1]** / **axis[4]**, confirm Pi daemon logs  
 

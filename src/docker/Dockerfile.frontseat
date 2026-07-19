@@ -1,13 +1,13 @@
-# Production image: bare minimum to run the frontseat and joystick_control packages.
+# Frontseat image: bare minimum to run the frontseat packages.
 FROM ros:humble-ros-base
 
 SHELL ["/bin/bash", "-c"]
 ENV DEBIAN_FRONTEND=noninteractive
 
 # colcon to build the mounted workspace + runtime ROS deps:
-#   joy               -> joy_node used by both launch files
+#   joy                -> joy_node used by both launch files
 #   tf-transformations -> imu_estimation, dual_antenna, moving_base_rtk
-#   ublox-gps/msgs    -> GPS launch files and NavRELPOSNED9 messages
+#   ublox-gps/msgs     -> GPS launch files and NavRELPOSNED9 messages
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     python3-colcon-common-extensions \

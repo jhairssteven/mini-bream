@@ -29,7 +29,7 @@ class MotorControllerNode(Node):
         host = os.environ.get("PWM_DAEMON_HOST", "127.0.0.1")
         port = int(os.environ.get("PWM_DAEMON_PORT", "5600"))
         self.client = PwmDaemonClient(host=host, port=port)
-        self.get_logger().info("PWM daemon at udp://%s:%d", host, port)
+        self.get_logger().info(f"PWM daemon at udp://{host}:{port}")
 
         self.create_subscription(
             Float32, "/pwm/right_thrust_cmd", self.__right_thrust_cbk, reliable_volatile_qos

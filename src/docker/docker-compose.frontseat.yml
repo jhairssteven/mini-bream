@@ -1,8 +1,8 @@
-name: mini-bream-prod
+name: mini-bream-frontseat
 
 # Robot stack. Start with:
-#   docker compose -f docker-compose.prod.yml up -d pwm_daemon radio_rx
-#   docker compose -f docker-compose.prod.yml up frontseat
+#   docker compose -f docker-compose.frontseat.yml up -d pwm_daemon radio_rx
+#   docker compose -f docker-compose.frontseat.yml up frontseat
 #
 # Device profile: set DEVICE_CONFIG=rpi|jetson (see ../teleop/devices/)
 # See ../teleop/README.md for roles, SiK port discovery, and data flow.
@@ -35,7 +35,6 @@ services:
       '
     # entrypoint.teleop.sh starts pigpiod before this command
 
-
   radio_rx:
     container_name: mini_bream_radio_rx
     image: mini-bream:teleop
@@ -60,11 +59,11 @@ services:
         --baud ${RADIO_BAUD:-57600}
 
   frontseat:
-    container_name: mini_bream_prod
-    image: mini-bream:prod
+    container_name: mini_bream_frontseat
+    image: mini-bream:frontseat
     build:
       context: ../
-      dockerfile: docker/Dockerfile.prod
+      dockerfile: docker/Dockerfile.frontseat
     network_mode: host
     init: true
     depends_on:
@@ -77,15 +76,9 @@ services:
     volumes:
       - ../ros2_ws:/workspace/ros2_ws
       - ../teleop:/opt/teleop
+      - ../docker/start_frontseat.sh:/start_frontseat.sh:ro
       - /dev:/dev
     working_dir: /workspace/ros2_ws
     stdin_open: true
     tty: true
-    command: >
-      bash -c "
-        source /opt/ros/humble/setup.bash &&
-        colcon build --packages-select frontseat joystick_control --symlink-install &&
-        grep -qxF 'source /workspace/ros2_ws/install/setup.bash' ~/.bashrc ||
-          echo 'source /workspace/ros2_ws/install/setup.bash' >> ~/.bashrc &&
-        exec bash
-      "
+    command: ["bash", "/start_frontseat.sh"]

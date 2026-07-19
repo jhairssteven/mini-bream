@@ -19,7 +19,7 @@ flowchart LR
         RRadio["SiK telemetry radio<br/>serial USB"]
         RadioRx["radio_rx<br/>mini-bream:teleop<br/>Dockerfile.teleop"]
         Pwm["pwm_daemon<br/>mini-bream:teleop<br/>Dockerfile.teleop"]
-        Frontseat["frontseat<br/>mini-bream:prod<br/>Dockerfile.prod"]
+        Frontseat["frontseat<br/>mini-bream:frontseat<br/>Dockerfile.frontseat"]
         Motors["ESCs / motors<br/>GPIO pins"]
 
         RRadio --> RadioRx
@@ -43,7 +43,7 @@ flowchart LR
   - `radio_rx` converts serial radio frames into local UDP commands.
   - `pwm_daemon` is the only process allowed to control the motor pins.
 
-- `Dockerfile.prod` builds `mini-bream:prod`.
+- `Dockerfile.frontseat` builds `mini-bream:frontseat`.
   - Provides ROS 2 Humble and the dependencies needed by `frontseat` and `joystick_control`.
   - Mounts and builds `ros2_ws`.
   - ROS motor commands are forwarded to `pwm_daemon`; this container does not own the GPIO pins.
@@ -51,7 +51,7 @@ flowchart LR
 ## Compose files
 
 - `docker-compose.ground.yml` is started on the ground-station computer.
-- `docker-compose.prod.yml` is started on the robot and contains:
+- `docker-compose.frontseat.yml` is started on the robot and contains:
   - `pwm_daemon`
   - `radio_rx`
   - `frontseat`
@@ -77,8 +77,8 @@ docker compose -f docker-compose.ground.yml up --build
 Robot:
 
 ```bash
-docker compose -f docker-compose.prod.yml up -d --build pwm_daemon radio_rx
-docker compose -f docker-compose.prod.yml up --build frontseat
+docker compose -f docker-compose.frontseat.yml up -d --build pwm_daemon radio_rx
+docker compose -f docker-compose.frontseat.yml up --build frontseat
 ```
 
 See `../teleop/README.md` for device discovery, controller mapping, safety behavior, and detailed setup.

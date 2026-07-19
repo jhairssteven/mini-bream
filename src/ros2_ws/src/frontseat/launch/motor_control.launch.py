@@ -36,7 +36,7 @@ def generate_launch_description():
         )
     
     return LaunchDescription([
-        joystick_nodes,
+        #joystick_nodes,
         motor_controller,
-        thrust_source_selector
+        #thrust_source_selector
     ])
