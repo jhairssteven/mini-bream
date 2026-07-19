@@ -10,6 +10,14 @@ logger = logging.getLogger("teleop.motors")
 # BlueRobotics T200 / Basic ESC style mapping (matches frontseat BlueRoboticsT200)
 PWM_FREQ_HZ = 340
 SENSITIVITY = 0.7
+# Ignore tiny commands from any source (joystick residual, radio noise, etc.)
+COMMAND_DEADBAND = 0.09
+
+
+def apply_command_deadband(thrust: float, deadband: float = COMMAND_DEADBAND) -> float:
+    if abs(thrust) <= deadband:
+        return 0.0
+    return max(-1.0, min(1.0, float(thrust)))
 
 
 def thrust_to_pulse_us(thrust: float) -> float:
@@ -33,6 +41,11 @@ def thrust_to_duty_percent(thrust: float, sensibility: float = SENSITIVITY) -> f
     return pulse_us_to_duty_percent(thrust_to_pulse_us(thrust * sensibility))
 
 
+def thrust_to_servo_pulse_us(thrust: float, sensibility: float = SENSITIVITY) -> int:
+    """Exact ESC pulse width in microseconds (for logging / diagnostics)."""
+    return int(round(thrust_to_pulse_us(apply_command_deadband(thrust) * sensibility)))
+
+
 class MotorPair(Protocol):
     def set_thrust(self, left: float, right: float) -> None: ...
     def stop(self) -> None: ...
@@ -44,15 +57,15 @@ class DryRunMotors:
         self._last = (0.0, 0.0)
 
     def set_thrust(self, left: float, right: float) -> None:
-        left = max(-1.0, min(1.0, left))
-        right = max(-1.0, min(1.0, right))
+        left = apply_command_deadband(left)
+        right = apply_command_deadband(right)
         if (left, right) != self._last:
             logger.info(
-                "dry-run thrust L=%.3f R=%.3f (duty L=%.2f%% R=%.2f%%)",
+                "dry-run thrust L=%.3f R=%.3f (pulse L=%dus R=%dus)",
                 left,
                 right,
-                thrust_to_duty_percent(left),
-                thrust_to_duty_percent(right),
+                thrust_to_servo_pulse_us(left),
+                thrust_to_servo_pulse_us(right),
             )
             self._last = (left, right)
 
@@ -64,27 +77,51 @@ class DryRunMotors:
 
 
 class PigpioMotors:
-    """Hardware PWM via pigpio (Raspberry Pi). Requires pigpiod."""
+    """Hardware PWM via pigpio (GPIO 12/13/18/19 only). Requires pigpiod."""
 
     def __init__(self, left_pin: int, right_pin: int, freq_hz: int = PWM_FREQ_HZ) -> None:
         import pigpio
 
         self.pi = pigpio.pi()
         if not self.pi.connected:
-            raise RuntimeError("pigpio not connected — is pigpiod running?")
+            raise RuntimeError(
+                "pigpio not connected — is pigpiod running? "
+                "(teleop entrypoint should start it inside the container)"
+            )
         self.left_pin = left_pin
         self.right_pin = right_pin
         self.freq_hz = freq_hz
+        self._last = (None, None)
         self.stop()
+        logger.info(
+            "pigpio hardware_PWM pins L=%d R=%d @ %d Hz (command deadband ±%.2f)",
+            left_pin,
+            right_pin,
+            freq_hz,
+            COMMAND_DEADBAND,
+        )
 
     def _write(self, pin: int, thrust: float) -> None:
+        thrust = apply_command_deadband(thrust)
+        # hardware_PWM duty is 0..1_000_000 (parts per million)
         duty_pct = thrust_to_duty_percent(thrust)
-        duty_ppm = int(max(0, min(1_000_000, duty_pct * 10_000)))
+        duty_ppm = int(max(0, min(1_000_000, round(duty_pct * 10_000))))
         self.pi.hardware_PWM(pin, self.freq_hz, duty_ppm)
 
     def set_thrust(self, left: float, right: float) -> None:
-        self._write(self.left_pin, max(-1.0, min(1.0, left)))
-        self._write(self.right_pin, max(-1.0, min(1.0, right)))
+        left = apply_command_deadband(left)
+        right = apply_command_deadband(right)
+        if (left, right) != self._last:
+            logger.info(
+                "PWM cmd L=%.3f R=%.3f → pulse %d / %d µs (hw PWM)",
+                left,
+                right,
+                thrust_to_servo_pulse_us(left),
+                thrust_to_servo_pulse_us(right),
+            )
+            self._last = (left, right)
+        self._write(self.left_pin, left)
+        self._write(self.right_pin, right)
 
     def stop(self) -> None:
         self.set_thrust(0.0, 0.0)
@@ -113,8 +150,10 @@ class JetsonMotors:
         self.right.start(zero)
 
     def set_thrust(self, left: float, right: float) -> None:
-        self.left.ChangeDutyCycle(thrust_to_duty_percent(max(-1.0, min(1.0, left))))
-        self.right.ChangeDutyCycle(thrust_to_duty_percent(max(-1.0, min(1.0, right))))
+        left = apply_command_deadband(left)
+        right = apply_command_deadband(right)
+        self.left.ChangeDutyCycle(thrust_to_duty_percent(left))
+        self.right.ChangeDutyCycle(thrust_to_duty_percent(right))
 
     def stop(self) -> None:
         self.set_thrust(0.0, 0.0)

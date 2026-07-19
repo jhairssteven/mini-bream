@@ -1,7 +1,7 @@
 name: mini-bream-ground
 
-# Ground station: local joystick → telemetry radio serial.
-# Does NOT use host networking. Bind-mount input + radio devices.
+# Ground station: Linux joystick (/dev/input/js*) → telemetry radio serial.
+# No ROS. Own Docker network (not host) — isolated from robot autonomy.
 #
 #   docker compose -f docker-compose.ground.yml up --build
 #
@@ -22,6 +22,7 @@ services:
     restart: unless-stopped
     privileged: true
     environment:
+      - JOY_DEVICE=${JOY_DEVICE:-/dev/input/js0}
       - RADIO_SERIAL_PORT=${RADIO_SERIAL_PORT:-/dev/ttyUSB0}
       - RADIO_BAUD=${RADIO_BAUD:-57600}
     volumes:
@@ -30,5 +31,14 @@ services:
     devices:
       - ${JOY_DEVICE:-/dev/input/js0}:${JOY_DEVICE:-/dev/input/js0}
       - ${RADIO_SERIAL_PORT:-/dev/ttyUSB0}:${RADIO_SERIAL_PORT:-/dev/ttyUSB0}
+    # Xbox: axis[1]/left thrust, axis[4]=right thrust, button[5]=deadman
+    command: >
+      python3 /opt/teleop/joy_to_serial.py
+        --joy-device ${JOY_DEVICE:-/dev/input/js0}
+        --port ${RADIO_SERIAL_PORT:-/dev/ttyUSB0}
+        --baud ${RADIO_BAUD:-57600}
+        --left-axis ${JOY_LEFT_AXIS:-1}
+        --right-axis ${JOY_RIGHT_AXIS:-4}
+        --deadman-button ${JOY_DEADMAN_BUTTON:-5}
     stdin_open: true
     tty: true

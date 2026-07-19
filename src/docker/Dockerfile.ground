@@ -1,27 +1,14 @@
-# Ground station: ROS 2 joy + serial bridge to telemetry radio.
-FROM ros:humble-ros-base
+# Ground station: Linux joystick → serial telemetry radio (no ROS required at runtime).
+FROM python:3.11-slim-bookworm
 
-SHELL ["/bin/bash", "-c"]
-ENV DEBIAN_FRONTEND=noninteractive
+WORKDIR /opt/teleop
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3-pip \
-    ros-humble-joy \
-    && rm -rf /var/lib/apt/lists/* \
-    && pip install --no-cache-dir pyserial
+RUN pip install --no-cache-dir pyserial
 
 COPY teleop/ /opt/teleop/
 
-RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
+ENV JOY_DEVICE=/dev/input/js0
+ENV RADIO_SERIAL_PORT=/dev/ttyUSB0
+ENV RADIO_BAUD=57600
 
-ENV DEBIAN_FRONTEND=dialog
-WORKDIR /opt/teleop
-
-# joy_node + joy_to_serial
-CMD bash -c "\
-  source /opt/ros/humble/setup.bash && \
-  ros2 run joy joy_node & \
-  python3 /opt/teleop/joy_to_serial.py \
-    --port \${RADIO_SERIAL_PORT:-/dev/ttyUSB0} \
-    --baud \${RADIO_BAUD:-57600} \
-"
+CMD ["python3", "/opt/teleop/joy_to_serial.py"]

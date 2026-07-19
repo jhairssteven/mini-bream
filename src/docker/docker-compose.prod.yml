@@ -33,6 +33,8 @@ services:
         if [ -n "$$PWM_BACKEND_OVERRIDE" ]; then EXTRA="--backend $$PWM_BACKEND_OVERRIDE"; fi
         exec python3 /opt/teleop/pwm_daemon.py --device "$$DEVICE_CONFIG" $$EXTRA
       '
+    # entrypoint.teleop.sh starts pigpiod before this command
+
 
   radio_rx:
     container_name: mini_bream_radio_rx
