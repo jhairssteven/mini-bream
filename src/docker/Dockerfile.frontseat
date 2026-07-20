@@ -1,4 +1,4 @@
-# Frontseat image: bare minimum to run the frontseat packages.
+# Frontseat image: bare minimum to run the frontseat packages (Pi).
 FROM ros:humble-ros-base
 
 SHELL ["/bin/bash", "-c"]

@@ -1,0 +1,24 @@
+# Perception / LiDAR image for the Jetson (cameras can join later).
+FROM ros:humble-ros-base
+
+SHELL ["/bin/bash", "-c"]
+ENV DEBIAN_FRONTEND=noninteractive
+ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+
+# libpcap/yaml-cpp -> rslidar_sdk; Cyclone DDS -> Airy frame rate on Humble
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3-colcon-common-extensions \
+    libpcap-dev \
+    libyaml-cpp-dev \
+    iproute2 \
+    tcpdump \
+    nano \
+    tmux \
+    ros-humble-rmw-cyclonedds-cpp \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
+
+ENV DEBIAN_FRONTEND=dialog
+WORKDIR /workspace/ros2_ws
+CMD ["bash"]

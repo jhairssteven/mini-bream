@@ -1,11 +1,13 @@
 name: mini-bream-frontseat
 
 # Robot stack. Start with:
-#   docker compose -f docker-compose.frontseat.yml up -d pwm_daemon radio_rx
-#   docker compose -f docker-compose.frontseat.yml up frontseat
+#   Pi:     docker compose -f docker-compose.frontseat.yml up -d pwm_daemon radio_rx
+#           docker compose -f docker-compose.frontseat.yml up frontseat
+#   Jetson: docker compose -f docker-compose.frontseat.yml up --build lidar
 #
 # Device profile: set DEVICE_CONFIG=rpi|jetson (see ../teleop/devices/)
 # See ../teleop/README.md for roles, SiK port discovery, and data flow.
+# LiDAR network: ../ros2_ws/src/frontseat/config/rslidar_airy/README.md
 
 services:
   pwm_daemon:
@@ -82,3 +84,29 @@ services:
     stdin_open: true
     tty: true
     command: ["bash", "/start_frontseat.sh"]
+
+  # Jetson: LiDAR (cameras can join this image later). No dependency on pwm/frontseat.
+  lidar:
+    container_name: mini_bream_lidar
+    image: mini-bream:lidar
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.lidar
+      # Jetson Docker often has broken container DNS when daemon iptables=false.
+      network: host
+    network_mode: host
+    init: true
+    restart: unless-stopped
+    privileged: true
+    environment:
+      - LIDAR_IFACE=${LIDAR_IFACE:-eth0}
+      - SETUP_AIRY_NETWORK=${SETUP_AIRY_NETWORK:-1}
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+    volumes:
+      - ../ros2_ws:/workspace/ros2_ws
+      - ../docker/start_lidar.sh:/start_lidar.sh:ro
+      - /dev:/dev
+    working_dir: /workspace/ros2_ws
+    stdin_open: true
+    tty: true
+    command: ["bash", "/start_lidar.sh"]

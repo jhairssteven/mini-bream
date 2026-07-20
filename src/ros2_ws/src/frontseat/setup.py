@@ -14,6 +14,7 @@ setup(
         ('share/' + package_name + '/launch', glob('launch/*')),
         ('share/' + package_name + '/config' + '/cameras', glob('config/cameras/*')),
         ('share/' + package_name + '/config' + '/ublox_gps', glob('config/ublox_gps/*')),
+        ('share/' + package_name + '/config' + '/rslidar_airy', glob('config/rslidar_airy/*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,

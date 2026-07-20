@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build frontseat and start its launch files in detached tmux sessions.
+# Build frontseat and start motor/RTK launch files in detached tmux sessions.
 set -eo pipefail
 
 source /opt/ros/humble/setup.bash
@@ -30,4 +30,9 @@ start_launch motor_control motor_control.launch.py
 start_launch moving_base_rtk moving_base_rtk.launch.py
 
 echo "[frontseat] sessions: $(tmux ls 2>/dev/null || echo none)"
-exec bash
+
+if [[ -t 0 ]]; then
+  exec bash
+else
+  exec sleep infinity
+fi
