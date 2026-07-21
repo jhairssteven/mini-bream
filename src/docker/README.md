@@ -67,7 +67,20 @@ flowchart LR
 
 ## Start commands
 
-Emergency teleop transmitter (joystick → SiK radio):
+Use the role launcher (recommended):
+
+```bash
+cd src/docker
+chmod +x mini_bream_start.sh
+
+./mini_bream_start.sh pi       # pwm_daemon + radio_rx + frontseat
+./mini_bream_start.sh jetson   # LiDAR network + perception
+./mini_bream_start.sh gs       # telemetry_tx + RViz ground_station
+```
+
+Options: `--build`, `--dry-run` (Pi PWM safe mode), `--no-telemetry` (GS RViz only), `--detach-frontseat`.
+
+Manual compose commands:
 
 ```bash
 docker compose -f docker-compose.ground.telemetry.yaml up --build
