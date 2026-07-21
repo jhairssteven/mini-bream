@@ -1,0 +1,26 @@
+# Ground station: RViz2 viewer for robot ROS topics over the LAN.
+FROM ros:humble-desktop
+
+SHELL ["/bin/bash", "-c"]
+ENV DEBIAN_FRONTEND=noninteractive
+ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ros-humble-rmw-cyclonedds-cpp \
+    ros-humble-rviz2 \
+    ros-humble-rviz-common \
+    ros-humble-rviz-default-plugins \
+    ros-humble-image-transport-plugins \
+    ros-humble-compressed-image-transport \
+    tmux \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY docker/config/ground_station.rviz /opt/ground_station/ground_station.rviz
+COPY docker/start_ground_station.sh /start_ground_station.sh
+RUN chmod +x /start_ground_station.sh
+
+RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
+
+ENV DEBIAN_FRONTEND=dialog
+WORKDIR /workspace/ros2_ws
+CMD ["bash", "/start_ground_station.sh"]

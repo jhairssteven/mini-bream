@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<!-- Cyclone DDS: static peers for Pi <-> Jetson on 192.168.0.0/24 -->
+<!-- Cyclone DDS static peers on 192.168.0.0/24 (robot LAN).
+     .100 Pi (frontseat)  .101 spare  .102 Jetson (perception)  .103 ground station (RViz) -->
 <CycloneDDS xmlns="https://cdds.io/config">
   <Domain>
     <General>

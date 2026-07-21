@@ -4,18 +4,21 @@ This document covers the production, teleoperation, ground-station, and Jetson p
 
 ```mermaid
 flowchart LR
-    subgraph GS["Ground-station computer"]
+    subgraph GS["Ground-station computer (.103)"]
         Xbox["Xbox controller<br/>/dev/input/js0"]
-        Ground["ground_station<br/>mini-bream:ground<br/>Dockerfile.ground"]
+        Telemetry["telemetry_tx<br/>mini-bream:telemetry"]
         GRadio["SiK telemetry radio<br/>serial USB"]
+        Rviz["ground_station<br/>mini-bream:ground-station<br/>RViz2"]
 
-        Xbox --> Ground
-        Ground --> GRadio
+        Xbox --> Telemetry
+        Telemetry --> GRadio
+        Rviz -.->|"ROS 2 DDS"| Pi
+        Rviz -.->|"ROS 2 DDS"| Jetson
     end
 
     GRadio <-->|"9-byte serial commands<br/>over SiK radio"| RRadio
 
-    subgraph Pi["Raspberry Pi"]
+    subgraph Pi["Raspberry Pi (.100)"]
         RRadio["SiK telemetry radio<br/>serial USB"]
         RadioRx["radio_rx<br/>mini-bream:teleop"]
         Pwm["pwm_daemon<br/>mini-bream:teleop"]
@@ -28,7 +31,7 @@ flowchart LR
         Pwm -->|"pigpio hardware PWM"| Motors
     end
 
-    subgraph Jetson["Jetson Orin Nano"]
+    subgraph Jetson["Jetson Orin Nano (.102)"]
         Perception["perception<br/>mini-bream:perception"]
         Airy["RS-LiDAR-AIRY"]
         Zed["ZED 2i"]
@@ -40,7 +43,8 @@ flowchart LR
 
 ## Images and services
 
-- `Dockerfile.ground` builds `mini-bream:ground` (ground-station computer).
+- `Dockerfile.ground_station.telemetry_tx` builds `mini-bream:telemetry` (joystick → SiK radio, no ROS).
+- `Dockerfile.ground_station` builds `mini-bream:ground-station` (RViz2 topic viewer).
 - `Dockerfile.teleop` builds `mini-bream:teleop` (`radio_rx`, `pwm_daemon` on the Pi).
 - `Dockerfile.frontseat` builds `mini-bream:frontseat` (Pi: motor control + RTK).
 - `Dockerfile.perception` builds `mini-bream:perception` (Jetson: RoboSense Airy + ZED 2i).
@@ -49,7 +53,8 @@ flowchart LR
 
 | Compose file | Host | Services |
 |--------------|------|----------|
-| `docker-compose.ground.yml` | Ground station | ground |
+| `docker-compose.ground.telemetry.yaml` | Ground PC | `telemetry_tx` (emergency teleop radio) |
+| `docker-compose.ground.yml` | Ground PC (`.103`) | `ground_station` (RViz2) |
 | `docker-compose.frontseat.yml` | Pi / Jetson | Pi: `pwm_daemon`, `radio_rx`, `frontseat` · Jetson: `perception` |
 
 ## Motor command priority
@@ -62,9 +67,16 @@ flowchart LR
 
 ## Start commands
 
-Ground station:
+Emergency teleop transmitter (joystick → SiK radio):
 
 ```bash
+docker compose -f docker-compose.ground.telemetry.yaml up --build
+```
+
+Ground station RViz2 (same LAN as robot, `192.168.0.103`):
+
+```bash
+xhost +local:docker
 docker compose -f docker-compose.ground.yml up --build
 ```
 
@@ -96,15 +108,22 @@ The `perception` service sets `build.network: host` for the same reason.
 
 See `../ros2_ws/src/frontseat/config/rslidar_airy/README.md` and `../teleop/README.md`.
 
-## Cross-host ROS (Pi ↔ Jetson)
+## Cross-host ROS (Pi ↔ Jetson ↔ ground station)
 
-Both hosts use `network_mode: host`, so Docker is not isolating ROS traffic. Topics are discovered via DDS on the LAN.
+All ROS hosts use `network_mode: host`, so Docker is not isolating ROS traffic. Topics are discovered via DDS on the LAN.
 
 Requirements:
 
-1. **Same RMW** — both `frontseat` (Pi) and `perception` (Jetson) use `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp`. Fast DDS and Cyclone cannot talk to each other.
-2. **Same domain** — set the same `ROS_DOMAIN_ID` on both (default `0`).
-3. **Multicast** — Cyclone DDS discovers peers via multicast on `192.168.0.0/24`. Some Wi‑Fi routers block this; use wired Ethernet or add a Cyclone peer list (below).
+1. **Same RMW** — `frontseat`, `perception`, and `ground_station` use `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp`. Fast DDS and Cyclone cannot talk to each other.
+2. **Same domain** — set the same `ROS_DOMAIN_ID` on all hosts (default `0`).
+3. **Static peers** — `cyclonedds.xml` lists Pi (`.100`), Jetson (`.102`), and ground station (`.103`). Mount it on every ROS service.
+
+Verify from ground station:
+
+```bash
+docker exec mini_bream_ground_station bash -lc \
+  'source /opt/ros/humble/setup.bash && ros2 topic list | grep -E zed|rslidar|fix|pwm'
+```
 
 Verify from Pi:
 
@@ -113,25 +132,12 @@ docker exec mini_bream_frontseat bash -lc \
   'source /opt/ros/humble/setup.bash && source /workspace/ros2_ws/install/setup.bash && ros2 topic list | grep -E zed|rslidar'
 ```
 
-If topics still do not appear after rebuilding `frontseat`, create `src/docker/cyclonedds.xml` and mount it on both services:
+Peer list in `src/docker/cyclonedds.xml`:
 
 ```xml
-<?xml version="1.0" encoding="UTF-8" ?>
-<CycloneDDS>
-  <Domain>
-    <General>
-      <Interfaces>
-        <NetworkInterface name="eth0"/>
-      </Interfaces>
-    </General>
-    <Discovery>
-      <Peers>
-        <Peer address="192.168.0.100"/>  <!-- Pi -->
-        <Peer address="192.168.0.102"/>  <!-- Jetson -->
-      </Peers>
-    </Discovery>
-  </Domain>
-</CycloneDDS>
+<Peer address="192.168.0.100"/>  <!-- Pi -->
+<Peer address="192.168.0.102"/>  <!-- Jetson -->
+<Peer address="192.168.0.103"/>  <!-- Ground station (RViz) -->
 ```
 
-Set `CYCLONEDDS_URI=file:///path/to/cyclonedds.xml` in both compose services.
+Set `CYCLONEDDS_URI=file:///etc/cyclonedds.xml` in each compose service.

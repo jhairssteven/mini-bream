@@ -9,16 +9,19 @@ ROS autonomy can run normally; radio teleop **overrides** it when armed.
 
 | Service | Where | Compose file | Role |
 |---------|-------|--------------|------|
-| `ground_station` | Ground PC | `docker-compose.ground.yml` | Linux `js*` reader + `joy_to_serial` → telemetry radio |
+| `telemetry_tx` | Ground PC | `docker-compose.ground.telemetry.yaml` | Linux `js*` reader + `joy_to_serial` → telemetry radio |
+| `ground_station` | Ground PC (`.103`) | `docker-compose.ground.yml` | RViz2 viewer for robot ROS topics (DDS) |
 | `pwm_daemon` | Robot | `docker-compose.frontseat.yml` | **Only** process that writes motor PWM; mux + failsafe |
 | `radio_rx` | Robot | `docker-compose.frontseat.yml` | Serial from radio → UDP to daemon (no ROS) |
 | `frontseat` | Robot | `docker-compose.frontseat.yml` | ROS stack; `motor_controller` sends thrust to daemon over UDP |
 
-### Ground station isolation (by design)
+### Ground station roles
 
-The ground station does **not** use ROS to talk to the robot. It reads the controller via the Linux joystick device (`/dev/input/js0`) and sends framed packets over the SiK radio. The container uses Docker’s **default bridge network** (not `network_mode: host`), so even if ROS were present there, its topics would be unreachable from the robot autonomy stack. The only link to the boat is the **serial telemetry radio**.
+**`telemetry_tx`** does **not** use ROS. It reads the controller via `/dev/input/js0` and sends framed packets over the SiK radio. The container uses Docker’s default bridge network, so it is isolated from robot DDS. The only teleop link to the boat is the **serial telemetry radio**.
 
-(We intentionally avoid ROS 2 `joy_node` on the GS: it uses SDL and often fails to publish for Xbox 360 wireless receivers that still work fine as `/dev/input/js0`.)
+**`ground_station`** (separate compose file) is for **RViz2** on the ground PC (`192.168.0.103`). It joins the same Cyclone DDS domain as Pi and Jetson to visualize LiDAR, camera, GPS, etc. It does not send motor commands.
+
+(We intentionally avoid ROS 2 `joy_node` on the GS teleop container: it uses SDL and often fails to publish for Xbox 360 wireless receivers that still work fine as `/dev/input/js0`.)
 
 ## Data flow
 
@@ -159,8 +162,8 @@ ls -l /dev/serial/by-id/
 Optional: map axes/buttons on the ground PC before starting compose:
 
 ```bash
-# stop GS container if it already holds js0
-docker stop mini_bream_ground 2>/dev/null
+# stop telemetry container if it already holds js0
+docker stop mini_bream_telemetry_tx 2>/dev/null
 cd <repo>/src
 python3 teleop/js_dump.py          # move sticks / press buttons; note indices
 ```
@@ -199,20 +202,20 @@ docker logs -f mini_bream_radio_rx
 
 You want `radio_rx` to open the SiK port, and when the GS is armed, `pwm_daemon` should show `Active source → radio`.
 
-### 2) Ground station (PC with Xbox Controller) — start second
+### 2) Ground PC — emergency teleop transmitter
 
 ```bash
 cd <repo>/src/docker
 
 RADIO_SERIAL_PORT=/dev/serial/by-id/usb-FTDI_FT231X_USB_UART_<GS_SERIAL>-if00-port0 \
 JOY_DEVICE=/dev/input/js0 \
-  docker compose -f docker-compose.ground.yml up --build
+  docker compose -f docker-compose.ground.telemetry.yaml up --build
 ```
 
-Watch GS logs:
+Watch telemetry logs:
 
 ```bash
-docker logs -f mini_bream_ground
+docker logs -f mini_bream_telemetry_tx
 ```
 
 Expect something like:
@@ -227,8 +230,18 @@ Hold **button[5]** → log `Deadman ARMED`; release → `disarmed` / robot falls
 
 1. Power radios + Xbox receiver  
 2. On **Pi**: `pwm_daemon` + `radio_rx` (`docker-compose.frontseat.yml`)  
-3. On **ground PC**: `ground_station` (`docker-compose.ground.yml`)  
+3. On **ground PC**: `telemetry_tx` (`docker-compose.ground.telemetry.yaml`)  
 4. Hold deadman (**button[5]**), move **axis[1]** / **axis[4]**, confirm Pi daemon logs  
+
+### RViz2 on ground PC (optional)
+
+On the ground-station computer (`192.168.0.103`), with Pi/Jetson stacks running:
+
+```bash
+cd <repo>/src/docker
+xhost +local:docker
+docker compose -f docker-compose.ground.yml up --build
+```
 
 ## Failsafe notes
 

@@ -1,0 +1,44 @@
+name: mini-bream-ground-telemetry
+
+# Emergency teleop transmitter: joystick (/dev/input/js*) → SiK telemetry radio.
+# No ROS. Uses Docker bridge network — isolated from robot DDS.
+#
+#   docker compose -f docker-compose.ground.telemetry.yaml up --build
+#
+# Env overrides:
+#   RADIO_SERIAL_PORT=/dev/serial/by-id/usb-FTDI_FT231X_USB_UART_<SERIAL>-if00-port0
+#   RADIO_BAUD=57600
+#   JOY_DEVICE=/dev/input/js0
+# See ../teleop/README.md for identifying the SiK radio.
+
+services:
+  telemetry_tx:
+    container_name: mini_bream_telemetry_tx
+    image: mini-bream:telemetry
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.ground_station.telemetry_tx
+    init: true
+    restart: unless-stopped
+    privileged: true
+    environment:
+      - JOY_DEVICE=${JOY_DEVICE:-/dev/input/js0}
+      - RADIO_SERIAL_PORT=${RADIO_SERIAL_PORT:-/dev/ttyUSB0}
+      - RADIO_BAUD=${RADIO_BAUD:-57600}
+    volumes:
+      - ../teleop:/opt/teleop
+      - /dev:/dev
+    devices:
+      - ${JOY_DEVICE:-/dev/input/js0}:${JOY_DEVICE:-/dev/input/js0}
+      - ${RADIO_SERIAL_PORT:-/dev/ttyUSB0}:${RADIO_SERIAL_PORT:-/dev/ttyUSB0}
+    # Xbox: axis[1]/left thrust, axis[4]=right thrust, button[5]=deadman
+    command: >
+      python3 /opt/teleop/joy_to_serial.py
+        --joy-device ${JOY_DEVICE:-/dev/input/js0}
+        --port ${RADIO_SERIAL_PORT:-/dev/ttyUSB0}
+        --baud ${RADIO_BAUD:-57600}
+        --left-axis ${JOY_LEFT_AXIS:-1}
+        --right-axis ${JOY_RIGHT_AXIS:-4}
+        --deadman-button ${JOY_DEADMAN_BUTTON:-5}
+    stdin_open: true
+    tty: true

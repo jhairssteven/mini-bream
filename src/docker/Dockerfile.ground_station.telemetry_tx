@@ -1,4 +1,4 @@
-# Ground station: Linux joystick → serial telemetry radio (no ROS required at runtime).
+# Telemetry transmitter: Linux joystick → SiK radio serial (no ROS).
 FROM python:3.11-slim-bookworm
 
 WORKDIR /opt/teleop

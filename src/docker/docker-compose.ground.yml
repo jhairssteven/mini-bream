@@ -1,44 +1,39 @@
 name: mini-bream-ground
 
-# Ground station: Linux joystick (/dev/input/js*) → telemetry radio serial.
-# No ROS. Own Docker network (not host) — isolated from robot autonomy.
+# Ground station RViz2 viewer (192.168.0.103). Subscribes to robot topics over DDS.
+# Requires host networking + Cyclone DDS peers (see cyclonedds.xml).
 #
+# On the ground-station PC (with a display):
+#   xhost +local:docker
 #   docker compose -f docker-compose.ground.yml up --build
 #
-# Env overrides:
-#   RADIO_SERIAL_PORT=/dev/serial/by-id/usb-FTDI_FT231X_USB_UART_<SERIAL>-if00-port0
-#   RADIO_BAUD=57600
-#   JOY_DEVICE=/dev/input/js0
-# See ../teleop/README.md for identifying the SiK radio.
+# Verify topics without RViz:
+#   docker exec mini_bream_ground_station bash -lc \
+#     'source /opt/ros/humble/setup.bash && ros2 topic list'
 
 services:
   ground_station:
-    container_name: mini_bream_ground
-    image: mini-bream:ground
+    container_name: mini_bream_ground_station
+    image: mini-bream:ground-station
     build:
       context: ../
-      dockerfile: docker/Dockerfile.ground
+      dockerfile: docker/Dockerfile.ground_station
+    network_mode: host
     init: true
-    restart: unless-stopped
-    privileged: true
     environment:
-      - JOY_DEVICE=${JOY_DEVICE:-/dev/input/js0}
-      - RADIO_SERIAL_PORT=${RADIO_SERIAL_PORT:-/dev/ttyUSB0}
-      - RADIO_BAUD=${RADIO_BAUD:-57600}
+      - DISPLAY=${DISPLAY:-:0}
+      - QT_X11_NO_MITSHM=1
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - CYCLONEDDS_URI=file:///etc/cyclonedds.xml
+      - RVIZ_CONFIG=${RVIZ_CONFIG:-/opt/ground_station/ground_station.rviz}
     volumes:
-      - ../teleop:/opt/teleop
-      - /dev:/dev
-    devices:
-      - ${JOY_DEVICE:-/dev/input/js0}:${JOY_DEVICE:-/dev/input/js0}
-      - ${RADIO_SERIAL_PORT:-/dev/ttyUSB0}:${RADIO_SERIAL_PORT:-/dev/ttyUSB0}
-    # Xbox: axis[1]/left thrust, axis[4]=right thrust, button[5]=deadman
-    command: >
-      python3 /opt/teleop/joy_to_serial.py
-        --joy-device ${JOY_DEVICE:-/dev/input/js0}
-        --port ${RADIO_SERIAL_PORT:-/dev/ttyUSB0}
-        --baud ${RADIO_BAUD:-57600}
-        --left-axis ${JOY_LEFT_AXIS:-1}
-        --right-axis ${JOY_RIGHT_AXIS:-4}
-        --deadman-button ${JOY_DEADMAN_BUTTON:-5}
+      - ../ros2_ws:/workspace/ros2_ws
+      - ../docker/cyclonedds.xml:/etc/cyclonedds.xml:ro
+      - ../docker/start_ground_station.sh:/start_ground_station.sh:ro
+      - ../docker/config/ground_station.rviz:/opt/ground_station/ground_station.rviz:ro
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    working_dir: /workspace/ros2_ws
     stdin_open: true
     tty: true
+    command: ["bash", "/start_ground_station.sh"]
