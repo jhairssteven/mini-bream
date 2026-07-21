@@ -5,7 +5,8 @@
   <Domain>
     <General>
       <Interfaces>
-        <NetworkInterface name="eth0" priority="default" multicast="true"/>
+        <!-- autodetermine: eth0 and WiFi. -->
+        <NetworkInterface autodetermine="true" multicast="true"/>
       </Interfaces>
       <AllowMulticast>true</AllowMulticast>
     </General>

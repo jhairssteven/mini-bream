@@ -1,5 +1,5 @@
 # Ground station: RViz2 viewer for robot ROS topics over the LAN.
-FROM ros:humble-desktop
+FROM ros:humble-ros-core
 
 SHELL ["/bin/bash", "-c"]
 ENV DEBIAN_FRONTEND=noninteractive
