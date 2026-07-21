@@ -24,13 +24,14 @@ services:
       - DISPLAY=${DISPLAY:-:0}
       - QT_X11_NO_MITSHM=1
       - XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-/tmp/runtime-root}
-      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}  # must match Pi/Jetson (default 0)
+      - GROUND_WIFI_IFACE=${GROUND_WIFI_IFACE:-wlp5s0}
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-      - CYCLONEDDS_URI=file:///etc/cyclonedds.xml
+      - CYCLONEDDS_URI=file:///etc/cyclonedds.ground.xml
       - RVIZ_CONFIG=${RVIZ_CONFIG:-/opt/ground_station/ground_station.rviz}
     volumes:
       - ../ros2_ws:/workspace/ros2_ws
-      - ../docker/cyclonedds.xml:/etc/cyclonedds.xml:ro
+      - ../docker/cyclonedds.ground.xml:/etc/cyclonedds.ground.xml:ro
       - ../docker/start_ground_station.sh:/start_ground_station.sh:ro
       - ../docker/config/ground_station.rviz:/opt/ground_station/ground_station.rviz:ro
       - /tmp/.X11-unix:/tmp/.X11-unix:rw

@@ -2,7 +2,8 @@
 set -eo pipefail
 
 source /opt/ros/humble/setup.bash
-if [[ -f /workspace/ros2_ws/install/setup.bash ]]; then
+# Workspace optional on ground station (standard sensor_msgs only for RViz).
+if [[ -f /workspace/ros2_ws/install/setup.bash ]] && [[ -f /workspace/ros2_ws/install/.colcon_install_layout ]]; then
   source /workspace/ros2_ws/install/setup.bash
 fi
 

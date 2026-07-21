@@ -116,7 +116,7 @@ Requirements:
 
 1. **Same RMW** — `frontseat`, `perception`, and `ground_station` use `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp`. Fast DDS and Cyclone cannot talk to each other.
 2. **Same domain** — set the same `ROS_DOMAIN_ID` on all hosts (default `0`).
-3. **Static peers** — `cyclonedds.xml` lists Pi (`.100`), Jetson (`.102`), and ground station (`.103`). Mount it on every ROS service.
+3. **Static peers** — `cyclonedds.xml` (Pi/Jetson, `eth0`) and `cyclonedds.ground.xml` (ground station, Wi‑Fi). Mount the correct file per host.
 
 Verify from ground station:
 
@@ -141,3 +141,26 @@ Peer list in `src/docker/cyclonedds.xml`:
 ```
 
 Set `CYCLONEDDS_URI=file:///etc/cyclonedds.xml` in each compose service.
+
+## Bandwidth report
+
+After changing router or Wi‑Fi setup, measure sensor load vs link capacity:
+
+```bash
+cd src/docker
+chmod +x bandwidth_report.sh
+
+# From Pi (SSH keys to Jetson + ground). Optional passwords via env:
+# export SSHPASS_JETSON=... SSHPASS_GROUND=...
+./bandwidth_report.sh | tee reports/bandwidth_$(date +%Y%m%d_%H%M%S).txt
+```
+
+Override hosts/paths if needed:
+
+```bash
+PI_IP=192.168.0.101 GROUND_IP=192.168.0.103 ROUTER_MODEL="MyNewRouter" \
+  GROUND_REPO="/path/to/mini-bream/src/docker" \
+  ./bandwidth_report.sh
+```
+
+Requires: `perception` on Jetson, `frontseat` on Pi (optional), `mini-bream:ground-station` image on ground, `iperf3` for link test. Takes ~3–5 minutes.

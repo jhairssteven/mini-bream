@@ -1,12 +1,11 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<!-- Cyclone DDS static peers on 192.168.0.0/24 (robot LAN).
-     .100 Pi (frontseat)  .101 spare  .102 Jetson (perception)  .103 ground station (RViz) -->
+<!-- Ground station: bind DDS to robot Wi‑Fi (not campus ethernet enp4s0).
+     Override if interface name differs: GROUND_WIFI_IFACE=wlp5s0 -->
 <CycloneDDS xmlns="https://cdds.io/config">
   <Domain>
     <General>
       <Interfaces>
-        <!-- Pi + Jetson: wired LAN on eth0. Ground uses cyclonedds.ground.xml -->
-        <NetworkInterface name="eth0" multicast="true"/>
+        <NetworkInterface name="wlp5s0" multicast="true"/>
       </Interfaces>
       <AllowMulticast>true</AllowMulticast>
     </General>
@@ -14,9 +13,7 @@
       <ParticipantIndex>auto</ParticipantIndex>
       <Peers>
         <Peer address="192.168.0.100"/>
-        <Peer address="192.168.0.101"/>
         <Peer address="192.168.0.102"/>
-        <Peer address="192.168.0.103"/>
       </Peers>
     </Discovery>
   </Domain>
