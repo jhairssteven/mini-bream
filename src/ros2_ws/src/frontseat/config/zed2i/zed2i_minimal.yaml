@@ -1,0 +1,54 @@
+# Minimal ZED 2i publishing: RGB + camera_info + point cloud only.
+/**:
+  ros__parameters:
+    general:
+      grab_resolution: 'HD720'
+      grab_frame_rate: 15
+      pub_resolution: 'CUSTOM'
+      pub_downscale_factor: 2.0
+      pub_frame_rate: 15.0
+      publish_status: false
+      self_calib: false
+
+    video:
+      publish_rgb: true
+      publish_left_right: false
+      publish_raw: false
+      publish_gray: false
+      publish_stereo: false
+
+    sensors:
+      publish_imu: false
+      publish_imu_raw: false
+      publish_cam_imu_transf: false
+      publish_mag: false
+      publish_baro: false
+      publish_temp: false
+      publish_imu_tf: false
+
+    depth:
+      # PERFORMANCE avoids neural model downloads in /usr/local/zed/resources.
+      depth_mode: 'PERFORMANCE'
+      depth_stabilization: 0
+      publish_depth_map: false
+      publish_depth_info: false
+      publish_point_cloud: true
+      publish_depth_confidence: false
+      publish_disparity: false
+      point_cloud_freq: 10.0
+      min_depth: 0.3
+      max_depth: 15.0
+
+    pos_tracking:
+      pos_tracking_enabled: false
+      publish_tf: false
+      publish_map_tf: false
+
+    mapping:
+      mapping_enabled: false
+
+    object_detection:
+      od_enabled: false
+
+    body_tracking:
+      bt_enabled: false

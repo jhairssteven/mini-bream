@@ -3,11 +3,13 @@ FROM ros:humble-ros-base
 
 SHELL ["/bin/bash", "-c"]
 ENV DEBIAN_FRONTEND=noninteractive
+ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 
 # colcon to build the mounted workspace + runtime ROS deps:
 #   joy                -> joy_node used by both launch files
 #   tf-transformations -> imu_estimation, dual_antenna, moving_base_rtk
 #   ublox-gps/msgs     -> GPS launch files and NavRELPOSNED9 messages
+#   rmw-cyclonedds     -> must match Jetson perception for cross-host ROS
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     python3-colcon-common-extensions \
@@ -16,6 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-humble-tf-transformations \
     ros-humble-ublox-gps \
     ros-humble-ublox-msgs \
+    ros-humble-rmw-cyclonedds-cpp \
     && rm -rf /var/lib/apt/lists/*
 
 # Python-only deps: utm (GPS coordinate conversion), PWM backends for the motor driver

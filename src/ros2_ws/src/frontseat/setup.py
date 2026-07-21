@@ -15,6 +15,8 @@ setup(
         ('share/' + package_name + '/config' + '/cameras', glob('config/cameras/*')),
         ('share/' + package_name + '/config' + '/ublox_gps', glob('config/ublox_gps/*')),
         ('share/' + package_name + '/config' + '/rslidar_airy', glob('config/rslidar_airy/*')),
+        ('share/' + package_name + '/config' + '/zed2i', glob('config/zed2i/*.yaml') + glob('config/zed2i/*.md')),
+        ('share/' + package_name + '/config' + '/zed2i/settings', glob('config/zed2i/settings/*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,

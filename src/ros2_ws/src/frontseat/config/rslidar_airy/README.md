@@ -1,7 +1,7 @@
 # RoboSense RS-LiDAR-AIRY (ROS 2 Humble)
 
-Driver config for the Airy LiDAR. Runs in the Jetson `mini-bream:lidar` container
-(`lidar` service in `src/docker/docker-compose.frontseat.yml`). Start only that
+Driver config for the Airy LiDAR. Runs in the Jetson `mini-bream:perception` container
+(`perception` service in `src/docker/docker-compose.frontseat.yml`). Start only that
 service on the Jetson; Pi runs `pwm_daemon` / `radio_rx` / `frontseat`.
 
 | File | Role |
@@ -55,15 +55,15 @@ sudo nmcli connection up "$CONN"
 
 ```bash
 cd /home/orin-nano/mini-bream/src/docker
-docker compose -f docker-compose.frontseat.yml up --build lidar
+docker compose -f docker-compose.frontseat.yml up --build perception
 ```
 
-`start_lidar.sh` builds `rslidar_msg` / `rslidar_sdk` (IMU parse on) / `frontseat` (for launch+config), then starts `airy_lidar`.
+`start_perception.sh` builds `rslidar_msg` / `rslidar_sdk` (IMU parse on) / `frontseat` (for launch+config), then starts `airy_lidar`.
 
 ## Verify
 
 ```bash
-docker exec mini_bream_lidar bash -lc '
+docker exec mini_bream_perception bash -lc '
   source /opt/ros/humble/setup.bash && source /workspace/ros2_ws/install/setup.bash
   ros2 topic hz /rslidar_points
   ros2 topic hz /rslidar_imu_data'

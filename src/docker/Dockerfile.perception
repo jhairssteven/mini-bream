@@ -1,0 +1,68 @@
+# Jetson perception image: ZED SDK (Stereolabs base) + ZED ROS2 wrapper + LiDAR deps.
+FROM stereolabs/zed:5.4-runtime-l4t-r36.4
+
+SHELL ["/bin/bash", "-c"]
+ENV DEBIAN_FRONTEND=noninteractive
+ENV ROS_DISTRO=humble
+ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+ENV ZED_WS=/opt/zed_ws
+
+# ROS 2 Humble + ZED wrapper build/runtime dependencies.
+RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
+      -o /usr/share/keyrings/ros-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] \
+      http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) main" \
+      > /etc/apt/sources.list.d/ros2.list && \
+    apt-get update && apt-get install -y --no-install-recommends \
+      ros-humble-ros-base \
+      ros-humble-rmw-cyclonedds-cpp \
+      ros-humble-xacro \
+      ros-humble-image-transport-plugins \
+      ros-humble-compressed-image-transport \
+      ros-humble-compressed-depth-image-transport \
+      ros-humble-theora-image-transport \
+      ros-humble-diagnostic-updater \
+      ros-humble-robot-localization \
+      ros-humble-nmea-msgs \
+      ros-humble-geographic-msgs \
+      ros-humble-angles \
+      ros-humble-tf2-geometry-msgs \
+      python3-colcon-common-extensions \
+      python3-rosdep \
+      python3-pip \
+      git \
+      wget \
+      cmake \
+      build-essential \
+      pkg-config \
+      nlohmann-json3-dev \
+      libpcap-dev \
+      libyaml-cpp-dev \
+      iproute2 \
+      tcpdump \
+      nano \
+      tmux \
+      && rm -rf /var/lib/apt/lists/*
+
+# Build ZED ROS2 wrapper (v5.4.0) against the preinstalled ZED SDK 5.4.
+WORKDIR /opt/zed_ws/src
+RUN git clone --depth 1 --branch v5.4.0 https://github.com/stereolabs/zed-ros2-wrapper.git _wrapper && \
+    shopt -s dotglob && mv _wrapper/* . && rm -rf _wrapper && \
+    git clone --depth 1 https://github.com/stereolabs/zed-ros2-interfaces.git zed_msgs && \
+    git clone --depth 1 https://github.com/stereolabs/zed-ros2-description.git zed_description && \
+    git clone --depth 1 --branch 1.0.7 https://github.com/pal-robotics/backward_ros.git
+
+WORKDIR /opt/zed_ws
+RUN source /opt/ros/humble/setup.bash && \
+    colcon build --symlink-install --parallel-workers "$(nproc)" \
+      --cmake-args \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_CXX_FLAGS="-Wl,--allow-shlib-undefined"
+
+RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc && \
+    echo "source /opt/zed_ws/install/setup.bash" >> ~/.bashrc
+
+WORKDIR /workspace/ros2_ws
+CMD ["bash"]

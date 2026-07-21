@@ -29,12 +29,12 @@ flowchart LR
     end
 
     subgraph Jetson["Jetson Orin Nano"]
-        LidarCtr["lidar<br/>mini-bream:lidar"]
+        Perception["perception<br/>mini-bream:perception"]
         Airy["RS-LiDAR-AIRY"]
-        Cameras["cameras TBD"]
+        Zed["ZED 2i"]
 
-        Airy --> LidarCtr
-        Cameras -.-> LidarCtr
+        Airy --> Perception
+        Zed --> Perception
     end
 ```
 
@@ -43,14 +43,14 @@ flowchart LR
 - `Dockerfile.ground` builds `mini-bream:ground` (ground-station computer).
 - `Dockerfile.teleop` builds `mini-bream:teleop` (`radio_rx`, `pwm_daemon` on the Pi).
 - `Dockerfile.frontseat` builds `mini-bream:frontseat` (Pi: motor control + RTK).
-- `Dockerfile.lidar` builds `mini-bream:lidar` (Jetson: RoboSense Airy; cameras later).
+- `Dockerfile.perception` builds `mini-bream:perception` (Jetson: RoboSense Airy + ZED 2i).
 
 ## Compose files
 
 | Compose file | Host | Services |
 |--------------|------|----------|
 | `docker-compose.ground.yml` | Ground station | ground |
-| `docker-compose.frontseat.yml` | Pi / Jetson | Pi: `pwm_daemon`, `radio_rx`, `frontseat` · Jetson: `lidar` |
+| `docker-compose.frontseat.yml` | Pi / Jetson | Pi: `pwm_daemon`, `radio_rx`, `frontseat` · Jetson: `perception` |
 
 ## Motor command priority
 
@@ -75,22 +75,63 @@ docker compose -f docker-compose.frontseat.yml up -d --build pwm_daemon radio_rx
 docker compose -f docker-compose.frontseat.yml up --build frontseat
 ```
 
-Jetson (LiDAR):
+Jetson (LiDAR + ZED 2i):
 
 ```bash
 # Secondary IP for factory LiDAR destination (see rslidar_airy README)
 sudo LIDAR_IFACE=eth0 \
   ../ros2_ws/src/frontseat/config/rslidar_airy/setup_network.sh
 
-docker compose -f docker-compose.frontseat.yml up --build lidar
+# ZED calibration file must exist in config/zed2i/settings/ (see zed2i README)
+docker compose -f docker-compose.frontseat.yml up --build perception
 ```
 
 If Jetson `docker compose build` fails with DNS errors (`iptables: false` daemon), build with:
 
 ```bash
-docker build --network=host -f Dockerfile.lidar -t mini-bream:lidar ../
+docker build --network=host -f Dockerfile.perception -t mini-bream:perception ../
 ```
 
-The `lidar` service sets `build.network: host` for the same reason.
+The `perception` service sets `build.network: host` for the same reason.
 
 See `../ros2_ws/src/frontseat/config/rslidar_airy/README.md` and `../teleop/README.md`.
+
+## Cross-host ROS (Pi ↔ Jetson)
+
+Both hosts use `network_mode: host`, so Docker is not isolating ROS traffic. Topics are discovered via DDS on the LAN.
+
+Requirements:
+
+1. **Same RMW** — both `frontseat` (Pi) and `perception` (Jetson) use `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp`. Fast DDS and Cyclone cannot talk to each other.
+2. **Same domain** — set the same `ROS_DOMAIN_ID` on both (default `0`).
+3. **Multicast** — Cyclone DDS discovers peers via multicast on `192.168.0.0/24`. Some Wi‑Fi routers block this; use wired Ethernet or add a Cyclone peer list (below).
+
+Verify from Pi:
+
+```bash
+docker exec mini_bream_frontseat bash -lc \
+  'source /opt/ros/humble/setup.bash && source /workspace/ros2_ws/install/setup.bash && ros2 topic list | grep -E zed|rslidar'
+```
+
+If topics still do not appear after rebuilding `frontseat`, create `src/docker/cyclonedds.xml` and mount it on both services:
+
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<CycloneDDS>
+  <Domain>
+    <General>
+      <Interfaces>
+        <NetworkInterface name="eth0"/>
+      </Interfaces>
+    </General>
+    <Discovery>
+      <Peers>
+        <Peer address="192.168.0.100"/>  <!-- Pi -->
+        <Peer address="192.168.0.102"/>  <!-- Jetson -->
+      </Peers>
+    </Discovery>
+  </Domain>
+</CycloneDDS>
+```
+
+Set `CYCLONEDDS_URI=file:///path/to/cyclonedds.xml` in both compose services.

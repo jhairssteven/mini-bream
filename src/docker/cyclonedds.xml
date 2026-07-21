@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!-- Cyclone DDS: static peers for Pi <-> Jetson on 192.168.0.0/24 -->
+<CycloneDDS xmlns="https://cdds.io/config">
+  <Domain>
+    <General>
+      <Interfaces>
+        <NetworkInterface name="eth0" priority="default" multicast="true"/>
+      </Interfaces>
+      <AllowMulticast>true</AllowMulticast>
+    </General>
+    <Discovery>
+      <ParticipantIndex>auto</ParticipantIndex>
+      <Peers>
+        <Peer address="192.168.0.100"/>
+        <Peer address="192.168.0.101"/>
+        <Peer address="192.168.0.102"/>
+        <Peer address="192.168.0.103"/>
+      </Peers>
+    </Discovery>
+  </Domain>
+</CycloneDDS>

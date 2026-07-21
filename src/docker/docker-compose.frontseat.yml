@@ -3,7 +3,8 @@ name: mini-bream-frontseat
 # Robot stack. Start with:
 #   Pi:     docker compose -f docker-compose.frontseat.yml up -d pwm_daemon radio_rx
 #           docker compose -f docker-compose.frontseat.yml up frontseat
-#   Jetson: docker compose -f docker-compose.frontseat.yml up --build lidar
+#   Jetson: docker compose -f docker-compose.frontseat.yml up --build perception
+#   ZED notes: ../ros2_ws/src/frontseat/config/zed2i/README.md
 #
 # Device profile: set DEVICE_CONFIG=rpi|jetson (see ../teleop/devices/)
 # See ../teleop/README.md for roles, SiK port discovery, and data flow.
@@ -75,38 +76,52 @@ services:
       - TELEOP_PATH=/opt/teleop
       - PWM_DAEMON_HOST=127.0.0.1
       - PWM_DAEMON_PORT=5600
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - CYCLONEDDS_URI=file:///etc/cyclonedds.xml
     volumes:
       - ../ros2_ws:/workspace/ros2_ws
       - ../teleop:/opt/teleop
       - ../docker/start_frontseat.sh:/start_frontseat.sh:ro
+      - ../docker/cyclonedds.xml:/etc/cyclonedds.xml:ro
       - /dev:/dev
     working_dir: /workspace/ros2_ws
     stdin_open: true
     tty: true
     command: ["bash", "/start_frontseat.sh"]
 
-  # Jetson: LiDAR (cameras can join this image later). No dependency on pwm/frontseat.
-  lidar:
-    container_name: mini_bream_lidar
-    image: mini-bream:lidar
+  # Jetson: LiDAR + cameras (ZED 2i). No dependency on pwm/frontseat.
+  perception:
+    container_name: mini_bream_perception
+    image: mini-bream:perception
     build:
       context: ../
-      dockerfile: docker/Dockerfile.lidar
+      dockerfile: docker/Dockerfile.perception
       # Jetson Docker often has broken container DNS when daemon iptables=false.
       network: host
+    runtime: nvidia
     network_mode: host
+    ipc: host
+    pid: host
     init: true
     restart: unless-stopped
     privileged: true
     environment:
       - LIDAR_IFACE=${LIDAR_IFACE:-eth0}
       - SETUP_AIRY_NETWORK=${SETUP_AIRY_NETWORK:-1}
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - CYCLONEDDS_URI=file:///etc/cyclonedds.xml
+      - NVIDIA_DRIVER_CAPABILITIES=all
     volumes:
       - ../ros2_ws:/workspace/ros2_ws
-      - ../docker/start_lidar.sh:/start_lidar.sh:ro
+      - ../docker/start_perception.sh:/start_perception.sh:ro
+      - ../docker/cyclonedds.xml:/etc/cyclonedds.xml:ro
+      - ../ros2_ws/src/frontseat/config/zed2i/settings:/usr/local/zed/settings
+      - ../ros2_ws/src/frontseat/config/zed2i/resources:/usr/local/zed/resources
       - /dev:/dev
+      - /dev/shm:/dev/shm
     working_dir: /workspace/ros2_ws
     stdin_open: true
     tty: true
-    command: ["bash", "/start_lidar.sh"]
+    command: ["bash", "/start_perception.sh"]
