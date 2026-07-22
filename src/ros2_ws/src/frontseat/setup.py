@@ -17,6 +17,7 @@ setup(
         ('share/' + package_name + '/config' + '/rslidar_airy', glob('config/rslidar_airy/*')),
         ('share/' + package_name + '/config' + '/zed2i', glob('config/zed2i/*.yaml') + glob('config/zed2i/*.md')),
         ('share/' + package_name + '/config' + '/zed2i/settings', glob('config/zed2i/settings/*')),
+        ('share/' + package_name + '/config' + '/tf', glob('config/tf/*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -34,6 +35,7 @@ setup(
             'dual_antenna = frontseat.DualAntenna:main',
             'moving_base_rtk = frontseat.MovingBaseRTK:main',
             'gps_center_offset_node = frontseat.GpsCenterOffsetNode:main',
+            'static_tf_broadcaster = frontseat.StaticTfBroadcasterNode:main',
         ],
     },
 )

@@ -1,0 +1,50 @@
+# BlueBoat static extrinsics (approximate — refine from CAD / field measurements).
+#
+# base_link: origin at water level, centered between hulls (Blue Robotics convention).
+#   +X forward (bow), +Y port (left), +Z up (REP-103).
+#
+# Boat deployed size: 1.20 m (length) × 0.93 m (width) × 0.46 m (height).
+# Thruster positions from ArduPilot SITL BlueBoat model.
+#
+# Rotations: roll-pitch-yaw in radians, fixed-frame XYZ (tf_transformations / REP-103).
+
+transforms:
+  # ZED 2i mount — middle front hull, leveled. Internal camera chain published by zed_wrapper.
+  - parent: base_link
+    child: zed_camera_link
+    translation: {x: 0.55, y: 0.0, z: 0.32}
+    rpy: [0.0, 0.0, 0.0]
+
+  # RoboSense Airy — middle aft hull, 1 m above boat top, Z down, X yawed 30° toward starboard.
+  - parent: base_link
+    child: rslidar
+    translation: {x: -0.55, y: 0.0, z: 1.46}
+    rpy: [3.14159265, 0.0, -0.52359878]
+
+  # Dual RTK antennas (moving base): rover = front, base = aft, on centerline.
+  - parent: base_link
+    child: gps_rover
+    translation: {x: 0.55, y: 0.0, z: 0.38}
+    rpy: [0.0, 0.0, 0.0]
+
+  - parent: base_link
+    child: gps_base
+    translation: {x: -0.55, y: 0.0, z: 0.38}
+    rpy: [0.0, 0.0, 0.0]
+
+  # Midpoint between antennas (used by moving_base_rtk averaged fix).
+  - parent: base_link
+    child: gps_center_link
+    translation: {x: 0.0, y: 0.0, z: 0.38}
+    rpy: [0.0, 0.0, 0.0]
+
+  # Default BlueBoat T200 thrusters (ArduPilot SITL blueboat model).
+  - parent: base_link
+    child: thruster_port_link
+    translation: {x: -0.488, y: 0.295, z: -0.272}
+    rpy: [0.0, 0.0, 0.0]
+
+  - parent: base_link
+    child: thruster_starboard_link
+    translation: {x: -0.488, y: -0.295, z: -0.272}
+    rpy: [0.0, 0.0, 0.0]

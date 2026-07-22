@@ -2,6 +2,7 @@
 /**:
   ros__parameters:
     general:
+      base_frame: 'base_link'
       grab_resolution: 'HD720'
       grab_frame_rate: 15
       pub_resolution: 'CUSTOM'
@@ -41,7 +42,7 @@
 
     pos_tracking:
       pos_tracking_enabled: false
-      publish_tf: false
+      publish_tf: true
       publish_map_tf: false
 
     mapping:

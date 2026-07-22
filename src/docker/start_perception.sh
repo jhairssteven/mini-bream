@@ -47,6 +47,7 @@ start_launch() {
   echo "[perception] started tmux session '$session' → ${launch_file}"
 }
 
+start_launch static_tf static_tf.launch.py
 start_launch zed2i zed2i_camera.launch.py
 start_launch airy_lidar airy_lidar.launch.py
 
