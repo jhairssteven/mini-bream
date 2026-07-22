@@ -129,7 +129,7 @@ Requirements:
 
 1. **Same RMW** — `frontseat`, `perception`, and `ground_station` use `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp`. Fast DDS and Cyclone cannot talk to each other.
 2. **Same domain** — set the same `ROS_DOMAIN_ID` on all hosts (default `0`).
-3. **Static peers** — `cyclonedds.xml` (Pi/Jetson, `eth0`) and `cyclonedds.ground.xml` (ground station, Wi‑Fi). Mount the correct file per host.
+3. **Static peers** — `cyclonedds.xml` (Pi), `cyclonedds.jetson.xml` (Jetson, pin `192.168.0.102`), `cyclonedds.ground.xml` (ground station, Wi-Fi). Mount the correct file per host.
 
 Verify from ground station:
 
