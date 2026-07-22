@@ -71,14 +71,18 @@ Use the role launcher (recommended):
 
 ```bash
 cd src/docker
-chmod +x mini_bream_start.sh
+chmod +x mini_bream_env.sh
 
-./mini_bream_start.sh pi       # pwm_daemon + radio_rx + frontseat
-./mini_bream_start.sh jetson   # LiDAR network + perception
-./mini_bream_start.sh gs       # telemetry_tx + RViz ground_station
+./mini_bream_env.sh start pi       # pwm_daemon + radio_rx + frontseat
+./mini_bream_env.sh start jetson   # LiDAR network + perception
+./mini_bream_env.sh start gs       # telemetry_tx + RViz ground_station
+
+./mini_bream_env.sh stop pi        # remove Pi containers (compose down -v)
+./mini_bream_env.sh stop jetson    # remove perception
+./mini_bream_env.sh stop gs        # remove ground_station + telemetry_tx
 ```
 
-Options: `--build`, `--dry-run` (Pi PWM safe mode), `--no-telemetry` (GS RViz only), `--detach-frontseat`.
+Start options: `--build`, `--dry-run` (Pi PWM safe mode), `--no-telemetry` (GS RViz only), `--detach-frontseat`.
 
 Manual compose commands:
 

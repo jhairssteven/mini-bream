@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
-# Start mini-bream Docker stack for Pi, Jetson, or ground station.
+# Start or stop mini-bream Docker stacks for Pi, Jetson, or ground station.
 #
 # Usage:
-#   ./mini_bream_start.sh pi              # pwm_daemon + radio_rx + frontseat
-#   ./mini_bream_start.sh jetson          # LiDAR + ZED perception
-#   ./mini_bream_start.sh gs              # telemetry_tx + RViz ground_station
+#   ./mini_bream_env.sh start pi              # pwm_daemon + radio_rx + frontseat
+#   ./mini_bream_env.sh start jetson          # LiDAR + ZED perception
+#   ./mini_bream_env.sh start gs              # telemetry_tx + RViz ground_station
+#   ./mini_bream_env.sh stop pi               # remove Pi containers (compose down -v)
+#   ./mini_bream_env.sh stop jetson           # remove perception
+#   ./mini_bream_env.sh stop gs               # remove ground_station + telemetry_tx
 #
-# Options:
+# Start options:
 #   --build              Rebuild images before starting
 #   --dry-run            Pi only: PWM dry_run (no motor output)
 #   --no-telemetry       GS only: skip telemetry_tx (RViz only)
@@ -33,19 +36,28 @@ LIDAR_NET_SCRIPT="../ros2_ws/src/frontseat/config/rslidar_airy/setup_network.sh"
 ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
 export ROS_DOMAIN_ID
 
+ACTION=""
+ROLE=""
 BUILD=0
 DRY_RUN=0
 NO_TELEMETRY=0
 DETACH_FRONTSEAT=0
-ROLE=""
 
 usage() {
-  sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
 log() { echo "[mini-bream] $*"; }
 die() { echo "[mini-bream] ERROR: $*" >&2; exit 1; }
+
+normalize_role() {
+  case "$1" in
+    ground|ground-station) echo gs ;;
+    pi|jetson|gs) echo "$1" ;;
+    *) return 1 ;;
+  esac
+}
 
 need_docker() {
   command -v docker >/dev/null 2>&1 || die "docker not found"
@@ -58,6 +70,28 @@ compose() {
 
 build_flag() {
   [[ "${BUILD}" -eq 1 ]] && echo --build
+}
+
+teardown_services() {
+  local compose_file="$1"
+  shift
+  local -a services=("$@")
+  local found=0
+
+  for svc in "${services[@]}"; do
+    if docker ps -a --format '{{.Names}}' | grep -qx "mini_bream_${svc}"; then
+      found=1
+      break
+    fi
+  done
+
+  if [[ "${found}" -eq 0 ]]; then
+    log "No containers for: ${services[*]}"
+    return 0
+  fi
+
+  log "Removing ${services[*]} (docker compose down -v)..."
+  compose -f "${compose_file}" down -v "${services[@]}"
 }
 
 setup_jetson_lidar_network() {
@@ -122,6 +156,13 @@ start_pi() {
   fi
 }
 
+stop_pi() {
+  need_docker
+  log "Tearing down Pi stack..."
+  teardown_services "${COMPOSE_FRONTSEAT}" frontseat radio_rx pwm_daemon
+  log "Pi stack removed"
+}
+
 start_jetson() {
   need_docker
   log "Starting Jetson perception (ROS_DOMAIN_ID=${ROS_DOMAIN_ID})..."
@@ -135,6 +176,13 @@ start_jetson() {
   verify_ros_topics mini_bream_perception 'rslidar|zed'
 
   log "Done. LiDAR + ZED should publish on /rslidar_points and /zed/zed/..."
+}
+
+stop_jetson() {
+  need_docker
+  log "Tearing down Jetson perception..."
+  teardown_services "${COMPOSE_FRONTSEAT}" perception
+  log "Jetson perception removed"
 }
 
 start_gs() {
@@ -154,15 +202,36 @@ start_gs() {
   compose -f "${COMPOSE_GROUND}" up $(build_flag) ground_station
 }
 
+stop_gs() {
+  need_docker
+  log "Tearing down ground station stack..."
+  teardown_services "${COMPOSE_GROUND}" ground_station
+  teardown_services "${COMPOSE_TELEMETRY}" telemetry_tx
+  log "Ground station stack removed"
+}
+
+run_action() {
+  case "${ACTION}:${ROLE}" in
+    start:pi) start_pi ;;
+    stop:pi) stop_pi ;;
+    start:jetson) start_jetson ;;
+    stop:jetson) stop_jetson ;;
+    start:gs) start_gs ;;
+    stop:gs) stop_gs ;;
+    *) die "unknown action/role: ${ACTION} ${ROLE}" ;;
+  esac
+}
+
 # --- parse args ---
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    start|stop)
+      [[ -z "${ACTION}" ]] || die "action already set: ${ACTION}"
+      ACTION="$1"
+      ;;
     pi|jetson|gs|ground|ground-station)
       [[ -z "${ROLE}" ]] || die "role already set: ${ROLE}"
-      case "$1" in
-        ground|ground-station) ROLE=gs ;;
-        *) ROLE="$1" ;;
-      esac
+      ROLE="$(normalize_role "$1")" || die "unknown role: $1"
       ;;
     --build) BUILD=1 ;;
     --dry-run) DRY_RUN=1 ;;
@@ -174,11 +243,13 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-[[ -n "${ROLE}" ]] || usage 1
+[[ -n "${ACTION}" ]] || usage 1
+[[ -n "${ROLE}" ]] || die "missing role (pi, jetson, or gs)"
 
-case "${ROLE}" in
-  pi) start_pi ;;
-  jetson) start_jetson ;;
-  gs) start_gs ;;
-  *) die "unknown role: ${ROLE}" ;;
-esac
+if [[ "${ACTION}" == stop ]]; then
+  if [[ "${BUILD}" -eq 1 || "${DRY_RUN}" -eq 1 || "${NO_TELEMETRY}" -eq 1 || "${DETACH_FRONTSEAT}" -eq 1 ]]; then
+    die "start-only options cannot be used with stop"
+  fi
+fi
+
+run_action
