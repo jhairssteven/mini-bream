@@ -106,7 +106,9 @@ class PigpioMotors:
         # hardware_PWM duty is 0..1_000_000 (parts per million)
         duty_pct = thrust_to_duty_percent(thrust)
         duty_ppm = int(max(0, min(1_000_000, round(duty_pct * 10_000))))
-        self.pi.hardware_PWM(pin, self.freq_hz, duty_ppm)
+        rc = self.pi.hardware_PWM(pin, self.freq_hz, duty_ppm)
+        if rc != 0:
+            logger.error("hardware_PWM failed on GPIO %d (rc=%d, duty=%d)", pin, rc, duty_ppm)
 
     def set_thrust(self, left: float, right: float) -> None:
         left = apply_command_deadband(left)

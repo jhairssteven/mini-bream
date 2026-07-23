@@ -67,10 +67,10 @@ Defaults live in JSON, not scattered env vars:
 
 | File | Platform | Backend | Pins |
 |------|----------|---------|------|
-| `devices/rpi.json` | Raspberry Pi | `pigpio` (hardware PWM) | BCM 13 / 12 |
+| `devices/rpi.json` | Raspberry Pi | `pigpio` (hardware PWM) | BCM 19 / 12 (phys 35 / 32) |
 | `devices/jetson.json` | Jetson Orin | `jetson` | BOARD 33 / 32 |
 
-`pigpio` uses **hardware PWM** via `pigpiod` (built into the teleop image and started by `entrypoint.teleop.sh`). Pins must be BCM **12, 13, 18, or 19**.
+`pigpio` uses **hardware PWM** via `pigpiod` (built into the teleop image and started by `entrypoint.teleop.sh`). On Pi 4 use BCM **12 + 19** (physical pins 32 + 35). Avoid GPIO **13** — on some Pi 4 boards pigpio `hardware_PWM` never toggles that pin.
 
 Select with `DEVICE_CONFIG`:
 

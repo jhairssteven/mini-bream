@@ -1,11 +1,11 @@
 {
   "name": "rpi",
   "backend": "pigpio",
-  "left_pin": 13,
+  "left_pin": 19,
   "right_pin": 12,
   "radio_timeout_s": 0.25,
   "ros_timeout_s": 0.5,
   "daemon_host": "127.0.0.1",
   "daemon_port": 5600,
-  "notes": "Raspberry Pi BCM pins 12/13 via pigpio hardware_PWM. pigpiod is started by entrypoint.teleop.sh inside the container."
+  "notes": "Pi 4 BCM GPIO 19 (phys pin 35) left + GPIO 12 (phys pin 32) right. Avoid GPIO 13 — pigpio hardware_PWM does not toggle on Pi 4 rev 1.5 even with audio off."
 }
