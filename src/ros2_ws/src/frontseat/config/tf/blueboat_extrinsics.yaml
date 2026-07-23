@@ -12,30 +12,30 @@ transforms:
   # ZED 2i mount — middle front hull, leveled. Internal camera chain published by zed_wrapper.
   - parent: base_link
     child: zed_camera_link
-    translation: {x: 0.64135, y: 0.0, z: 0.34925}
+    translation: {x: 0.64135, y: 0.0, z: 0.1651}
     rpy: [0.0, 0.0, 0.0]
 
   # RoboSense Airy — middle aft hull, 1 m above boat top, Z down, X yawed -90° toward port.
   - parent: base_link
     child: rslidar
-    translation: {x: -0.64135, y: 0.0, z: 0.84455}
+    translation: {x: -0.33655, y: 0.0, z: 0.6604}
     rpy: [3.14159265, 0.0, 1.57079633]
 
   # Dual RTK antennas (moving base): rover = front, base = aft, on centerline.
   - parent: base_link
     child: gps_rover
-    translation: {x: 0.64135, y: 0.0, z: 0.18415}
+    translation: {x: 0.64135, y: 0.0, z: 0.0}
     rpy: [0.0, 0.0, 0.0]
 
   - parent: base_link
     child: gps_base
-    translation: {x: -0.64135, y: 0.0, z: 0.18415}
+    translation: {x: -0.64135, y: 0.0, z: 0.0}
     rpy: [0.0, 0.0, 0.0]
 
   # Midpoint between antennas (used by moving_base_rtk averaged fix).
   - parent: base_link
     child: gps_center_link
-    translation: {x: 0.0, y: 0.0, z: 0.18415}
+    translation: {x: 0.0, y: 0.0, z: 0.0}
     rpy: [0.0, 0.0, 0.0]
 
   # Default BlueBoat T200 thrusters (ArduPilot SITL blueboat model).
