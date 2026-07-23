@@ -49,6 +49,11 @@ RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
       tmux \
       && rm -rf /var/lib/apt/lists/*
 
+# ZED base image ships NumPy 2.x; Ubuntu's transforms3d 0.3.1 breaks tf_transformations.
+RUN pip3 install --no-cache-dir 'transforms3d>=0.4.2' && \
+    source /opt/ros/humble/setup.bash && \
+    python3 -c 'from tf_transformations import quaternion_from_euler; quaternion_from_euler(0, 0, 0)'
+
 # Build ZED ROS2 wrapper (v5.4.0) against the preinstalled ZED SDK 5.4.
 WORKDIR /opt/zed_ws/src
 RUN git clone --depth 1 --branch v5.4.0 https://github.com/stereolabs/zed-ros2-wrapper.git _wrapper && \
