@@ -163,6 +163,8 @@ Set `CYCLONEDDS_URI=file:///etc/cyclonedds.xml` in each compose service.
 
 Sensor mount transforms live in `../ros2_ws/src/frontseat/config/tf/blueboat_extrinsics.yaml` and are published by `static_tf_broadcaster` on **Jetson perception** only. The ZED wrapper publishes the internal camera chain (`zed_camera_link` → optical frames) with `publish_tf:=true`; only the boat mount `base_link` → `zed_camera_link` is in the YAML. Ground station RViz uses fixed frame `base_link` and receives the tree over DDS.
 
+BlueBoat hull mesh (ArduPilot SITL model) is in `frontseat/meshes/blueboat/` and rendered via `robot_description.launch.py` + RViz `RobotModel` display.
+
 ## Bandwidth report
 
 After changing router or Wi‑Fi setup, measure sensor load vs link capacity:

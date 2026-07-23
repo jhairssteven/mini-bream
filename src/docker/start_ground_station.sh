@@ -2,9 +2,18 @@
 set -eo pipefail
 
 source /opt/ros/humble/setup.bash
-# Workspace optional on ground station (standard sensor_msgs only for RViz).
-if [[ -f /workspace/ros2_ws/install/setup.bash ]] && [[ -f /workspace/ros2_ws/install/.colcon_install_layout ]]; then
-  source /workspace/ros2_ws/install/setup.bash
+
+# Build frontseat for BlueBoat URDF/meshes (mounted workspace).
+if [[ -d /workspace/ros2_ws/src/frontseat ]]; then
+  cd /workspace/ros2_ws
+  colcon build --packages-select frontseat --symlink-install
+  source install/setup.bash
+fi
+
+# Local robot_description for RViz RobotModel (TF still comes from Jetson over DDS).
+if ! pgrep -f '[r]obot_state_publisher' >/dev/null 2>&1; then
+  ros2 launch frontseat robot_description.launch.py &
+  sleep 2
 fi
 
 RVIZ_CONFIG="${RVIZ_CONFIG:-/opt/ground_station/ground_station.rviz}"

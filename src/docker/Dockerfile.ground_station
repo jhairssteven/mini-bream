@@ -12,6 +12,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-humble-rviz-default-plugins \
     ros-humble-image-transport-plugins \
     ros-humble-compressed-image-transport \
+    ros-humble-robot-state-publisher \
+    python3-colcon-common-extensions \
     tmux \
     && rm -rf /var/lib/apt/lists/*
 

@@ -18,6 +18,8 @@ setup(
         ('share/' + package_name + '/config' + '/zed2i', glob('config/zed2i/*.yaml') + glob('config/zed2i/*.md')),
         ('share/' + package_name + '/config' + '/zed2i/settings', glob('config/zed2i/settings/*')),
         ('share/' + package_name + '/config' + '/tf', glob('config/tf/*')),
+        ('share/' + package_name + '/urdf', glob('urdf/*')),
+        ('share/' + package_name + '/meshes/blueboat', glob('meshes/blueboat/*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,

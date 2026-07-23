@@ -48,6 +48,7 @@ start_launch() {
 }
 
 start_launch static_tf static_tf.launch.py
+start_launch robot_description robot_description.launch.py
 start_launch zed2i zed2i_camera.launch.py
 start_launch airy_lidar airy_lidar.launch.py
 

@@ -1,0 +1,70 @@
+<?xml version="1.0"?>
+<!-- BlueBoat RViz model (ArduPilot SITL meshes, base_link frame). -->
+<robot name="blueboat">
+  <link name="base_link">
+    <visual name="hull_visual">
+      <geometry>
+        <mesh filename="package://frontseat/meshes/blueboat/blueboat_hull.dae"/>
+      </geometry>
+      <material name="hull_blue">
+        <color rgba="0.0 0.2 0.8 1.0"/>
+      </material>
+    </visual>
+    <visual name="crosstube_visual">
+      <geometry>
+        <mesh filename="package://frontseat/meshes/blueboat/blueboat_crosstube.dae"/>
+      </geometry>
+      <material name="crosstube_gray">
+        <color rgba="0.2 0.2 0.2 1.0"/>
+      </material>
+    </visual>
+    <visual name="frame_fore_visual">
+      <geometry>
+        <mesh filename="package://frontseat/meshes/blueboat/blueboat_frame_asm_fore.dae"/>
+      </geometry>
+      <material name="frame_gray">
+        <color rgba="0.25 0.25 0.25 1.0"/>
+      </material>
+    </visual>
+    <visual name="frame_aft_visual">
+      <geometry>
+        <mesh filename="package://frontseat/meshes/blueboat/blueboat_frame_asm_aft.dae"/>
+      </geometry>
+      <material name="frame_aft_gray">
+        <color rgba="0.25 0.25 0.25 1.0"/>
+      </material>
+    </visual>
+    <visual name="hatch_port_visual">
+      <geometry>
+        <mesh filename="package://frontseat/meshes/blueboat/blueboat_hatch_asm_port.dae"/>
+      </geometry>
+      <material name="hatch_port">
+        <color rgba="0.15 0.15 0.15 1.0"/>
+      </material>
+    </visual>
+    <visual name="hatch_stbd_visual">
+      <geometry>
+        <mesh filename="package://frontseat/meshes/blueboat/blueboat_hatch_asm_stbd.dae"/>
+      </geometry>
+      <material name="hatch_stbd">
+        <color rgba="0.15 0.15 0.15 1.0"/>
+      </material>
+    </visual>
+    <visual name="motor_port_visual">
+      <geometry>
+        <mesh filename="package://frontseat/meshes/blueboat/blueboat_motor_port.dae"/>
+      </geometry>
+      <material name="motor_port">
+        <color rgba="0.1 0.1 0.1 1.0"/>
+      </material>
+    </visual>
+    <visual name="motor_stbd_visual">
+      <geometry>
+        <mesh filename="package://frontseat/meshes/blueboat/blueboat_motor_stbd.dae"/>
+      </geometry>
+      <material name="motor_stbd">
+        <color rgba="0.1 0.1 0.1 1.0"/>
+      </material>
+    </visual>
+  </link>
+</robot>
