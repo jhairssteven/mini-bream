@@ -12,7 +12,7 @@ transforms:
   # ZED 2i mount — middle front hull, leveled. Internal camera chain published by zed_wrapper.
   - parent: base_link
     child: zed_camera_link
-    translation: {x: 0.64135, y: 0.0, z: 0.1651}
+    translation: {x: 0.48895, y: 0.0, z: 0.1651}
     rpy: [0.0, 0.0, 0.0]
 
   # RoboSense Airy — middle aft hull, 1 m above boat top, Z down, X yawed -90° toward port.
