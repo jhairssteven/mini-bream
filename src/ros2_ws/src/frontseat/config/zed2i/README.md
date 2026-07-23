@@ -22,6 +22,11 @@ If you swap cameras, download the new file once (with internet):
 `resources/` is mounted for optional SDK assets; PERFORMANCE depth mode avoids
 neural model downloads.
 
+## TF
+
+- Boat mount `base_link` → `zed_camera_link` is published by `static_tf` (see `config/tf/blueboat_extrinsics.yaml`).
+- Internal ZED frames (`zed_camera_link` → `zed_camera_center` → `zed_left_camera_frame` → optical) are published by the wrapper’s `robot_state_publisher` when `publish_urdf:=true` (required when positional tracking is off).
+
 ## Launch
 
 Started automatically by `src/docker/start_perception.sh` in tmux session `zed2i`.
