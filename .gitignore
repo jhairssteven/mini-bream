@@ -6,5 +6,10 @@ __pycache__/
 dqn_ws/
 logs/
 .vscode/
-field_tests/
+src/field_tests/*
+!src/field_tests/rosbags/
+!src/field_tests/rosbags/**
+src/field_tests/rosbags/**/*
+!src/field_tests/rosbags/.gitkeep
+!src/field_tests/rosbags/README.md
 src/ros2_ws/src/mission_planner/mission_planner/moloplanner/assets

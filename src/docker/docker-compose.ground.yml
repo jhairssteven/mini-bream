@@ -31,6 +31,9 @@ services:
       - RVIZ_CONFIG=${RVIZ_CONFIG:-/opt/ground_station/ground_station.rviz}
     volumes:
       - ../ros2_ws:/workspace/ros2_ws
+      - ../field_tests/rosbags:/workspace/field_tests/rosbags
+      - ../docker:/workspace/docker:ro
+      - ../docker/record_rosbag.sh:/usr/local/bin/record_rosbag:ro
       - ../docker/cyclonedds.ground.xml:/etc/cyclonedds.ground.xml:ro
       - ../docker/start_ground_station.sh:/start_ground_station.sh:ro
       - ../docker/config/ground_station.rviz:/opt/ground_station/ground_station.rviz:ro

@@ -5,27 +5,14 @@ SHELL ["/bin/bash", "-c"]
 ENV DEBIAN_FRONTEND=noninteractive
 ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 
-# colcon to build the mounted workspace + runtime ROS deps:
-#   joy                -> joy_node used by both launch files
-#   tf-transformations -> imu_estimation, dual_antenna, moving_base_rtk
-#   ublox-gps/msgs     -> GPS launch files and NavRELPOSNED9 messages
-#   rmw-cyclonedds     -> must match Jetson perception for cross-host ROS
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3-pip \
-    python3-colcon-common-extensions \
-    python3-numpy \
-    ros-humble-joy \
-    ros-humble-tf-transformations \
-    ros-humble-ublox-gps \
-    ros-humble-ublox-msgs \
-    ros-humble-rmw-cyclonedds-cpp \
+COPY docker/install_ros2_ws_deps.sh /tmp/install_ros2_ws_deps.sh
+RUN chmod +x /tmp/install_ros2_ws_deps.sh && /tmp/install_ros2_ws_deps.sh
+
+# PWM backends for legacy motor driver code paths
+RUN pip install --no-cache-dir pigpio Jetson.GPIO
+
+RUN apt-get update && apt-get install -y --no-install-recommends nano tmux \
     && rm -rf /var/lib/apt/lists/*
-
-# Python-only deps: utm (GPS coordinate conversion), PWM backends for the motor driver
-RUN pip install --no-cache-dir utm pigpio Jetson.GPIO
-
-# Dev tools
-RUN apt-get update && apt-get install -y nano tmux
 
 RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
 

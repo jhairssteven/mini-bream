@@ -82,6 +82,9 @@ services:
     volumes:
       - ../ros2_ws:/workspace/ros2_ws
       - ../teleop:/opt/teleop
+      - ../field_tests/rosbags:/workspace/field_tests/rosbags
+      - ../docker:/workspace/docker:ro
+      - ../docker/record_rosbag.sh:/usr/local/bin/record_rosbag:ro
       - ../docker/start_frontseat.sh:/start_frontseat.sh:ro
       - ../docker/cyclonedds.xml:/etc/cyclonedds.xml:ro
       - /dev:/dev
@@ -115,6 +118,9 @@ services:
       - NVIDIA_DRIVER_CAPABILITIES=all
     volumes:
       - ../ros2_ws:/workspace/ros2_ws
+      - ../field_tests/rosbags:/workspace/field_tests/rosbags
+      - ../docker:/workspace/docker:ro
+      - ../docker/record_rosbag.sh:/usr/local/bin/record_rosbag:ro
       - ../docker/start_perception.sh:/start_perception.sh:ro
       - ../docker/cyclonedds.jetson.xml:/etc/cyclonedds.jetson.xml:ro
       - ../ros2_ws/src/frontseat/config/zed2i/settings:/usr/local/zed/settings

@@ -187,3 +187,42 @@ PI_IP=192.168.0.101 GROUND_IP=192.168.0.103 ROUTER_MODEL="MyNewRouter" \
 ```
 
 Requires: `perception` on Jetson, `frontseat` on Pi (optional), `mini-bream:ground-station` image on ground, `iperf3` for link test. Takes ~3–5 minutes.
+
+## ROS 2 workspace build and rosbag recording
+
+All runtime images (`frontseat`, `perception`, `ground_station`) install shared deps via
+`install_ros2_ws_deps.sh` (colcon, ublox apt packages, rosbag2 + mcap, LiDAR build libs).
+
+**Do not colcon-build the `ublox` git submodule** — use apt `ros-humble-ublox-msgs` /
+`ros-humble-ublox-gps` instead (avoids missing `asio` when building from source).
+
+Build the mounted workspace inside any container:
+
+```bash
+docker exec -it mini_bream_frontseat bash -lc '/workspace/docker/build_ros2_workspace.sh'
+# or on Jetson:
+docker exec -it mini_bream_perception bash -lc '/workspace/docker/build_ros2_workspace.sh'
+```
+
+Record bags (persisted on the host under `src/field_tests/rosbags/`):
+
+```bash
+docker exec -it mini_bream_frontseat bash -lc \
+  'source /opt/ros/humble/setup.bash && source /workspace/ros2_ws/install/setup.bash && \
+   ros2 launch frontseat rosbag.launch.py bag_storage:=mcap bag_suffix:=rtk_test'
+```
+
+Launch args: `record_bag`, `bag_suffix`, `bag_storage` (`mcap` default, or `sqlite3`). Bags are written to
+`/workspace/field_tests/rosbags/YYYY-MM-DD/rosbag_YYYY-MM-DD_HH-MM-SS[_suffix]/`.
+
+On Jetson, ZED topics are `/zed/zed/rgb/color/rect/image`, etc. The launch file sources
+`/opt/zed_ws` so `zed_msgs` types resolve. Manual recording:
+
+```bash
+docker exec -it mini_bream_perception record_rosbag bag_suffix:=zed_test
+# or
+docker exec -it mini_bream_perception bash -lc \
+  'source /opt/zed_ws/install/setup.bash && source /workspace/ros2_ws/install/setup.bash && \
+   ros2 bag record -s mcap -o /workspace/field_tests/rosbags/$(date +%F)/manual_zed \
+   /zed/zed/rgb/color/rect/image /zed/zed/point_cloud/cloud_registered /tf /tf_static'
+```
