@@ -20,8 +20,8 @@ from protocol import SOURCE_ROS  # noqa: E402
 class MotorControllerNode(Node):
     def __init__(self, node_name: str = "motor_controller"):
         super().__init__(node_name)
-        self.right_max_thrust_pgt = 0.8
-        self.left_max_thrust_pgt = 1.0
+        self.right_max_thrust_pgt = 0.4
+        self.left_max_thrust_pgt = 0.4
         self.left_thrust = 0.0
         self.right_thrust = 0.0
         self.seq = 0

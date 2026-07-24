@@ -1,0 +1,12 @@
+# Short bench run on the real boat: real GPS/IMU, no motor output (log_only thrust).
+# Use via: ./run_real_boat.sh --bench
+
+boat_bridge:
+  thrust_mode: log_only
+
+experiment:
+  warmup_s: 8.0
+  evaluate_s: 15.0
+  skip_initial_s: 8.0
+  wait_for_gps_timeout_s: 60.0
+  wait_for_xte_timeout_s: 20.0

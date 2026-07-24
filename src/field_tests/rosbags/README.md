@@ -6,6 +6,9 @@ Bags recorded via `ros2 launch frontseat rosbag.launch.py` are written here
 This directory is mounted into Pi, Jetson, and ground-station Docker services
 so recordings persist after containers are removed.
 
+H0 MPC experiment results are saved alongside under `field_tests/h0_boat/`
+(see `molo_wpt_follower/h0_boat/run_real_boat.sh`).
+
 Example:
 
 ```bash

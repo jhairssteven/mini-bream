@@ -1,0 +1,18 @@
+# Overlay for Pi→Jetson mock integration tests (no real motor commands).
+# Uses dedicated /mock/* sensor topics so real RTK on the Pi is not required.
+
+topics:
+  gps: /mock/wamv/sensors/gps/gps/fix
+  imu: /mock/wamv/sensors/imu/imu/data
+
+boat_bridge:
+  gps_topic: /mock/wamv/sensors/gps/gps/fix
+  imu_topic: /mock/wamv/sensors/imu/imu/data
+  thrust_mode: log_only
+
+experiment:
+  warmup_s: 8.0
+  evaluate_s: 20.0
+  skip_initial_s: 8.0
+  wait_for_gps_timeout_s: 20.0
+  wait_for_xte_timeout_s: 25.0

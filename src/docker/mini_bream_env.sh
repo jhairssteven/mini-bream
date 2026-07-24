@@ -5,6 +5,7 @@
 #   ./mini_bream_env.sh start pi              # pwm_daemon + radio_rx + frontseat
 #   ./mini_bream_env.sh start jetson          # LiDAR + ZED perception
 #   ./mini_bream_env.sh start gs              # telemetry_tx + RViz ground_station
+#   ./mini_bream_env.sh start gs --h0-boat    # RViz with H0 path overlays (world frame)
 #   ./mini_bream_env.sh stop pi               # remove Pi containers (compose down -v)
 #   ./mini_bream_env.sh stop jetson           # remove perception
 #   ./mini_bream_env.sh stop gs               # remove ground_station + telemetry_tx
@@ -42,6 +43,7 @@ BUILD=0
 DRY_RUN=0
 NO_TELEMETRY=0
 DETACH_FRONTSEAT=0
+H0_BOAT_RVIZ=0
 
 usage() {
   sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'
@@ -191,6 +193,11 @@ start_gs() {
 
   setup_ground_display
 
+  if [[ "${H0_BOAT_RVIZ}" -eq 1 ]]; then
+    export RVIZ_CONFIG=/opt/ground_station/h0_boat.rviz
+    log "Using H0 boat RViz config (${RVIZ_CONFIG})"
+  fi
+
   if [[ "${NO_TELEMETRY}" -eq 0 ]]; then
     log "Starting telemetry_tx (joystick → SiK radio, detached)..."
     compose -f "${COMPOSE_TELEMETRY}" up -d $(build_flag) telemetry_tx
@@ -237,6 +244,7 @@ while [[ $# -gt 0 ]]; do
     --dry-run) DRY_RUN=1 ;;
     --no-telemetry) NO_TELEMETRY=1 ;;
     --detach-frontseat) DETACH_FRONTSEAT=1 ;;
+    --h0-boat) H0_BOAT_RVIZ=1 ;;
     -h|--help) usage 0 ;;
     *) die "unknown argument: $1 (try --help)" ;;
   esac

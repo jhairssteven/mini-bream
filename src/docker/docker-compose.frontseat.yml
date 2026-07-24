@@ -82,7 +82,7 @@ services:
     volumes:
       - ../ros2_ws:/workspace/ros2_ws
       - ../teleop:/opt/teleop
-      - ../field_tests/rosbags:/workspace/field_tests/rosbags
+      - ../field_tests:/workspace/field_tests
       - ../docker:/workspace/docker:ro
       - ../docker/record_rosbag.sh:/usr/local/bin/record_rosbag:ro
       - ../docker/start_frontseat.sh:/start_frontseat.sh:ro
@@ -118,7 +118,7 @@ services:
       - NVIDIA_DRIVER_CAPABILITIES=all
     volumes:
       - ../ros2_ws:/workspace/ros2_ws
-      - ../field_tests/rosbags:/workspace/field_tests/rosbags
+      - ../field_tests:/workspace/field_tests
       - ../docker:/workspace/docker:ro
       - ../docker/record_rosbag.sh:/usr/local/bin/record_rosbag:ro
       - ../docker/start_perception.sh:/start_perception.sh:ro

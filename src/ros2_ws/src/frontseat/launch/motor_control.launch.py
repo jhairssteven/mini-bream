@@ -21,13 +21,6 @@ def generate_launch_description():
     ])
 
     
-    thrust_source_selector = Node(
-        package='frontseat',
-        executable='thrust_source_selector',
-        name='thrust_source_selector',
-        output='screen'
-        )
-    
     motor_controller = Node(
         package='frontseat',
         executable='motor_controller',
@@ -38,5 +31,4 @@ def generate_launch_description():
     return LaunchDescription([
         #joystick_nodes,
         motor_controller,
-        #thrust_source_selector
     ])

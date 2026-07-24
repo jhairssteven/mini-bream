@@ -197,7 +197,7 @@ class MpcFollowerNode(Node):
         )
 
         self.create_subscription(
-            NavSatFix, topics.get("gps", "/wamv/sensors/gps/gps/fix"), self._gps_cb, qos_c
+            NavSatFix, topics.get("gps", "/wamv/sensors/gps/gps/fix"), self._gps_cb, qos_s
         )
         self.create_subscription(
             Imu, topics.get("imu", "/wamv/sensors/imu/imu/data"), self._imu_cb, qos_s

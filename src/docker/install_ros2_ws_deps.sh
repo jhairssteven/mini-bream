@@ -46,9 +46,16 @@ apt-get install -y --no-install-recommends \
   ros-humble-compressed-depth-image-transport \
   ros-humble-theora-image-transport \
   ros-humble-diagnostic-updater \
-  ros-humble-xacro
+  ros-humble-xacro \
+  gcc \
+  g++ \
+  git
 
 rm -rf /var/lib/apt/lists/*
 
-# Python deps used by frontseat GPS nodes
-pip3 install --no-cache-dir utm 'transforms3d>=0.4.2'
+# Python deps used by frontseat GPS nodes and molo MPC follower (see install_mpc_deps.sh).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=install_mpc_deps.sh
+source "${SCRIPT_DIR}/install_mpc_deps.sh"
+install_mpc_python_deps
+echo "ros2_ws + mpc deps ok"
