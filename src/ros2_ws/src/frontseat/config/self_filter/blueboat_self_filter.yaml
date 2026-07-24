@@ -1,0 +1,41 @@
+# Self-filter volumes in base_link (REP-103: +X bow, +Y port, +Z up).
+# base_link origin: center of hull top surface (deck). z=0 is the deck; hull extends down.
+#
+# Mount bars: 25 mm × 25 mm aluminum, one vertical bar per sensor (along +Z).
+
+output_frame: base_link  # frame where hull/bar volumes are defined (not the published cloud frame)
+filter_margin: 0.005
+
+# Debug outputs (extra compute when enabled). Set debug.enabled: false in production.
+debug:
+  enabled: true
+  publish_markers: true
+  markers_topic: /self_filter/debug_markers
+  publish_removed_cloud: true
+
+point_clouds:
+  - input_topic: /rslidar_points
+    output_topic: /rslidar_points/filtered
+    removed_topic: /rslidar_points/removed
+
+# Hull envelope below deck (1.20 m × 0.93 m × 0.46 m).
+# deck_padding extends the box slightly above z=0 for deck-surface returns.
+hull:
+  enabled: true
+  center: {x: 0.0, y: 0.0, z: -0.23}
+  size: {x: 1.22, y: 0.95, z: 0.48}
+  rpy: [0.0, 0.0, 0.0]
+
+# Vertical support bars from deck (z=0) to sensor link origins (blueboat_extrinsics.yaml).
+volumes:
+  - name: camera_mast
+    enabled: true
+    center: {x: 0.48895, y: 0.0, z: 0.08255}
+    size: {x: 0.025, y: 0.025, z: 0.1651}
+    rpy: [0.0, 0.0, 0.0]
+
+  - name: lidar_mast
+    enabled: true
+    center: {x: -0.33655, y: 0.0, z: 0.3302}
+    size: {x: 0.025, y: 0.025, z: 0.6604}
+    rpy: [0.0, 0.0, 0.0]

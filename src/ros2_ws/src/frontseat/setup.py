@@ -18,6 +18,7 @@ setup(
         ('share/' + package_name + '/config' + '/zed2i', glob('config/zed2i/*.yaml') + glob('config/zed2i/*.md')),
         ('share/' + package_name + '/config' + '/zed2i/settings', glob('config/zed2i/settings/*')),
         ('share/' + package_name + '/config' + '/tf', glob('config/tf/*')),
+        ('share/' + package_name + '/config' + '/self_filter', glob('config/self_filter/*')),
         ('share/' + package_name + '/urdf', glob('urdf/*')),
         ('share/' + package_name + '/meshes/blueboat', glob('meshes/blueboat/*')),
     ],
@@ -38,6 +39,7 @@ setup(
             'moving_base_rtk = frontseat.MovingBaseRTK:main',
             'gps_center_offset_node = frontseat.GpsCenterOffsetNode:main',
             'static_tf_broadcaster = frontseat.StaticTfBroadcasterNode:main',
+            'self_filter = frontseat.SelfFilterNode:main',
         ],
     },
 )

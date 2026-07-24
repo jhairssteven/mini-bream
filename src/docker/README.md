@@ -84,6 +84,16 @@ chmod +x mini_bream_env.sh
 
 Start options: `--build`, `--dry-run` (Pi PWM safe mode), `--no-telemetry` (GS RViz only), `--detach-frontseat`.
 
+Sync code to Jetson or ground station from the Pi:
+
+```bash
+chmod +x mini_bream_sync.sh
+./mini_bream_sync.sh jetson --restart --build
+./mini_bream_sync.sh gs --restart
+```
+
+Uses `rsync` over SSH. Set `SSHPASS_JETSON` / `SSHPASS_GROUND` for password auth, or use SSH keys.
+
 Manual compose commands:
 
 ```bash
