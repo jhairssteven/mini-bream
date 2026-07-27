@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+  <xacro:include filename="$(find blueboat_sim)/urdf/thrusters/blueboat_thruster.xacro"/>
+
+  <!-- Thruster poses from ArduPilot SITL blueboat model.sdf (degrees: -90 0 90). -->
+  <xacro:property name="thruster_rpy" value="${-pi/2} 0 ${pi/2}"/>
+
+  <xacro:blueboat_engine prefix="left"
+    position="-0.488 0.295 -0.272"
+    orientation="${thruster_rpy}"
+    prop_mesh="package://blueboat_sim/meshes/blueboat/blueboat_prop_port.dae"/>
+  <xacro:blueboat_engine prefix="right"
+    position="-0.488 -0.295 -0.272"
+    orientation="${thruster_rpy}"
+    prop_mesh="package://blueboat_sim/meshes/blueboat/blueboat_prop_stbd.dae"/>
+
+  <xacro:include filename="$(find blueboat_sim)/urdf/thrusters/blueboat_thruster_config.xacro"/>
+  <xacro:blueboat_thruster_config name="left" thrust_sign="-1"/>
+  <xacro:blueboat_thruster_config name="right" thrust_sign="1"/>
+</robot>

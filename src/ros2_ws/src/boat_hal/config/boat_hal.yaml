@@ -1,0 +1,29 @@
+# Master HAL configuration. Mode-specific overlays: sim.yaml, real.yaml
+mode: simulation
+use_sim_time: true
+
+origin:
+  lat: 40.448417
+  lon: -86.86775
+
+model_name: blueboat
+
+boat:
+  # BlueBoat T200 thrusters (ArduPilot SITL: ~35 N per side at multiplier 70)
+  max_thrust_N: 250.0
+  sim_thrust_scale: 1000.0
+
+topics:
+  gps: /blueboat/sensors/gps/gps/fix
+  imu: /blueboat/sensors/imu/imu/data
+  ground_truth_odometry: /blueboat/sensors/position/ground_truth_odometry
+  left_thrust: /blueboat/thrusters/left/thrust
+  right_thrust: /blueboat/thrusters/right/thrust
+  pwm_left: /pwm/left_thrust_cmd
+  pwm_right: /pwm/right_thrust_cmd
+  lidar_points: /rslidar_points
+  lidar_points_filtered: /rslidar_points/filtered
+  lidar_imu: /rslidar_imu_data
+  zed_rgb_image: /zed/zed/rgb/color/rect/image
+  zed_rgb_camera_info: /zed/zed/rgb/color/rect/camera_info
+  zed_point_cloud: /zed/zed/point_cloud/cloud_registered

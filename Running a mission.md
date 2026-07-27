@@ -16,7 +16,7 @@ chmod -R u+x /workspace
 
 - Launch vrx simulator (when simulating only)
 ```shell
-ros2 launch linc_gz docking_harner.launch.py
+ros2 launch blueboat_sim open_water.launch.py
 ```
 
 - Launches tools to visualize current pose, trajectories and to send custom trajectories through RViz.

@@ -1,0 +1,26 @@
+# H0 lemniscate experiment overlay for BlueBoat Gazebo simulation (HAL topics).
+# Algorithm params from mpc/experiments/results/lemniscate_validation/H0_baseline/config.yaml
+
+sim_enable: true
+
+feedback:
+  use_ground_truth_pose: true
+
+origin:
+  lat: 40.448417
+  lon: -86.86775
+
+topics:
+  gps: /blueboat/sensors/gps/gps/fix
+  imu: /blueboat/sensors/imu/imu/data
+  odometry: /blueboat/sensors/position/ground_truth_odometry
+  left_thrust: /blueboat/thrusters/left/thrust
+  right_thrust: /blueboat/thrusters/right/thrust
+
+experiment:
+  warmup_s: 5.0
+  evaluate_s: 60.0
+  skip_initial_s: 5.0
+  target_rmse_m: 0.25
+  wait_for_gps_timeout_s: 30.0
+  wait_for_xte_timeout_s: 30.0

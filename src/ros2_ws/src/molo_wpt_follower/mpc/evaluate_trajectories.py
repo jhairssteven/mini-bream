@@ -23,7 +23,7 @@ try:
     from tune_mpc import OPEN_WATER_LAUNCH, kill_gazebo, ros_env, ensure_gazebo, gazebo_ready, BASH
 except ImportError:
     OPEN_WATER_LAUNCH = (
-        "/workspace/codebase/mini-bream/src/ros2_ws/install/linc_gz/share/linc_gz/launch/open_water.launch.py"
+        "/workspace/ros2_ws/install/blueboat_sim/share/blueboat_sim/launch/open_water.launch.py"
     )
     BASH = "bash --noprofile --norc -lc"
 
@@ -42,7 +42,7 @@ except ImportError:
 
     def gazebo_ready() -> bool:
         r = subprocess.run(
-            [*BASH.split(), f"{ros_env()} && timeout 4 ros2 topic echo /wamv/sensors/gps/gps/fix --once 2>/dev/null | grep -q latitude"],
+            [*BASH.split(), f"{ros_env()} && timeout 4 ros2 topic echo /blueboat/sensors/gps/gps/fix --once 2>/dev/null | grep -q latitude"],
             capture_output=True,
         )
         return r.returncode == 0

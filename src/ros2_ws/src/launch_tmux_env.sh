@@ -10,7 +10,7 @@ for session in $sessions; do
     # Configure the session based on its name
     case "$session" in
         sim)
-            tmux send-keys -t "$session" "ros2 launch linc_gz docking_harner.launch.py"
+            tmux send-keys -t "$session" "ros2 launch blueboat_sim open_water.launch.py"
             ;;
         other)
             # First command in the initial window

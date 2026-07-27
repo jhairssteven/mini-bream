@@ -8,7 +8,8 @@
 #   ./mini_bream_env.sh start gs --h0-boat    # RViz with H0 path overlays (world frame)
 #   ./mini_bream_env.sh stop pi               # remove Pi containers (compose down -v)
 #   ./mini_bream_env.sh stop jetson           # remove perception
-#   ./mini_bream_env.sh stop gs               # remove ground_station + telemetry_tx
+#   ./mini_bream_env.sh start sim            # BlueBoat Gazebo simulation (HAL)
+#   ./mini_bream_env.sh stop sim             # remove simulation container
 #
 # Start options:
 #   --build              Rebuild images before starting
@@ -31,7 +32,9 @@ cd "${SCRIPT_DIR}"
 
 COMPOSE_FRONTSEAT="docker-compose.frontseat.yml"
 COMPOSE_GROUND="docker-compose.ground.yml"
+COMPOSE_SIMULATION="docker-compose.simulation.yml"
 COMPOSE_TELEMETRY="docker-compose.ground.telemetry.yaml"
+
 LIDAR_NET_SCRIPT="../ros2_ws/src/frontseat/config/rslidar_airy/setup_network.sh"
 
 ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
@@ -56,7 +59,7 @@ die() { echo "[mini-bream] ERROR: $*" >&2; exit 1; }
 normalize_role() {
   case "$1" in
     ground|ground-station) echo gs ;;
-    pi|jetson|gs) echo "$1" ;;
+    pi|jetson|gs|sim) echo "$1" ;;
     *) return 1 ;;
   esac
 }
@@ -217,6 +220,21 @@ stop_gs() {
   log "Ground station stack removed"
 }
 
+start_sim() {
+  need_docker
+  log "Starting BlueBoat simulation (ROS_DOMAIN_ID=${ROS_DOMAIN_ID})..."
+  setup_ground_display
+  log "Building/starting simulation container..."
+  compose -f "${COMPOSE_SIMULATION}" up $(build_flag) simulation
+}
+
+stop_sim() {
+  need_docker
+  log "Tearing down simulation..."
+  teardown_services "${COMPOSE_SIMULATION}" simulation
+  log "Simulation removed"
+}
+
 run_action() {
   case "${ACTION}:${ROLE}" in
     start:pi) start_pi ;;
@@ -225,6 +243,8 @@ run_action() {
     stop:jetson) stop_jetson ;;
     start:gs) start_gs ;;
     stop:gs) stop_gs ;;
+    start:sim) start_sim ;;
+    stop:sim) stop_sim ;;
     *) die "unknown action/role: ${ACTION} ${ROLE}" ;;
   esac
 }
@@ -236,7 +256,7 @@ while [[ $# -gt 0 ]]; do
       [[ -z "${ACTION}" ]] || die "action already set: ${ACTION}"
       ACTION="$1"
       ;;
-    pi|jetson|gs|ground|ground-station)
+    pi|jetson|gs|sim|ground|ground-station)
       [[ -z "${ROLE}" ]] || die "role already set: ${ROLE}"
       ROLE="$(normalize_role "$1")" || die "unknown role: $1"
       ;;
@@ -252,7 +272,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -n "${ACTION}" ]] || usage 1
-[[ -n "${ROLE}" ]] || die "missing role (pi, jetson, or gs)"
+[[ -n "${ROLE}" ]] || die "missing role (pi, jetson, gs, or sim)"
 
 if [[ "${ACTION}" == stop ]]; then
   if [[ "${BUILD}" -eq 1 || "${DRY_RUN}" -eq 1 || "${NO_TELEMETRY}" -eq 1 || "${DETACH_FRONTSEAT}" -eq 1 ]]; then

@@ -12,7 +12,7 @@ set -euo pipefail
 
 MPC_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 TUNE_ROOT="${TUNE_ROOT:-$MPC_DIR/experiments/results/tune_lemniscate_full}"
-OPEN_WATER_LAUNCH="${OPEN_WATER_LAUNCH:-/workspace/codebase/mini-bream/src/ros2_ws/install/linc_gz/share/linc_gz/launch/open_water.launch.py}"
+OPEN_WATER_LAUNCH="${OPEN_WATER_LAUNCH:-/workspace/ros2_ws/install/blueboat_sim/share/blueboat_sim/launch/open_water.launch.py}"
 
 source_ros() {
   if [ -f /opt/ros/humble/setup.bash ]; then
@@ -21,7 +21,7 @@ source_ros() {
     [ -f /workspace/codebase/mini-bream/src/ros2_ws/install/setup.bash ] && \
       source /workspace/codebase/mini-bream/src/ros2_ws/install/setup.bash
   fi
-}ros2 launch /workspace/codebase/mini-bream/src/ros2_ws/install/linc_gz/share/linc_gz/launch/open_water.launch.py
+}
 
 
 list_hypotheses() {
@@ -98,7 +98,7 @@ if [ "$LAUNCH_GAZEBO" = "1" ]; then
   ros2 launch "$OPEN_WATER_LAUNCH" headless:=True &
   echo "Waiting for GPS..."
   for _ in $(seq 1 45); do
-    if timeout 4 ros2 topic echo /wamv/sensors/gps/gps/fix --once 2>/dev/null | grep -q latitude; then
+    if timeout 4 ros2 topic echo /blueboat/sensors/gps/gps/fix --once 2>/dev/null | grep -q latitude; then
       echo "Gazebo ready."
       sleep 5
       break

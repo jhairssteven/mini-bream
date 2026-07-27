@@ -33,9 +33,9 @@ def generate_launch_description():
             ],
             remappings=[
                 ('/next_waypoint/geo_pose', '/goal_geopose'),
-                ('/camera_origin/gps', '/wamv/sensors/gps/centered_gps/fix'), 
-                ('/heading/imu/data', '/wamv/sensors/imu/imu/data'),
-                ('/camera/input_image', '/wamv/sensors/cameras/front_camera_sensor/image_raw'),
+                ('/camera_origin/gps', '/blueboat/sensors/gps/gps/fix'),
+                ('/heading/imu/data', '/blueboat/sensors/imu/imu/data'),
+                ('/camera/input_image', '/blueboat/sensors/cameras/front_camera_sensor/image_raw'),
                 #('/camera/image_id', ),
             ]
         ),

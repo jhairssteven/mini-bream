@@ -20,10 +20,10 @@ source /opt/ros/humble/setup.bash
 source /workspace/codebase/vrx_ws/install/setup.bash
 source /workspace/codebase/mini-bream/src/ros2_ws/install/setup.bash
 
-ros2 launch /workspace/codebase/mini-bream/src/ros2_ws/install/linc_gz/share/linc_gz/launch/open_water.launch.py headless:=True
+ros2 launch blueboat_sim open_water.launch.py headless:=True
 ```
 
-World file: `open_water_harner.sdf` (no shore/dock collisions). Rebuild after edits: `colcon build --packages-select linc_gz`.
+World file: `open_water_harner.sdf` (no shore/dock collisions). Rebuild after edits: `colcon build --packages-select blueboat_sim`.
 
 ## Run
 

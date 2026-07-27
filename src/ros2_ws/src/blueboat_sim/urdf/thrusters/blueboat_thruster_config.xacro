@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<plugin xmlns:xacro="http://ros.org/wiki/xacro">
+  <xacro:macro name="blueboat_thruster_config" params="name thrust_sign:=1">
+    <gazebo>
+      <!-- T200 thruster: ~100 N max, 0.112 m prop, ArduPilot SITL coeffs -->
+      <xacro:property name="max_velocity_mps" value="2.5"/>
+      <xacro:property name="thrust_coeff" value="${thrust_sign * 0.02}"/>
+      <xacro:property name="max_thrust" value="100.0"/>
+
+      <plugin filename="gz-sim-thruster-system" name="gz::sim::systems::Thruster">
+        <joint_name>${namespace}/${name}_engine_propeller_joint</joint_name>
+        <thrust_coefficient>${thrust_coeff}</thrust_coefficient>
+        <fluid_density>1025</fluid_density>
+        <propeller_diameter>0.112</propeller_diameter>
+        <velocity_control>true</velocity_control>
+        <max_thrust_cmd>${max_thrust}</max_thrust_cmd>
+        <namespace>${namespace}</namespace>
+        <topic>thrusters/${name}/thrust</topic>
+        <name>${name}</name>
+      </plugin>
+
+      <plugin filename="gz-sim-joint-position-controller-system"
+              name="gz::sim::systems::JointPositionController">
+        <joint_name>${namespace}/${name}_chassis_engine_joint</joint_name>
+        <use_velocity_commands>true</use_velocity_commands>
+        <topic>${namespace}/thrusters/${name}/pos</topic>
+        <name>${name}</name>
+      </plugin>
+    </gazebo>
+  </xacro:macro>
+</plugin>

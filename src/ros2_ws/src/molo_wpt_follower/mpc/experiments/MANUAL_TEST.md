@@ -17,12 +17,12 @@ On **host** (paths may differ), use your install path to `open_water.launch.py` 
 ## 2. Terminal A — Gazebo (open water)
 
 ```bash
-ros2 launch /workspace/codebase/mini-bream/src/ros2_ws/install/linc_gz/share/linc_gz/launch/open_water.launch.py
+ros2 launch blueboat_sim open_water.launch.py
 ```
 
 Add `headless:=True` if you do not need the GUI.
 
-Wait until the WAM-V is spawned and topics are live (`/wamv/sensors/gps/gps/fix`).
+Wait until BlueBoat is spawned and topics are live (`/blueboat/sensors/gps/gps/fix`).
 
 ## 3. Terminal B — RViz (optional)
 

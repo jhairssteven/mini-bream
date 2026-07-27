@@ -1,0 +1,20 @@
+# BlueBoat simulation via VRX (Gazebo Garden + ROS 2 Humble).
+FROM osrf/ros:humble-desktop
+
+SHELL ["/bin/bash", "-c"]
+ENV DEBIAN_FRONTEND=noninteractive
+ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+ENV GZ_VERSION=garden
+
+COPY docker/install_mpc_deps.sh /tmp/install_mpc_deps.sh
+COPY docker/install_ros2_ws_deps.sh /tmp/install_ros2_ws_deps.sh
+COPY docker/install_sim_deps.sh /tmp/install_sim_deps.sh
+RUN chmod +x /tmp/install_mpc_deps.sh /tmp/install_ros2_ws_deps.sh /tmp/install_sim_deps.sh \
+    && /tmp/install_ros2_ws_deps.sh \
+    && /tmp/install_sim_deps.sh
+
+RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
+
+ENV DEBIAN_FRONTEND=dialog
+WORKDIR /workspace
+CMD ["bash"]

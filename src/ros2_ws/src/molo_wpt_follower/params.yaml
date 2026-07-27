@@ -74,12 +74,12 @@ trajectory:
   min_distance_m: 0.3
 
 topics:
-  gps: /wamv/sensors/gps/gps/fix
-  imu: /wamv/sensors/imu/imu/data
-  odometry: /wamv/sensors/position/ground_truth_odometry
+  gps: /blueboat/sensors/gps/gps/fix
+  imu: /blueboat/sensors/imu/imu/data
+  odometry: /blueboat/sensors/position/ground_truth_odometry
   goal_pose: /goal_pose
-  left_thrust: /wamv/thrusters/left/thrust
-  right_thrust: /wamv/thrusters/right/thrust
+  left_thrust: /blueboat/thrusters/left/thrust
+  right_thrust: /blueboat/thrusters/right/thrust
   path: /molo_wpt/path
   mission_path: /molo_wpt/mission_path
   traversed_path: /molo_wpt/traversed_path

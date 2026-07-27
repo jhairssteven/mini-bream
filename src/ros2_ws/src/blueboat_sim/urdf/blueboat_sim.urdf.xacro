@@ -1,0 +1,70 @@
+<?xml version="1.0"?>
+<!-- BlueBoat with VRX Gazebo hydrodynamics plugins and HAL-compatible sensor/thruster topics. -->
+<robot xmlns:xacro="http://ros.org/wiki/xacro" name="blueboat">
+  <xacro:arg name="locked" default="false"/>
+  <xacro:arg name="thruster_config" default="H"/>
+  <xacro:arg name="camera_enabled" default="false"/>
+  <xacro:arg name="gps_enabled" default="false"/>
+  <xacro:arg name="imu_enabled" default="false"/>
+  <xacro:arg name="lidar_enabled" default="false"/>
+  <xacro:arg name="ground_truth_enabled" default="true"/>
+  <xacro:arg name="vrx_sensors_enabled" default="false"/>
+  <xacro:arg name="pinger_enabled" default="false"/>
+  <xacro:arg name="ball_shooter_enabled" default="false"/>
+  <xacro:arg name="thruster_namespace" default="thrusters/"/>
+  <xacro:arg name="camera_namespace" default="cameras/"/>
+  <xacro:arg name="sensor_namespace" default="sensors/"/>
+  <xacro:arg name="acoustic_namespace" default="acoustics/"/>
+  <xacro:arg name="shooter_namespace" default="shooters/"/>
+  <!-- BlueBoat model namespace (HAL topics under /blueboat/...). -->
+  <xacro:arg name="namespace" default="blueboat"/>
+  <xacro:property name="thruster_namespace" value="$(arg thruster_namespace)" scope="global"/>
+  <xacro:property name="camera_namespace" value="$(arg camera_namespace)" scope="global"/>
+  <xacro:property name="sensor_namespace" value="$(arg sensor_namespace)" scope="global"/>
+  <xacro:property name="acoustic_namespace" value="$(arg acoustic_namespace)" scope="global"/>
+  <xacro:property name="shooter_namespace" value="$(arg shooter_namespace)" scope="global"/>
+  <xacro:property name="namespace" value="$(arg namespace)" scope="global"/>
+
+  <xacro:arg name="yaml_component_generation" default="false"/>
+  <xacro:arg name="component_xacro_file" default=""/>
+  <xacro:arg name="yaml_thruster_generation" default="false"/>
+  <xacro:arg name="thruster_xacro_file" default=""/>
+
+  <xacro:include filename="$(find blueboat_sim)/urdf/blueboat_robot.xacro"/>
+  <xacro:include filename="$(find blueboat_sim)/urdf/blueboat_sensors.xacro"/>
+  <xacro:include filename="$(find blueboat_sim)/urdf/plugins/blueboat_p3d.xacro"/>
+
+  <xacro:unless value="$(arg yaml_thruster_generation)">
+    <xacro:property name="thruster_conf" value="$(arg thruster_config)"/>
+    <xacro:if value="${thruster_conf == 'H'}">
+      <xacro:blueboat_robot thruster_layout="$(find blueboat_sim)/urdf/thrusters/blueboat_aft_thrusters.xacro"/>
+    </xacro:if>
+  </xacro:unless>
+
+  <gazebo>
+    <plugin filename="libgz-sim-pose-publisher-system.so"
+            name="gz::sim::systems::PosePublisher">
+      <publish_link_pose>true</publish_link_pose>
+      <publish_sensor_pose>true</publish_sensor_pose>
+      <publish_collision_pose>false</publish_collision_pose>
+      <publish_visual_pose>false</publish_visual_pose>
+      <publish_nested_model_pose>false</publish_nested_model_pose>
+      <publish_model_pose>true</publish_model_pose>
+      <use_pose_vector_msg>true</use_pose_vector_msg>
+      <static_publisher>false</static_publisher>
+      <static_update_frequency>1</static_update_frequency>
+    </plugin>
+    <plugin filename="gz-sim-joint-state-publisher-system"
+            name="gz::sim::systems::JointStatePublisher"/>
+  </gazebo>
+
+  <xacro:unless value="$(arg yaml_component_generation)">
+    <xacro:if value="$(arg ground_truth_enabled)">
+      <xacro:blueboat_p3d name="p3d_blueboat"/>
+    </xacro:if>
+
+    <xacro:if value="$(arg vrx_sensors_enabled)">
+      <xacro:blueboat_sensors/>
+    </xacro:if>
+  </xacro:unless>
+</robot>

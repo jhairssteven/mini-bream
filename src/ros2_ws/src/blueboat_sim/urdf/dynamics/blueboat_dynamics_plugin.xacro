@@ -1,0 +1,55 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+  <xacro:macro name="blueboat_dynamics_gazebo" params="name">
+    <gazebo>
+      <!-- Port hull pontoon (base_link z=0 is deck; target ~13 cm above water) -->
+      <plugin filename="libSurface.so" name="vrx::Surface">
+        <link_name>${namespace}/base_link</link_name>
+        <hull_length>1.15</hull_length>
+        <hull_radius>0.13</hull_radius>
+        <fluid_level>0</fluid_level>
+        <points>
+          <point>0.45 0.35 -0.21</point>
+          <point>-0.45 0.35 -0.21</point>
+        </points>
+        <wavefield>
+          <topic>/vrx/wavefield/parameters</topic>
+        </wavefield>
+      </plugin>
+
+      <!-- Starboard hull pontoon -->
+      <plugin filename="libSurface.so" name="vrx::Surface">
+        <link_name>${namespace}/base_link</link_name>
+        <hull_length>1.15</hull_length>
+        <hull_radius>0.13</hull_radius>
+        <fluid_level>0</fluid_level>
+        <points>
+          <point>0.45 -0.35 -0.21</point>
+          <point>-0.45 -0.35 -0.21</point>
+        </points>
+        <wavefield>
+          <topic>/vrx/wavefield/parameters</topic>
+        </wavefield>
+      </plugin>
+
+      <!-- BlueBoat hydrodynamics (30 kg catamaran, scaled from WAM-V plugin) -->
+      <plugin filename="libSimpleHydrodynamics.so" name="vrx::SimpleHydrodynamics">
+        <link_name>${namespace}/base_link</link_name>
+        <xDotU>0.0</xDotU>
+        <yDotV>0.0</yDotV>
+        <nDotR>0.0</nDotR>
+        <xU>25.0</xU>
+        <xUU>40.0</xUU>
+        <yV>25.0</yV>
+        <yVV>30.0</yVV>
+        <zW>50.0</zW>
+        <kP>120.0</kP>
+        <kPP>240.0</kPP>
+        <mQ>300.0</mQ>
+        <mQQ>300.0</mQQ>
+        <nR>80.0</nR>
+        <nRR>80.0</nRR>
+      </plugin>
+    </gazebo>
+  </xacro:macro>
+</robot>

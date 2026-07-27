@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+  <xacro:include filename="$(find blueboat_sim)/urdf/dynamics/blueboat_dynamics_plugin.xacro"/>
+
+  <xacro:macro name="blueboat_robot" params="thruster_layout">
+    <xacro:include filename="$(find blueboat_sim)/urdf/blueboat_base.urdf.xacro"/>
+    <xacro:include filename="${thruster_layout}"/>
+    <xacro:blueboat_dynamics_gazebo name="blueboat_dynamics_plugin"/>
+  </xacro:macro>
+</robot>

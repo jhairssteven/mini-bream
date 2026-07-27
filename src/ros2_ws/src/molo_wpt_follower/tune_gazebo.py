@@ -45,7 +45,7 @@ def shell(cmd: str, timeout: Optional[float] = None) -> subprocess.CompletedProc
 
 def kill_gazebo() -> None:
     shell("pkill -f 'gz sim' 2>/dev/null; pkill -f 'ruby.*gz sim' 2>/dev/null; "
-          "pkill -f 'ros2 launch linc_gz' 2>/dev/null; sleep 2; true")
+          "pkill -f 'ros2 launch blueboat_sim' 2>/dev/null; sleep 2; true")
 
 
 def gazebo_rtf() -> Optional[float]:
@@ -67,7 +67,7 @@ def gazebo_rtf() -> Optional[float]:
 def gazebo_ready() -> bool:
     r = shell(
         f"source {WS_SETUP} && "
-        "timeout 4 ros2 topic echo /wamv/sensors/gps/gps/fix --once 2>/dev/null | grep -q latitude"
+        "timeout 4 ros2 topic echo /blueboat/sensors/gps/gps/fix --once 2>/dev/null | grep -q latitude"
     )
     return r.returncode == 0
 
@@ -82,7 +82,7 @@ def ensure_gazebo(min_rtf: float = 0.70, max_attempts: int = 3) -> bool:
     for attempt in range(max_attempts):
         launch_cmd = (
             f"source {WS_SETUP} && source {INSTALL_SETUP} && "
-            "ros2 launch linc_gz docking_harner.launch.py headless:=True"
+            "ros2 launch blueboat_sim open_water.launch.py headless:=True"
         )
         subprocess.Popen(
             ["bash", "-lc", launch_cmd],
