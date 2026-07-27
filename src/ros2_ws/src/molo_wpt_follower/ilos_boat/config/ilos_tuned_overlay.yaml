@@ -1,0 +1,28 @@
+path:
+  cruise_speed_mps: 0.3787900454010815
+ilos:
+  lookahead_min_m: 0.542606529359472
+  lookahead_max_m: 2.515320200600093
+  conv_rate: 11.565351737411358
+pid:
+  kp: 1.7591651574193374
+  kd: 0.19197190571616324
+guidance:
+  max_yaw_rate_rad_s: 0.6673991135726938
+  kappa_speed_scale: 1.0031150633640573
+thrust:
+  yaw_mix_gain: 0.7003940416959729
+  surge_gain: 0.6571534997141348
+  min_surge_norm: 0.2452665418846559
+speed:
+  angle_threshold_fast_rad: 0.08958996843460705
+  angle_threshold_slow_rad: 0.5526995702933888
+  min_speed_scale: 0.5284934481555127
+tuning:
+  platform: blueboat_sim
+  target_rmse_m: 0.1
+  controller: ILOS+PID (no MPC)
+  bo_best_rmse: 0.148446
+  validation_rmse: 0.276756
+  n_calls: 28
+  timestamp: '2026-07-27T20:57:09.826309+00:00'

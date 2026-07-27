@@ -17,4 +17,8 @@ if ! pgrep -f '[r]obot_state_publisher' >/dev/null 2>&1; then
 fi
 
 RVIZ_CONFIG="${RVIZ_CONFIG:-/opt/ground_station/ground_station.rviz}"
-exec rviz2 -d "${RVIZ_CONFIG}"
+RVIZ_ARGS=()
+if [[ "${USE_SIM_TIME:-0}" == "1" ]]; then
+  RVIZ_ARGS+=(--ros-args -p use_sim_time:=true)
+fi
+exec rviz2 -d "${RVIZ_CONFIG}" "${RVIZ_ARGS[@]}"

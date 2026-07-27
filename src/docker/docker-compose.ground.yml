@@ -29,6 +29,7 @@ services:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - CYCLONEDDS_URI=file:///etc/cyclonedds.ground.xml
       - RVIZ_CONFIG=${RVIZ_CONFIG:-/opt/ground_station/ground_station.rviz}
+      - USE_SIM_TIME=${USE_SIM_TIME:-0}
     volumes:
       - ../ros2_ws:/workspace/ros2_ws
       - ../field_tests:/workspace/field_tests

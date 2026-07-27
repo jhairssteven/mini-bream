@@ -59,7 +59,7 @@ ssh_jetson "docker exec mini_bream_perception bash -lc \
    export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp && \
    export CYCLONEDDS_URI=file:///etc/cyclonedds.jetson.xml && \
    python3 /workspace/ros2_ws/src/molo_wpt_follower/h0_boat/run_h0_experiment.py \
-     --overlay /workspace/ros2_ws/src/molo_wpt_follower/h0_boat/config/h0_mock_overlay.yaml \
+     --platform mock \
      --origin-lat ${ORIGIN_LAT} --origin-lon ${ORIGIN_LON} \
      --out ${OUT_DIR} --warmup ${WARMUP} --duration ${DURATION} --skip-initial ${SKIP_INITIAL} \
      --no-plot'" \

@@ -1,6 +1,4 @@
-# Hardware overlay for H0 lemniscate experiment on the real boat (frontseat).
-# Algorithm parameters come from mpc/experiments/results/lemniscate_validation/H0_baseline/config.yaml.
-
+# ILOS experiment overlay for real BlueBoat (frontseat).
 platform:
   name: real_boat
   profile: real
@@ -11,8 +9,6 @@ sim_enable: false
 feedback:
   use_ground_truth_pose: false
 
-# Set lat/lon to your deployment site, or leave null and let run_h0_experiment.py
-# capture the first GPS fix before starting MPC.
 origin:
   lat: null
   lon: null
@@ -33,9 +29,6 @@ boat_bridge:
   velocity_window_s: 0.4
   thrust_input_left: /molo_boat/thrust_left
   thrust_input_right: /molo_boat/thrust_right
-  # pwm_topics: Float32 → /pwm/*_thrust_cmd → motor_controller → pwm_daemon (default)
-  # pwm_daemon: UDP direct to pwm_daemon (no motor_controller)
-  # log_only: mock / bench tests
   thrust_mode: pwm_topics
   pwm_left: /pwm/left_thrust_cmd
   pwm_right: /pwm/right_thrust_cmd
@@ -47,7 +40,6 @@ viz:
   recent_poses_topic: /molo_h0/recent_poses
   frame_id: world
   max_recent_poses: 40
-  rviz_config: /opt/ground_station/h0_boat.rviz
 
 experiment:
   warmup_s: 20.0

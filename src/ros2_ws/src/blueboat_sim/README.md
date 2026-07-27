@@ -28,16 +28,29 @@ Default Docker launch: `lidar_obstacle_course.launch.py` with world `lidar_obsta
 
 ## H0 experiment in simulation
 
-```bash
-# Terminal 1: simulation
-ros2 launch blueboat_sim open_water.launch.py headless:=True
+Use the same H0 experiment harness as the real boat — only the platform prerequisite differs:
 
-# Terminal 2: MPC (H0 baseline)
-cd src/ros2_ws/src/molo_wpt_follower/mpc
-python3 mpc.py --config experiments/results/lemniscate_validation/H0_baseline/config.yaml
+```bash
+# Terminal 1: simulation (Docker)
+cd src/docker && ./mini_bream_env.sh start sim
+
+# Terminal 2: H0 lemniscate experiment
+cd src/ros2_ws/src/molo_wpt_follower/h0_boat
+./run_real_boat.sh --platform sim
 ```
 
-Use overlay `molo_wpt_follower/h0_boat/config/h0_sim_hal_overlay.yaml` for `/blueboat/...` topics.
+Or locally without Docker:
+
+```bash
+# Terminal 1
+ros2 launch blueboat_sim open_water.launch.py headless:=True
+
+# Terminal 2
+cd src/ros2_ws/src/molo_wpt_follower/h0_boat
+./run_h0_boat.sh --platform sim --out /tmp/h0_sim_run
+```
+
+Platform overlay: `molo_wpt_follower/h0_boat/config/h0_sim_hal_overlay.yaml` (topics under `/blueboat/...`).
 
 ## HAL topics (sim)
 

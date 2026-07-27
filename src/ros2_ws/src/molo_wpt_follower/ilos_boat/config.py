@@ -1,10 +1,10 @@
-"""Config helpers for the H0 lemniscate experiment across platform profiles."""
+"""Config helpers for the ILOS+PID lemniscate experiment (no MPC)."""
 
 from __future__ import annotations
 
 import copy
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Dict, List, Tuple
 
 import yaml
 
@@ -13,25 +13,19 @@ MOLO_DIR = PKG_DIR.parent
 MPC_DIR = MOLO_DIR / "mpc"
 CONFIG_DIR = PKG_DIR / "config"
 
-H0_SIM_CONFIG = (
-    MPC_DIR / "experiments" / "results" / "lemniscate_validation" / "H0_baseline" / "config.yaml"
-)
-BOAT_OVERLAY = CONFIG_DIR / "h0_boat_overlay.yaml"
-SIM_OVERLAY = CONFIG_DIR / "h0_sim_hal_overlay.yaml"
-MOCK_OVERLAY = CONFIG_DIR / "h0_mock_overlay.yaml"
-BENCH_OVERLAY = CONFIG_DIR / "h0_bench_overlay.yaml"
-BLUEBOAT_BOAT_OVERLAY = CONFIG_DIR / "h0_blueboat_boat.yaml"
-TUNED_OVERLAY = CONFIG_DIR / "h0_tuned_overlay.yaml"
+BASE_CONFIG = CONFIG_DIR / "ilos_base.yaml"
+BOAT_OVERLAY = CONFIG_DIR / "ilos_boat_overlay.yaml"
+SIM_OVERLAY = CONFIG_DIR / "ilos_sim_overlay.yaml"
+BENCH_OVERLAY = CONFIG_DIR / "ilos_bench_overlay.yaml"
+TUNED_OVERLAY = CONFIG_DIR / "ilos_tuned_overlay.yaml"
 
-# Platform profile → ordered overlay list (algorithm config is always H0_SIM_CONFIG).
 PLATFORM_PROFILES: Dict[str, List[Path]] = {
-    "real": [BOAT_OVERLAY, BLUEBOAT_BOAT_OVERLAY],
-    "sim": [SIM_OVERLAY, BLUEBOAT_BOAT_OVERLAY],
-    "mock": [BOAT_OVERLAY, BLUEBOAT_BOAT_OVERLAY, MOCK_OVERLAY],
-    "bench": [BOAT_OVERLAY, BLUEBOAT_BOAT_OVERLAY, BENCH_OVERLAY],
+    "real": [BOAT_OVERLAY],
+    "sim": [SIM_OVERLAY],
+    "bench": [BOAT_OVERLAY, BENCH_OVERLAY],
 }
 
-FIELD_TESTS_RESULTS = Path("/workspace/field_tests/h0_boat")
+FIELD_TESTS_RESULTS = Path("/workspace/field_tests/ilos_boat")
 DEFAULT_RESULTS = (
     FIELD_TESTS_RESULTS if FIELD_TESTS_RESULTS.parent.is_dir() else PKG_DIR / "results"
 )
@@ -53,7 +47,6 @@ def deep_merge(base: dict, patch: dict) -> dict:
 
 
 def platform_overlays(platform: str) -> List[Path]:
-    """Return overlay files for a named platform profile."""
     key = platform.lower().strip()
     if key not in PLATFORM_PROFILES:
         valid = ", ".join(sorted(PLATFORM_PROFILES))
@@ -61,16 +54,16 @@ def platform_overlays(platform: str) -> List[Path]:
     return PLATFORM_PROFILES[key]
 
 
-def build_h0_boat_config(
+def build_ilos_boat_config(
     platform: str = "real",
     overlay_path: Path | str | None = None,
     origin_latlon: Tuple[float, float] | None = None,
 ) -> dict:
-    """Merge tuned H0 algorithm config with a platform profile and optional extra overlay."""
-    if not H0_SIM_CONFIG.is_file():
-        raise FileNotFoundError(f"H0 sim config not found: {H0_SIM_CONFIG}")
+    """Merge base ILOS config with a platform profile and optional extra overlay."""
+    if not BASE_CONFIG.is_file():
+        raise FileNotFoundError(f"ILOS base config not found: {BASE_CONFIG}")
 
-    cfg = load_yaml(H0_SIM_CONFIG)
+    cfg = load_yaml(BASE_CONFIG)
     applied: List[Path] = []
     for overlay in platform_overlays(platform):
         if overlay.is_file():
@@ -95,7 +88,6 @@ def build_h0_boat_config(
 
 
 def platform_name(cfg: dict, fallback: str = "unknown") -> str:
-    """Human-readable platform label stored in experiment metadata."""
     plat = cfg.get("platform", {})
     if isinstance(plat, dict) and plat.get("name"):
         return str(plat["name"])
@@ -107,7 +99,6 @@ def prepare_run_config(
     run_dir: Path,
     log_csv_name: str = "log.csv",
 ) -> dict:
-    """Write experiment artifacts config for a single boat run."""
     out = copy.deepcopy(cfg)
     out.setdefault("experiment", {})
     out["experiment"]["log_csv"] = str(run_dir / log_csv_name)
@@ -117,12 +108,11 @@ def prepare_run_config(
     return out
 
 
-def bridge_topics(cfg: dict) -> Dict[str, Any]:
+def bridge_topics(cfg: dict) -> dict:
     return cfg.get("boat_bridge", {})
 
 
 def stack_components(cfg: dict) -> Dict[str, bool]:
-    """Which helper nodes stack_runner should start for this platform."""
     bridge = bridge_topics(cfg)
     sim = bool(cfg.get("sim_enable", False))
     return {

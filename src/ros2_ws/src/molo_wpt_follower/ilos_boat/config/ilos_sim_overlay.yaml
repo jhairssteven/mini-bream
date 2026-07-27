@@ -1,9 +1,4 @@
-# H0 lemniscate experiment overlay for BlueBoat Gazebo simulation (HAL topics).
-# Algorithm params from mpc/experiments/results/lemniscate_validation/H0_baseline/config.yaml
-#
-# Prerequisites: blueboat_sim running (e.g. ros2 launch blueboat_sim open_water.launch.py)
-# Run: ./run_real_boat.sh --platform sim
-
+# ILOS experiment overlay for BlueBoat Gazebo simulation.
 platform:
   name: blueboat_sim
   profile: sim
@@ -26,7 +21,6 @@ topics:
   left_thrust: /blueboat/thrusters/left/thrust
   right_thrust: /blueboat/thrusters/right/thrust
 
-# MPC publishes thrust directly to sim; no velocity odom or pwm bridge needed.
 boat_bridge:
   velocity_odom_enabled: false
   thrust_bridge_enabled: false

@@ -1,0 +1,12 @@
+# Bench run: real sensors, log_only thrust.
+platform:
+  name: real_boat_bench
+  profile: bench
+
+boat_bridge:
+  thrust_mode: log_only
+
+experiment:
+  warmup_s: 8.0
+  evaluate_s: 30.0
+  skip_initial_s: 8.0

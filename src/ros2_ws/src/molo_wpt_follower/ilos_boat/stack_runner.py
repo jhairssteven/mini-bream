@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run h0_boat helper nodes + MPC in a single ROS process."""
+"""Run ilos_boat helper nodes + ILOS follower in a single ROS process."""
 
 from __future__ import annotations
 
@@ -15,19 +15,25 @@ import yaml
 from rclpy.executors import MultiThreadedExecutor
 
 PKG_DIR = Path(__file__).resolve().parent
-MPC_DIR = PKG_DIR.parent / "mpc"
-for path in (str(PKG_DIR), str(MPC_DIR)):
+H0_DIR = PKG_DIR.parent / "h0_boat"
+for path in (str(PKG_DIR), str(H0_DIR)):
     if path not in sys.path:
         sys.path.insert(0, path)
 
-from config import bridge_topics, load_yaml, stack_components  # noqa: E402
+from config import bridge_topics, stack_components  # noqa: E402
+from ilos_follower import IlosFollowerNode  # noqa: E402
 from pose_trail_viz import PoseTrailViz  # noqa: E402
 from thrust_bridge import ThrustBridgeNode  # noqa: E402
 from velocity_odom import VelocityOdomNode  # noqa: E402
 
 
+def load_yaml(path: Path | str) -> dict:
+    with open(path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f) or {}
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run h0_boat ROS stack in one process")
+    parser = argparse.ArgumentParser(description="Run ilos_boat ROS stack in one process")
     parser.add_argument("--config", required=True, help="Merged experiment config YAML")
     args = parser.parse_args()
 
@@ -70,15 +76,12 @@ def main() -> None:
     nodes.append(
         PoseTrailViz(
             viz.get("pose_topic", "/molo_mpc/vehicle_pose"),
-            viz.get("recent_poses_topic", "/molo_h0/recent_poses"),
+            viz.get("recent_poses_topic", "/molo_ilos/recent_poses"),
             viz.get("frame_id", "world"),
             max_poses=int(viz.get("max_recent_poses", 40)),
         )
     )
-
-    from mpc import MpcFollowerNode  # noqa: E402
-
-    nodes.append(MpcFollowerNode(cfg))
+    nodes.append(IlosFollowerNode(cfg))
 
     for node in nodes:
         executor.add_node(node)

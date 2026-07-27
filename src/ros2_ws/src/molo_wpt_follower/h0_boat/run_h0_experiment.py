@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """
-Run the H0 baseline lemniscate experiment on the real boat (frontseat).
+Run the H0 baseline lemniscate experiment on any platform profile.
 
 Uses the tuned sim config from mpc/experiments/results/lemniscate_validation/H0_baseline
-with a hardware overlay. Produces the same artifacts as the sim validation run:
-  config.yaml, log.csv, ref_path.csv, origin.json, result.json, plots/
+with a platform overlay (real boat, Gazebo sim, mock, or bench). Produces the same
+artifacts regardless of platform: config.yaml, log.csv, ref_path.csv, origin.json,
+result.json, plots/
 
-Prerequisites:
-  - frontseat running (RTK GPS, IMU, motor_controller → pwm_daemon)
-  - pwm_daemon + radio_rx running on the Pi (see src/teleop/README.md)
-  - Radio deadman released so pwm_daemon accepts ROS thrust (arm=false on radio)
+Platform prerequisites (start these before the experiment):
+  real / bench  → frontseat on the Pi (RTK GPS, IMU, motor_controller)
+  sim           → blueboat_sim (ros2 launch blueboat_sim open_water.launch.py)
+  mock          → mock_frontseat.py on Pi + ROS peer for MPC
 """
 
 from __future__ import annotations
@@ -37,11 +38,12 @@ for path in (str(PKG_DIR), str(MPC_DIR), str(EXP_DIR)):
         sys.path.insert(0, path)
 
 from config import (  # noqa: E402
-    BOAT_OVERLAY,
     DEFAULT_RESULTS,
     H0_SIM_CONFIG,
+    PLATFORM_PROFILES,
     bridge_topics,
     build_h0_boat_config,
+    platform_name,
     prepare_run_config,
 )
 
@@ -70,7 +72,7 @@ def wait_for_xte(timeout_s: float) -> bool:
     return subprocess.run(bash_cmd(cmd), capture_output=True).returncode == 0
 
 
-def ros_env() -> str:
+def ros_env(cfg: Optional[dict] = None) -> str:
     parts = ["source /opt/ros/humble/setup.bash"]
     ws = Path("/workspace/ros2_ws/install/setup.bash")
     if ws.is_file():
@@ -78,25 +80,34 @@ def ros_env() -> str:
     local_ws = MOLO_DIR.parents[2] / "install" / "setup.bash"
     if local_ws.is_file():
         parts.append(f"source {local_ws}")
+    if cfg and cfg.get("use_sim_time"):
+        parts.append("export ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}")
+        parts.append("export USE_SIM_TIME=1")
     return " && ".join(parts)
 
 
-def bash_cmd(cmd: str) -> List[str]:
-    return ["bash", "--noprofile", "--norc", "-lc", f"{ros_env()} && {cmd}"]
+def bash_cmd(cmd: str, cfg: Optional[dict] = None) -> List[str]:
+    return ["bash", "--noprofile", "--norc", "-lc", f"{ros_env(cfg)} && {cmd}"]
 
 
-def wait_for_gps(timeout_s: float, gps_topic: str = "/wamv/sensors/gps/gps/fix") -> Optional[Tuple[float, float]]:
+def wait_for_gps(
+    timeout_s: float,
+    gps_topic: str = "/wamv/sensors/gps/gps/fix",
+    cfg: Optional[dict] = None,
+) -> Optional[Tuple[float, float]]:
     cmd = (
         f"timeout {timeout_s} bash -c "
         f"'until ros2 topic echo {gps_topic} --once 2>/dev/null "
         "| grep -q latitude; do sleep 0.5; done'"
     )
-    proc = subprocess.run(bash_cmd(cmd), capture_output=True, text=True)
+    proc = subprocess.run(bash_cmd(cmd, cfg), capture_output=True, text=True)
     if proc.returncode != 0:
         return None
 
     read_cmd = f"ros2 topic echo {gps_topic} --once"
-    proc = subprocess.run(bash_cmd(read_cmd), capture_output=True, text=True, timeout=timeout_s + 5)
+    proc = subprocess.run(
+        bash_cmd(read_cmd, cfg), capture_output=True, text=True, timeout=timeout_s + 5
+    )
     lat = lon = None
     for line in proc.stdout.splitlines():
         line = line.strip()
@@ -109,10 +120,10 @@ def wait_for_gps(timeout_s: float, gps_topic: str = "/wamv/sensors/gps/gps/fix")
     return lat, lon
 
 
-def run_evaluate(duration: float, skip_initial: float) -> float:
+def run_evaluate(duration: float, skip_initial: float, cfg: Optional[dict] = None) -> float:
     cmd = f"cd {MPC_DIR} && python3 evaluate_mpc.py --duration {duration} --skip-initial {skip_initial}"
     proc = subprocess.run(
-        bash_cmd(cmd),
+        bash_cmd(cmd, cfg),
         capture_output=True,
         text=True,
         timeout=duration + 90,
@@ -149,9 +160,9 @@ def rmse_from_log(log_path: Path, skip_initial_s: float) -> Optional[float]:
     return math.sqrt(sum(s * s for s in samples) / len(samples))
 
 
-def start_process(cmd: str, stderr_path: Optional[Path] = None) -> subprocess.Popen:
+def start_process(cmd: str, cfg: Optional[dict] = None, stderr_path: Optional[Path] = None) -> subprocess.Popen:
     err = open(stderr_path, "w", encoding="utf-8") if stderr_path else subprocess.DEVNULL
-    return subprocess.Popen(bash_cmd(cmd), stdout=subprocess.DEVNULL, stderr=err)
+    return subprocess.Popen(bash_cmd(cmd, cfg), stdout=subprocess.DEVNULL, stderr=err)
 
 
 def stop_process(proc: subprocess.Popen, grace_s: float = 4.0) -> None:
@@ -182,7 +193,7 @@ def run_boat_trial(
     if origin_lat is None or origin_lon is None:
         gps_topic = cfg.get("topics", {}).get("gps", "/wamv/sensors/gps/gps/fix")
         print(f"Waiting for GPS fix on {gps_topic}...", flush=True)
-        fix = wait_for_gps(wait_gps_timeout_s, gps_topic)
+        fix = wait_for_gps(wait_gps_timeout_s, gps_topic, cfg)
         if fix is None:
             print("ERROR: no GPS fix within timeout", flush=True)
             return float("inf")
@@ -196,14 +207,11 @@ def run_boat_trial(
     bridge = bridge_topics(cfg)
 
     procs: List[subprocess.Popen] = []
-    stderr_files: List[Any] = []
 
     stack_cmd = (
         f"cd {PKG_DIR} && exec python3 stack_runner.py --config {run_dir / 'config.yaml'}"
     )
-    stack_err = open(run_dir / "stack_stderr.log", "w", encoding="utf-8")
-    stderr_files.append(stack_err)
-    procs.append(subprocess.Popen(bash_cmd(stack_cmd), stdout=subprocess.DEVNULL, stderr=stack_err))
+    procs.append(start_process(stack_cmd, cfg=cfg, stderr_path=run_dir / "stack_stderr.log"))
 
     try:
         print(f"Warmup {warmup_s:.0f}s...", flush=True)
@@ -223,7 +231,7 @@ def run_boat_trial(
                 flush=True,
             )
 
-        rmse = run_evaluate(evaluate_s, skip_initial_s)
+        rmse = run_evaluate(evaluate_s, skip_initial_s, cfg)
         if not math.isfinite(rmse):
             log_rmse = rmse_from_log(run_dir / "log.csv", skip_initial_s)
             if log_rmse is not None:
@@ -233,14 +241,22 @@ def run_boat_trial(
     finally:
         for proc in procs:
             stop_process(proc)
-        for fh in stderr_files:
-            fh.close()
         time.sleep(1)
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="H0 baseline lemniscate experiment on real boat")
-    parser.add_argument("--overlay", default=str(BOAT_OVERLAY), help="Hardware overlay YAML")
+    parser = argparse.ArgumentParser(description="H0 baseline lemniscate experiment")
+    parser.add_argument(
+        "--platform",
+        choices=sorted(PLATFORM_PROFILES),
+        default="real",
+        help="Platform profile: real (frontseat), sim (blueboat_sim), mock, bench",
+    )
+    parser.add_argument(
+        "--overlay",
+        default=None,
+        help="Optional extra YAML overlay on top of the platform profile",
+    )
     parser.add_argument("--out", default=None, help="Output directory (default: h0_boat/results/<timestamp>)")
     parser.add_argument("--origin-lat", type=float, default=None, help="Override origin latitude")
     parser.add_argument("--origin-lon", type=float, default=None, help="Override origin longitude")
@@ -255,8 +271,13 @@ def main() -> None:
     if args.origin_lat is not None and args.origin_lon is not None:
         origin = (args.origin_lat, args.origin_lon)
 
-    cfg = build_h0_boat_config(args.overlay, origin_latlon=origin)
+    cfg = build_h0_boat_config(
+        platform=args.platform,
+        overlay_path=args.overlay,
+        origin_latlon=origin,
+    )
     exp = cfg.get("experiment", {})
+    plat_label = platform_name(cfg, fallback=args.platform)
 
     warmup_s = float(args.warmup if args.warmup is not None else exp.get("warmup_s", 20.0))
     evaluate_s = float(args.duration if args.duration is not None else exp.get("evaluate_s", 55.0))
@@ -293,14 +314,15 @@ def main() -> None:
         "path_points": path_points,
         "cruise_speed_mps": cfg.get("path", {}).get("cruise_speed_mps"),
         "source_config": str(H0_SIM_CONFIG),
-        "boat_overlay": str(args.overlay),
-        "platform": "real_boat",
+        "platform": plat_label,
+        "platform_profile": args.platform,
+        "extra_overlay": str(args.overlay) if args.overlay else None,
     }
 
     print(
         f"H0 boat experiment\n"
+        f"  platform:   {plat_label} ({args.platform})\n"
         f"  sim config: {H0_SIM_CONFIG}\n"
-        f"  overlay:    {args.overlay}\n"
         f"  output:     {run_dir}\n"
         f"  path_pts:   {meta['path_points']}\n"
         f"  cruise:     {meta['cruise_speed_mps']} m/s",
@@ -340,7 +362,8 @@ def main() -> None:
         "reference_hypothesis": "H0_baseline",
         "reference_path": ref_block,
         "target_rmse_m": target_rmse_m,
-        "platform": "real_boat",
+        "platform": plat_label,
+        "platform_profile": args.platform,
         "runs": [meta],
         "ranked": [
             {

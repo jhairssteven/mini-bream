@@ -1,27 +1,24 @@
 #!/usr/bin/env bash
-# H0 lemniscate experiment launcher (all platforms).
+# ILOS+PID lemniscate experiment launcher (all platforms).
 #
-# The experiment is identical across platforms; only the prerequisite stack differs:
-#   --platform sim   → blueboat_sim (Gazebo)
-#   --platform real  → frontseat on the Pi (default)
-#   --platform bench → frontseat, log_only thrust
+# Pure ILOS heading + PID yaw rate + differential thrust (no MPC).
 #
 # Examples:
 #   ./run_real_boat.sh --platform sim
 #   ./run_real_boat.sh --platform real
-#   ./run_real_boat.sh --platform sim --tune
-#   ./run_real_boat.sh --platform real --tune --install
+#   ./run_real_boat.sh --platform sim --tune --install
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
-FIELD_TESTS_HOST="${REPO_ROOT}/field_tests/h0_boat"
-FIELD_TESTS_CONTAINER="/workspace/field_tests/h0_boat"
+FIELD_TESTS_HOST="${REPO_ROOT}/field_tests/ilos_boat"
+FIELD_TESTS_CONTAINER="/workspace/field_tests/ilos_boat"
 
 PLATFORM="real"
 RUN_TS="$(date -u +%Y%m%dT%H%M%SZ)"
-OUT_DIR="${OUT_DIR:-${FIELD_TESTS_HOST}/${RUN_TS}}"
-CONTAINER_OUT="${FIELD_TESTS_CONTAINER}/$(basename "${OUT_DIR}")"
+OUT_SET=0
+OUT_DIR=""
+CONTAINER_OUT=""
 
 BENCH=0
 TUNE=0
@@ -34,9 +31,9 @@ TUNE_ARGS=()
 
 usage() {
   cat <<'EOF'
-Usage: ./run_real_boat.sh [options] [-- extra run_h0_experiment.py args]
+Usage: ./run_real_boat.sh [options] [-- extra run_ilos_experiment.py args]
 
-Run the H0 lemniscate MPC experiment. Start the platform stack first:
+Run the ILOS+PID lemniscate experiment (no MPC). Start the platform stack first:
 
   --platform sim    blueboat_sim: cd src/docker && ./mini_bream_env.sh start sim
   --platform real   frontseat:   cd src/docker && ./mini_bream_env.sh start pi
@@ -45,34 +42,32 @@ Run the H0 lemniscate MPC experiment. Start the platform stack first:
 Options:
   --platform P  Platform profile: sim, real, bench (default: real)
   --bench       Shorthand for --platform bench
-  --tune        Run Bayesian optimization (tune_h0.py) instead of a single experiment
-  --install     With --tune: write best params to config/h0_tuned_overlay.yaml
+  --tune        Run Bayesian optimization (tune_ilos.py) instead of a single experiment
+  --install     With --tune: write best params to config/ilos_tuned_overlay.yaml
   --quick       With --tune: 8 BO calls; otherwise shortened evaluate window
   --smoke       Short warmup/evaluate window (experiment only)
   --dry-run     Write config + ref_path only
   --no-plot     Skip plot generation
   --out DIR     Output directory
   -h, --help    Show this help
-
-Mock integration test (Pi→Jetson): ./run_mock_test.sh
 EOF
 }
 
-log() { echo "[h0-boat] $*"; }
-die() { echo "[h0-boat] ERROR: $*" >&2; exit 1; }
+log() { echo "[ilos-boat] $*"; }
+die() { echo "[ilos-boat] ERROR: $*" >&2; exit 1; }
 
-check_mpc_deps() {
+check_deps() {
   local container="$1"
   local rebuild_hint="$2"
   if ! docker exec "${container}" python3 -c \
-      'import dubins, osqp, scipy, matplotlib, utm, transforms3d' 2>/dev/null; then
-    die "MPC Python deps missing in ${container}. Rebuild the image:\n  ${rebuild_hint}"
+      'import dubins, scipy, matplotlib, utm, transforms3d' 2>/dev/null; then
+    die "Python deps missing in ${container}. Rebuild the image:\n  ${rebuild_hint}"
   fi
 }
 
 check_tune_deps() {
   local container="$1"
-  check_mpc_deps "$@"
+  check_deps "$@"
   if ! docker exec "${container}" python3 -c 'import skopt' 2>/dev/null; then
     die "scikit-optimize missing in ${container}. Install with:\n  docker exec ${container} pip3 install 'numpy<2' scikit-optimize"
   fi
@@ -101,12 +96,12 @@ ros_topic_ready() {
 run_in_container() {
   local container="$1"
   shift
-  docker exec "${container}" /workspace/docker/start_h0_boat.sh "$@"
+  docker exec "${container}" /workspace/docker/start_ilos_boat.sh "$@"
 }
 
 run_locally() {
   cd "${SCRIPT_DIR}"
-  ./run_h0_boat.sh "$@"
+  ./run_ilos_boat.sh "$@"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -125,7 +120,7 @@ while [[ $# -gt 0 ]]; do
     --out)
       shift
       OUT_DIR="${1:?missing value for --out}"
-      CONTAINER_OUT="${FIELD_TESTS_CONTAINER}/$(basename "${OUT_DIR}")"
+      OUT_SET=1
       ;;
     -h|--help) usage; exit 0 ;;
     --) shift; EXTRA_ARGS+=("$@"); break ;;
@@ -139,34 +134,53 @@ case "${PLATFORM}" in
   *) die "unknown platform: ${PLATFORM} (expected sim, real, or bench)" ;;
 esac
 
+container_out_for() {
+  local host_path="$1"
+  local rel="${host_path#${SCRIPT_DIR}/}"
+  if [[ "${rel}" != "${host_path}" ]]; then
+    echo "/workspace/ros2_ws/src/molo_wpt_follower/ilos_boat/${rel}"
+  else
+    echo "${FIELD_TESTS_CONTAINER}/$(basename "${host_path}")"
+  fi
+}
+
+if [[ "${OUT_SET}" -eq 0 ]]; then
+  if [[ "${PLATFORM}" == "sim" ]]; then
+    OUT_DIR="${SCRIPT_DIR}/results/${RUN_TS}"
+  else
+    OUT_DIR="${FIELD_TESTS_HOST}/${RUN_TS}"
+  fi
+fi
+CONTAINER_OUT="$(container_out_for "${OUT_DIR}")"
+
 TUNE_OUT="${OUT_DIR}"
 if [[ "${TUNE}" -eq 1 ]]; then
   TUNE_OUT="${OUT_DIR:-${SCRIPT_DIR}/results/tune_${PLATFORM}_${RUN_TS}}"
   mkdir -p "${TUNE_OUT}"
-  TUNE_CMD=(python3 "${SCRIPT_DIR}/tune_h0.py" --platform "${PLATFORM}" --out "${TUNE_OUT}")
+  TUNE_CMD=(python3 "${SCRIPT_DIR}/tune_ilos.py" --platform "${PLATFORM}" --out "${TUNE_OUT}")
   TUNE_CMD+=("${TUNE_ARGS[@]}")
   [[ "${INSTALL_TUNED}" -eq 1 ]] && TUNE_CMD+=(--install)
   TUNE_CMD+=("${EXTRA_ARGS[@]}")
 
   if [[ "${PLATFORM}" == "sim" ]]; then
     if docker ps --format '{{.Names}}' | grep -qx mini_bream_simulation; then
-      log "Running H0 Bayesian tuning in mini_bream_simulation..."
+      log "Running ILOS Bayesian tuning in mini_bream_simulation..."
       check_tune_deps mini_bream_simulation \
         "cd ${REPO_ROOT}/docker && docker compose -f docker-compose.simulation.yml build simulation"
-      CONTAINER_TUNE_OUT="/workspace/ros2_ws/src/molo_wpt_follower/h0_boat/results/$(basename "${TUNE_OUT}")"
+      CONTAINER_TUNE_OUT="/workspace/ros2_ws/src/molo_wpt_follower/ilos_boat/results/$(basename "${TUNE_OUT}")"
       docker exec mini_bream_simulation mkdir -p "$(dirname "${CONTAINER_TUNE_OUT}")"
       docker exec mini_bream_simulation bash -lc \
         "source /opt/ros/humble/setup.bash && source /workspace/ros2_ws/install/setup.bash && \
-         python3 /workspace/ros2_ws/src/molo_wpt_follower/h0_boat/tune_h0.py \
+         python3 /workspace/ros2_ws/src/molo_wpt_follower/ilos_boat/tune_ilos.py \
          --platform sim --out ${CONTAINER_TUNE_OUT} \
          ${TUNE_ARGS[*]+"${TUNE_ARGS[*]}"} \
          ${INSTALL_TUNED:+--install} \
          ${EXTRA_ARGS[*]+"${EXTRA_ARGS[*]}"}"
       TUNE_OUT="${SCRIPT_DIR}/results/$(basename "${TUNE_OUT}")"
     elif command -v python3 >/dev/null 2>&1; then
-      log "Running H0 Bayesian tuning locally..."
+      log "Running ILOS Bayesian tuning locally..."
       cd "${SCRIPT_DIR}"
-      ./run_h0_boat.sh "${TUNE_CMD[@]}"
+      ./run_ilos_boat.sh "${TUNE_CMD[@]}"
     else
       die "no environment for tuning. Start sim: cd ${REPO_ROOT}/docker && ./mini_bream_env.sh start sim"
     fi
@@ -176,11 +190,11 @@ if [[ "${TUNE}" -eq 1 ]]; then
     fi
     check_tune_deps mini_bream_frontseat \
       "cd ${REPO_ROOT}/docker && docker compose -f docker-compose.frontseat.yml build frontseat"
-    CONTAINER_TUNE_OUT="/workspace/ros2_ws/src/molo_wpt_follower/h0_boat/results/$(basename "${TUNE_OUT}")"
-    log "Running H0 field tuning in mini_bream_frontseat..."
+    CONTAINER_TUNE_OUT="/workspace/ros2_ws/src/molo_wpt_follower/ilos_boat/results/$(basename "${TUNE_OUT}")"
+    log "Running ILOS field tuning in mini_bream_frontseat..."
     docker exec mini_bream_frontseat bash -lc \
       "source /opt/ros/humble/setup.bash && source /workspace/ros2_ws/install/setup.bash && \
-       python3 /workspace/ros2_ws/src/molo_wpt_follower/h0_boat/tune_h0.py \
+       python3 /workspace/ros2_ws/src/molo_wpt_follower/ilos_boat/tune_ilos.py \
        --platform ${PLATFORM} --out ${CONTAINER_TUNE_OUT} \
        ${TUNE_ARGS[*]+"${TUNE_ARGS[*]}"} \
        ${INSTALL_TUNED:+--install} \
@@ -192,7 +206,7 @@ if [[ "${TUNE}" -eq 1 ]]; then
   [[ -f "${RESULT_JSON}" ]] || die "missing ${RESULT_JSON}"
   log "Tuning result:"
   cat "${RESULT_JSON}"
-  log "H0 tuning complete"
+  log "ILOS tuning complete"
   log "Artifacts: ${TUNE_OUT}/"
   exit 0
 fi
@@ -210,7 +224,7 @@ if [[ "${PLATFORM}" == "sim" ]]; then
   if docker ps --format '{{.Names}}' | grep -qx mini_bream_simulation; then
     RUN_CONTAINER="mini_bream_simulation"
     log "Using mini_bream_simulation container"
-    check_mpc_deps mini_bream_simulation \
+    check_deps mini_bream_simulation \
       "cd ${REPO_ROOT}/docker && docker compose -f docker-compose.simulation.yml build simulation"
   elif command -v ros2 >/dev/null 2>&1; then
     log "Running experiment on host (sim must be publishing ${GPS_TOPIC})"
@@ -233,6 +247,8 @@ if [[ "${PLATFORM}" == "sim" ]]; then
   fi
 
   log "Output (host): ${OUT_DIR}"
+  log "RViz (other terminal, while experiment runs):"
+  log "  cd ${REPO_ROOT}/docker && ./mini_bream_env.sh start gs --h0-boat --sim-viz"
   if [[ -n "${RUN_CONTAINER}" ]]; then
     log "Running experiment in ${RUN_CONTAINER}..."
     run_in_container "${RUN_CONTAINER}" "${RUN_ARGS[@]}"
@@ -258,11 +274,11 @@ else
     die "field_tests mount missing in container. Recreate frontseat:\n  cd ${REPO_ROOT}/docker && docker compose -f docker-compose.frontseat.yml up -d frontseat"
   fi
 
-  log "Checking MPC deps in frontseat container..."
-  check_mpc_deps mini_bream_frontseat \
+  log "Checking deps in frontseat container..."
+  check_deps mini_bream_frontseat \
     "cd ${REPO_ROOT}/docker && docker compose -f docker-compose.frontseat.yml build frontseat"
 
-  docker exec mini_bream_frontseat pkill -f 'h0_boat/mock_frontseat.py' 2>/dev/null || true
+  docker exec mini_bream_frontseat pkill -f 'ilos_boat/stack_runner.py' 2>/dev/null || true
 
   log "Checking GPS on ${GPS_TOPIC}..."
   ros_topic_ready "${GPS_TOPIC}" 15 mini_bream_frontseat \
@@ -281,8 +297,8 @@ else
   run_in_container mini_bream_frontseat "${RUN_ARGS[@]}"
 fi
 
-RESULT_JSON="${OUT_DIR}/H0_baseline/result.json"
-LOG_CSV="${OUT_DIR}/H0_baseline/log.csv"
+RESULT_JSON="${OUT_DIR}/ILOS_PID/result.json"
+LOG_CSV="${OUT_DIR}/ILOS_PID/log.csv"
 [[ -f "${RESULT_JSON}" ]] || die "missing ${RESULT_JSON}"
 [[ -s "${LOG_CSV}" ]] || die "missing or empty ${LOG_CSV}"
 
@@ -292,8 +308,8 @@ LINES=$(wc -l < "${LOG_CSV}")
 log "log.csv lines: ${LINES}"
 [[ "${LINES}" -gt 5 ]] || die "log.csv too short"
 
-log "H0 experiment complete (platform=${PLATFORM})"
-log "Artifacts: ${OUT_DIR}/H0_baseline/"
-if [[ "${PLATFORM}" == "real" ]]; then
-  log "RViz (while running): cd ${REPO_ROOT}/docker && ./mini_bream_env.sh start gs --h0-boat"
+log "ILOS experiment complete (platform=${PLATFORM})"
+log "Artifacts: ${OUT_DIR}/ILOS_PID/"
+if [[ "${PLATFORM}" == "sim" ]]; then
+  log "RViz: cd ${REPO_ROOT}/docker && ./mini_bream_env.sh start gs --h0-boat --sim-viz"
 fi

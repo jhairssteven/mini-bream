@@ -1,5 +1,10 @@
 # Overlay for Pi→Jetson mock integration tests (no real motor commands).
 # Uses dedicated /mock/* sensor topics so real RTK on the Pi is not required.
+# Applied on top of h0_boat_overlay.yaml via --platform mock.
+
+platform:
+  name: mock_frontseat
+  profile: mock
 
 topics:
   gps: /mock/wamv/sensors/gps/gps/fix

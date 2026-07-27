@@ -1,0 +1,78 @@
+# ILOS + PID heading control on lemniscate (no MPC, no boat model).
+experiment_id: ILOS_PID
+
+platform:
+  name: template
+  profile: base
+
+frame_id: world
+control_rate_hz: 10.0
+
+control:
+  approach: ilos_pid
+
+feedback:
+  use_ground_truth_pose: false
+
+waypoints:
+  relative_to_start: true
+  trajectory:
+    type: lemniscate
+    scale_m: 7.0
+    num_points: 64
+
+path:
+  resample_step_m: 0.396
+  cruise_speed_mps: 0.25
+  closed: true
+  smooth_dubins: true
+  monotonic_progress: false
+
+dubins:
+  turning_radius_m: 5.71
+  step_size_m: 1.25
+
+ilos:
+  lookahead_min_m: 0.65
+  lookahead_max_m: 2.0
+  conv_rate: 10.0
+  gamma: 0.0
+  replan_dist_m: 26.0
+  replan_lookahead_m: 8.0
+  handover_offset: 1
+  no_of_laps: 50
+
+pid:
+  kp: 1.6
+  ki: 0.0
+  kd: 0.45
+  integral_limit: 0.15
+
+guidance:
+  max_yaw_rate_rad_s: 0.65
+  kappa_speed_scale: 2.5
+
+thrust:
+  yaw_mix_gain: 0.85
+  surge_gain: 1.0
+  min_surge_norm: 0.12
+
+speed:
+  angle_threshold_fast_rad: 0.12
+  angle_threshold_slow_rad: 0.45
+  min_speed_scale: 0.35
+
+topics:
+  ref_path: /molo_mpc/ref_path
+  pred_path: /molo_mpc/pred_path
+  traversed_path: /molo_mpc/traversed_path
+  vehicle_pose: /molo_mpc/vehicle_pose
+  cross_track_error: /molo_mpc/cross_track_error
+
+experiment:
+  warmup_s: 5.0
+  evaluate_s: 60.0
+  skip_initial_s: 5.0
+  target_rmse_m: 0.1
+  wait_for_gps_timeout_s: 30.0
+  wait_for_xte_timeout_s: 30.0

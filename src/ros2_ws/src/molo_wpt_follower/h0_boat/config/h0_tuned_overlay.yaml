@@ -1,0 +1,32 @@
+path:
+  cruise_speed_mps: 0.1623042214111495
+ilos:
+  lookahead_min_m: 1.3241619593773848
+  lookahead_max_m: 1.4741619593773847
+  conv_rate: 4.0779157919123845
+pid:
+  kp: 2.524484100625338
+  kd: 0.3179397917453207
+guidance:
+  max_yaw_rate_rad_s: 1.0460684764373531
+control:
+  approach: baseline_ilos_velocity
+  lateral_v_gain: 0.7025083989230246
+mpc:
+  mode: velocity
+  horizon: 20
+  Q_vel_diag:
+  - 11.787821150936585
+  - 10.809782054189823
+  - 89.99685644346789
+  R_diag:
+  - 0.06213219922029884
+  - 0.06213219922029884
+  Q_terminal_scale: 5.243781120373193
+tuning:
+  platform: blueboat_sim
+  target_rmse_m: 0.1
+  bo_best_rmse: 0.171848
+  validation_rmse: 0.190557
+  n_calls: 20
+  timestamp: '2026-07-27T20:02:20.969949+00:00'

@@ -1,0 +1,24 @@
+# MPC internal boat model for the BlueBoat catamaran (30 kg, T200 thrusters).
+# Mapped from blueboat_sim VRX hydrodynamics plugin (libSimpleHydrodynamics.so).
+# Used for sim tuning and as the nominal model for field tests on the real BlueBoat.
+
+boat:
+  mass_kg: 30.0
+  yaw_inertia_kgm2: 5.64
+  cg_x_m: -0.05
+  cg_y_m: 0.0
+  added_mass_surge_kg: 2.0
+  added_mass_sway_kg: 4.0
+  added_mass_yaw_kgm2: 0.5
+  added_mass_y_r_kgm: 0.8
+  added_mass_n_v_kgm: 1.0
+  damp_surge_Ns_per_m: 25.0
+  damp_sway_Ns_per_m: 25.0
+  damp_yaw_Nms_per_rad: 80.0
+  damp_surge_quad_Ns2_per_m2: 40.0
+  damp_sway_quad_Ns2_per_m2: 30.0
+  damp_yaw_quad_Nms2_per_rad2: 80.0
+  thruster_arm_m: 0.295
+  thruster_eff_left: 1.0
+  thruster_eff_right: 1.0
+  max_thrust_N: 100.0
