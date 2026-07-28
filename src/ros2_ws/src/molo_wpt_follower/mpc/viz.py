@@ -39,15 +39,15 @@ class MpcVisualizer:
             Path, t.get("traversed_path", "/molo_mpc/traversed_path"), 10
         )
 
-    def _hdr(self) -> Header:
+    def _hdr(self, stamp=None) -> Header:
         h = Header()
-        h.stamp = self.node.get_clock().now().to_msg()
+        h.stamp = stamp if stamp is not None else self.node.get_clock().now().to_msg()
         h.frame_id = self.frame_id
         return h
 
-    def publish_ref(self, path: Sequence[PathSample]) -> None:
+    def publish_ref(self, path: Sequence[PathSample], stamp=None) -> None:
         msg = Path()
-        msg.header = self._hdr()
+        msg.header = self._hdr(stamp)
         for p in path:
             ps = PoseStamped()
             ps.header = msg.header

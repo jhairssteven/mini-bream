@@ -39,7 +39,8 @@ from algorithms import (  # noqa: E402
     speed_from_heading_error,
 )
 from mpc import build_mission_path  # noqa: E402
-from path_reference import PathSample, closest_index, rotate_path_to_index  # noqa: E402
+from path_activation import PathActivationManager  # noqa: E402
+from path_reference import PathSample, closest_index  # noqa: E402
 from viz import MpcVisualizer  # noqa: E402
 
 
@@ -160,9 +161,16 @@ class IlosFollowerNode(Node):
         self._ilos: Optional[ILOSFollower] = None
         self._path_ready = False
         self._path_idx = 0
-        self._pending_origin = bool(config.get("waypoints", {}).get("relative_to_start", True))
         fb = config.get("feedback", {})
         self._use_gt_pose = bool(fb.get("use_ground_truth_pose", False))
+
+        self._path_activation = PathActivationManager(
+            self,
+            config,
+            self._on_path_ready,
+            build_mission_path,
+        )
+        self._pending_origin = self._path_activation.pending
 
         self._rate = float(config.get("control_rate_hz", 10.0))
         self.create_timer(1.0 / self._rate, self._control_loop)
@@ -181,8 +189,8 @@ class IlosFollowerNode(Node):
             self._psi = 0.0
         if not self._use_gt_pose:
             self._x, self._y = x, y
-        if self._pending_origin and not self._use_gt_pose and self._psi is not None:
-            self._try_activate_path((x, y))
+        if self._path_activation.pending and not self._use_gt_pose and self._psi is not None:
+            self._path_activation.notify_pose(x, y, self._psi)
 
     def _imu_cb(self, msg: Imu) -> None:
         self._psi = self._yaw_from_imu(msg)
@@ -197,19 +205,22 @@ class IlosFollowerNode(Node):
             q = msg.pose.pose.orientation
             _, _, yaw = euler_from_quaternion((q.x, q.y, q.z, q.w))
             self._psi = float(yaw)
-            if self._pending_origin:
-                self._try_activate_path((self._x, self._y))
+            if self._path_activation.pending:
+                self._path_activation.notify_pose(self._x, self._y, self._psi)
 
-    def _try_activate_path(self, origin_xy: Tuple[float, float]) -> None:
-        if not self._pending_origin:
-            return
-        self._activate_path(origin_xy)
-
-    def _activate_path(self, origin_xy: Tuple[float, float]) -> None:
-        self._path, self._path_closed = build_mission_path(self.cfg, origin_xy)
-        idx0 = closest_index(self._path, origin_xy[0], origin_xy[1])
-        self._path = rotate_path_to_index(self._path, idx0)
-        self._path_ready = len(self._path) > 2
+    def _on_path_ready(
+        self,
+        samples: List[PathSample],
+        closed: bool,
+        origin_xy: Tuple[float, float],
+        idx0: int,
+        viz_samples: List[PathSample] | None = None,
+    ) -> None:
+        soft_update = self._path_ready and self._ilos is not None
+        display_samples = viz_samples if viz_samples is not None else samples
+        self._path = samples
+        self._path_closed = closed
+        self._path_ready = len(self._path) >= 2
         self._pending_origin = False
         if self._log_path:
             origin_file = Path(self._log_path).parent / "origin.json"
@@ -220,13 +231,18 @@ class IlosFollowerNode(Node):
             ilos_kw["no_of_laps"] = max(ilos_kw.get("no_of_laps", 1), 50)
         points = [PathPoint(s.x, s.y, s.psi) for s in self._path]
         self._ilos = ILOSFollower(points, dubins_planner=self._dubins, **ilos_kw)
+        if soft_update and self._x is not None and self._y is not None:
+            idx0 = closest_index(self._path, self._x, self._y)
         self._ilos.work_index = idx0
         self._ilos.orig_index = idx0
-        self._heading_pid.reset()
+        if not soft_update:
+            self._heading_pid.reset()
         self._path_idx = idx0
-        self.viz.publish_ref(self._path)
+        stamp = self._path_activation._last_path_stamp
+        self.viz.publish_ref(display_samples, stamp=stamp)
+        action = "updated" if soft_update else "loaded"
         self.get_logger().info(
-            f"ILOS path loaded ({len(self._path)} samples, closed={self._path_closed})"
+            f"ILOS path {action} ({len(self._path)} samples, closed={self._path_closed})"
         )
 
     def _speed_scale(self, head_err: float, kappa: float) -> float:
@@ -310,6 +326,12 @@ class IlosFollowerNode(Node):
 
         self.viz.publish_pose(self._x, self._y, self._psi)
         self.viz.publish_xte(xte)
+        if self._path_ready and self._path:
+            stamp = self._path_activation._last_path_stamp
+            display = getattr(self._path_activation, "_viz_samples", None)
+            if display is None:
+                display = self._path
+            self.viz.publish_ref(display, stamp=stamp)
         self.viz.publish_traversed(self._x, self._y, self._psi, self._traj_step)
 
 

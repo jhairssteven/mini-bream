@@ -1,0 +1,12 @@
+{
+  "footprint_length_m": 1.2,
+  "footprint_width_m": 0.6,
+  "step_size_m": 0.5,
+  "rewire_radius_m": 2.0,
+  "goal_sample_rate": 0.2,
+  "goal_tolerance_m": 0.4,
+  "max_planning_time_s": 0.2,
+  "collision_samples": 6,
+  "start_yaw_mode": "free",
+  "goal_yaw_mode": "face_goal"
+}

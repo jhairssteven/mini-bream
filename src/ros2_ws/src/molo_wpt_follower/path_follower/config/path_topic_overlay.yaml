@@ -1,0 +1,28 @@
+# Overlay for following an external nav_msgs/Path (e.g. from molo_plan_v2).
+# Merge on top of any controller config (ilos_boat / h0_boat / mpc).
+
+frame_id: map
+
+waypoints:
+  relative_to_start: false
+  points: []
+
+path:
+  source: topic
+  reference_path_topic: /molo_mpc/reference_path
+  relative_to_start: false
+  replan_on_update: true
+  replan_min_interval_s: 0.0
+  replan_min_change_m: 0.0
+  transform_body_to_map: false
+  pass_through: true
+  trim_to_closest: true
+  skip_rotate_to_closest: true
+  resample_step_m: 0.25
+  cruise_speed_mps: 0.28
+  closed: false
+  smooth_dubins: false
+  monotonic_progress: true
+
+ilos:
+  no_of_laps: 1

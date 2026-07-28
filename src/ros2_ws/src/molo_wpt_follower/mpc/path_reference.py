@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 import math
+import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import List, Sequence, Tuple
 
 import numpy as np
+
+_PARENT = Path(__file__).resolve().parent.parent
+if str(_PARENT) not in sys.path:
+    sys.path.append(str(_PARENT))
 
 
 @dataclass
@@ -269,6 +275,103 @@ def signed_cross_track_error(path: Sequence[PathSample], x: float, y: float) -> 
     cross = dx * (y - ay) - dy * (x - ax)
     sign = 1.0 if cross >= 0.0 else -1.0
     return sign * cross_track_error(path, x, y)
+
+
+def _smooth_and_finish_samples(
+    samples: List[PathSample],
+    cfg: dict,
+    closed: bool,
+    cruise: float,
+) -> List[PathSample]:
+    """Optional Dubins smoothing, cruise speed, and curvature attachment."""
+    path_cfg = cfg.get("path", {})
+    step = float(path_cfg.get("resample_step_m", 0.5))
+    if path_cfg.get("smooth_dubins", True) and len(samples) >= 2:
+        from algorithms import DubinsPlanner, PathPoint
+
+        dubins_cfg = cfg.get("dubins", {})
+        planner = DubinsPlanner(
+            float(dubins_cfg.get("turning_radius_m", 4.0)),
+            float(dubins_cfg.get("step_size_m", step)),
+        )
+        pts = [PathPoint(s.x, s.y, s.psi) for s in samples]
+        if closed and len(pts) > 2:
+            pts.append(PathPoint(pts[0].x, pts[0].y, pts[0].heading))
+        smooth = planner.plan(pts)
+        if closed and len(smooth) > 1:
+            smooth = smooth[:-1]
+        samples = [PathSample(p.x, p.y, p.heading, cruise) for p in smooth]
+    for s in samples:
+        s.u_ref = cruise
+    attach_curvature(samples, closed)
+    return samples
+
+
+def samples_from_nav_path(
+    msg,
+    cfg: dict,
+    origin_xy: Tuple[float, float],
+) -> Tuple[List[PathSample], bool]:
+    """Convert ``nav_msgs/Path`` poses into ``PathSample`` list."""
+    path_cfg = cfg.get("path", {})
+    wp_cfg = cfg.get("waypoints", {})
+    relative = bool(
+        path_cfg.get("relative_to_start", wp_cfg.get("relative_to_start", False))
+    )
+    step = float(path_cfg.get("resample_step_m", 0.5))
+    cruise = float(path_cfg.get("cruise_speed_mps", 0.45))
+    closed = bool(path_cfg.get("closed", False))
+
+    if path_cfg.get("pass_through", False):
+        raw_pts: List[Tuple[float, float]] = []
+        for ps in msg.poses:
+            x = float(ps.pose.position.x)
+            y = float(ps.pose.position.y)
+            if relative:
+                x += origin_xy[0]
+                y += origin_xy[1]
+            raw_pts.append((x, y))
+        if len(raw_pts) < 2:
+            return [], closed
+        samples: List[PathSample] = []
+        for i, (x, y) in enumerate(raw_pts):
+            if i < len(raw_pts) - 1:
+                dx = raw_pts[i + 1][0] - x
+                dy = raw_pts[i + 1][1] - y
+                psi = math.atan2(dy, dx)
+            elif samples:
+                psi = samples[-1].psi
+            else:
+                psi = 0.0
+            samples.append(PathSample(x, y, psi, cruise))
+        attach_curvature(samples, closed)
+        return samples, closed
+
+    raw: List[Tuple[float, float]] = []
+    for ps in msg.poses:
+        x = float(ps.pose.position.x)
+        y = float(ps.pose.position.y)
+        if relative:
+            x += origin_xy[0]
+            y += origin_xy[1]
+        raw.append((x, y))
+
+    if len(raw) < 2:
+        return [], closed
+
+    if (
+        not closed
+        and len(raw) >= 3
+        and math.hypot(raw[0][0] - raw[-1][0], raw[0][1] - raw[-1][1]) < step * 0.5
+    ):
+        closed = True
+        raw = raw[:-1]
+
+    samples = resample_polyline(raw, step, closed=closed)
+    if not samples:
+        return [], closed
+    finished = _smooth_and_finish_samples(samples, cfg, closed, cruise)
+    return finished, closed
 
 
 def horizon_reference(

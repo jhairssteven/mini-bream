@@ -28,8 +28,10 @@ if str(MPC_DIR) not in sys.path:
 
 from boat_model import BoatParameters
 from control_law import ControlLaw
+from path_activation import PathActivationManager
 from path_reference import (
     PathSample,
+    _smooth_and_finish_samples,
     attach_curvature,
     closest_index,
     generate_raw_points,
@@ -76,23 +78,8 @@ def build_mission_path(cfg: dict, origin_xy: Tuple[float, float]) -> Tuple[List[
 
     raw = [(origin_xy[0] + x, origin_xy[1] + y) for x, y in raw]
     samples = resample_polyline(raw, step, closed=closed)
-    if path_cfg.get("smooth_dubins", True):
-        dubins_cfg = cfg.get("dubins", {})
-        planner = DubinsPlanner(
-            float(dubins_cfg.get("turning_radius_m", 4.0)),
-            float(dubins_cfg.get("step_size_m", step)),
-        )
-        pts = [PathPoint(s.x, s.y, s.psi) for s in samples]
-        if closed and len(pts) > 2:
-            pts.append(PathPoint(pts[0].x, pts[0].y, pts[0].heading))
-        smooth = planner.plan(pts)
-        if closed and len(smooth) > 1:
-            smooth = smooth[:-1]
-        samples = [PathSample(p.x, p.y, p.heading, cruise) for p in smooth]
-    for s in samples:
-        s.u_ref = cruise
-    attach_curvature(samples, closed)
-    return samples, closed
+    finished = _smooth_and_finish_samples(samples, cfg, closed, cruise)
+    return finished, closed
 
 
 def path_to_ilos_points(samples: List[PathSample]) -> List[PathPoint]:
@@ -226,9 +213,16 @@ class MpcFollowerNode(Node):
         self._path: List[PathSample] = []
         self._ilos: Optional[ILOSFollower] = None
         self._path_ready = False
-        self._pending_origin = bool(config.get("waypoints", {}).get("relative_to_start", True))
         fb = config.get("feedback", {})
         self._use_gt_pose = bool(fb.get("use_ground_truth_pose", False))
+
+        self._path_activation = PathActivationManager(
+            self,
+            config,
+            self._on_path_ready,
+            build_mission_path,
+        )
+        self._pending_origin = self._path_activation.pending
 
         self._rate = float(config.get("control_rate_hz", 10.0))
         self.create_timer(1.0 / self._rate, self._control_loop)
@@ -250,8 +244,8 @@ class MpcFollowerNode(Node):
             self._psi = 0.0
         if not self._use_gt_pose:
             self._x, self._y = x, y
-        if self._pending_origin and not self._use_gt_pose and self._psi is not None:
-            self._try_activate_path((x, y))
+        if self._path_activation.pending and not self._use_gt_pose and self._psi is not None:
+            self._path_activation.notify_pose(x, y, self._psi)
 
     def _imu_cb(self, msg: Imu) -> None:
         self._psi = self._yaw_from_imu(msg)
@@ -266,19 +260,21 @@ class MpcFollowerNode(Node):
             q = msg.pose.pose.orientation
             _, _, yaw = euler_from_quaternion((q.x, q.y, q.z, q.w))
             self._psi = float(yaw)
-            if self._pending_origin:
-                self._try_activate_path((self._x, self._y))
+            if self._path_activation.pending:
+                self._path_activation.notify_pose(self._x, self._y, self._psi)
 
-    def _try_activate_path(self, origin_xy: Tuple[float, float]) -> None:
-        if not self._pending_origin:
-            return
-        self._activate_path(origin_xy)
-
-    def _activate_path(self, origin_xy: Tuple[float, float]) -> None:
-        self._path, self._path_closed = build_mission_path(self.cfg, origin_xy)
-        idx0 = closest_index(self._path, origin_xy[0], origin_xy[1])
-        self._path = rotate_path_to_index(self._path, idx0)
-        self._path_ready = len(self._path) > 2
+    def _on_path_ready(
+        self,
+        samples: List[PathSample],
+        closed: bool,
+        origin_xy: Tuple[float, float],
+        idx0: int,
+        viz_samples: List[PathSample] | None = None,
+    ) -> None:
+        display = viz_samples if viz_samples is not None else samples
+        self._path = samples
+        self._path_closed = closed
+        self._path_ready = len(self._path) >= 2
         self._pending_origin = False
         if self._log_path:
             origin_file = Path(self._log_path).parent / "origin.json"
@@ -398,6 +394,8 @@ class MpcFollowerNode(Node):
 
         self.viz.publish_pose(self._x, self._y, self._psi)
         self.viz.publish_xte(xte)
+        if self._path_ready and self._path:
+            self.viz.publish_ref(self._path)
         self.viz.publish_traversed(self._x, self._y, self._psi, self._traj_step)
         if pred is not None and len(pred) > 1 and self._path:
             if pred.shape[1] >= 3:

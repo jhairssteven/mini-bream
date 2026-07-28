@@ -1,6 +1,18 @@
 from setuptools import find_packages, setup
 from glob import glob
+from pathlib import Path
+
 package_name = 'mission_planner'
+_config_root = Path(__file__).parent / "config"
+_config_data_files = []
+if _config_root.is_dir():
+    for _cfg_file in _config_root.rglob("*"):
+        if _cfg_file.is_file():
+            _rel_parent = _cfg_file.parent.relative_to(_config_root)
+            _dest = f"share/{package_name}/config"
+            if str(_rel_parent) != ".":
+                _dest = f"{_dest}/{_rel_parent}"
+            _config_data_files.append((_dest, [str(_cfg_file)]))
 
 setup(
     name=package_name,
@@ -20,8 +32,9 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name, glob('launch/*.launch.py')),
-        ('share/' + package_name + '/missions', glob('missions/*.csv'))
-    ],
+        ('share/' + package_name, glob('launch/*.py')),
+        ('share/' + package_name + '/missions', glob('missions/*.csv')),
+    ] + _config_data_files,
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='Steven Gallego',

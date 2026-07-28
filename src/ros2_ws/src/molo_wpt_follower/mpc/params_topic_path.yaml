@@ -19,6 +19,8 @@ waypoints:
 path:
   source: topic
   reference_path_topic: /molo_mpc/reference_path
+  relative_to_start: false
+  replan_on_update: true
   resample_step_m: 0.35
   cruise_speed_mps: 0.28
   closed: false

@@ -1,0 +1,14 @@
+{
+  "world_frame": "map",
+  "parent_frame_aliases": ["world", "odom"],
+  "broadcast_odom_tf": true,
+  "odometry_topic": "/molo_boat/estimated_odometry",
+  "static_transforms": [
+    {
+      "parent": "base_link",
+      "child": "blueboat/blueboat/base_link",
+      "translation": [0.0, 0.0, 0.0],
+      "rotation_rpy": [0.0, 0.0, 0.0]
+    }
+  ]
+}

@@ -6,6 +6,7 @@ platform:
 
 sim_enable: true
 use_sim_time: true
+frame_id: map
 
 feedback:
   use_ground_truth_pose: true
@@ -27,7 +28,7 @@ boat_bridge:
 viz:
   pose_topic: /molo_mpc/vehicle_pose
   recent_poses_topic: /molo_h0/recent_poses
-  frame_id: world
+  frame_id: map
   max_recent_poses: 40
 
 experiment:

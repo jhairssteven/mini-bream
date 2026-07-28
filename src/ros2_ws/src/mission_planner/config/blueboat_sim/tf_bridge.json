@@ -1,0 +1,20 @@
+{
+  "world_frame": "map",
+  "broadcast_odom_tf": false,
+  "map_world_aliases": [
+    "open_water_harner",
+    "open_water",
+    "lidar_obstacle_course_harner",
+    "lidar_obstacle_course",
+    "world"
+  ],
+  "odometry_topic": "/blueboat/sensors/position/ground_truth_odometry",
+  "static_transforms": [
+    {
+      "parent": "blueboat/base_link",
+      "child": "blueboat",
+      "translation": [0.0, 0.0, 0.0],
+      "rotation_rpy": [0.0, 0.0, 0.0]
+    }
+  ]
+}

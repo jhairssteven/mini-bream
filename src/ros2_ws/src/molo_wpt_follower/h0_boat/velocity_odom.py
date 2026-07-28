@@ -124,7 +124,8 @@ def main() -> None:
     parser.add_argument("--odom-topic", default="/molo_boat/estimated_odometry")
     parser.add_argument("--origin-lat", type=float, required=True)
     parser.add_argument("--origin-lon", type=float, required=True)
-    parser.add_argument("--frame-id", default="world")
+    parser.add_argument("--frame-id", default="map")
+    parser.add_argument("--child-frame-id", default="base_link")
     parser.add_argument("--window-s", type=float, default=0.4)
     args = parser.parse_args()
 
@@ -136,6 +137,7 @@ def main() -> None:
         args.origin_lat,
         args.origin_lon,
         frame_id=args.frame_id,
+        child_frame_id=args.child_frame_id,
         window_s=args.window_s,
     )
     try:

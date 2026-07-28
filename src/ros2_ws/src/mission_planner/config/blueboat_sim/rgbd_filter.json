@@ -1,0 +1,26 @@
+{
+  "image_topic": "/zed/zed/rgb/color/rect/image",
+  "camera_info_topic": "/zed/zed/rgb/color/rect/camera_info",
+  "pointcloud_topic": "/rslidar_points",
+  "output_topic": "/molo/local/lidar_sem_filtered",
+
+  "association_mode": "latest_message",
+  "latest_message_trigger": "pointcloud",
+
+  "mask_provider_module": "mask_provider_mock.py",
+  "mask_provider_class": "MockBottomBandMaskProvider",
+  "mask_provider_kwargs": {
+    "fraction": 0.0
+  },
+
+  "image_use_sensor_data_qos": true,
+  "camera_info_use_sensor_data_qos": true,
+  "pointcloud_use_sensor_data_qos": true,
+
+  "invert_mask": false,
+  "keep_unprojectable_points": true,
+  "drop_nan_points": true,
+
+  "save_snapshots_dir": "",
+  "save_snapshots_every_n_messages": 0
+}

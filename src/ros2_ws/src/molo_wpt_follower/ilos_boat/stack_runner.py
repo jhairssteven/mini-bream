@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import signal
 import sys
 import threading
@@ -43,7 +44,11 @@ def main() -> None:
     viz = cfg.get("viz", {})
 
     init_args = []
-    if cfg.get("use_sim_time"):
+    if cfg.get("use_sim_time") or os.environ.get("MOLO_USE_SIM_TIME", "").lower() in (
+        "1",
+        "true",
+        "yes",
+    ):
         init_args = ["--ros-args", "-p", "use_sim_time:=true"]
     rclpy.init(args=init_args if init_args else None)
     executor = MultiThreadedExecutor(num_threads=6)
