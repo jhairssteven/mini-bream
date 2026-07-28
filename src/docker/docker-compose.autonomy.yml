@@ -1,0 +1,37 @@
+name: mini-bream-autonomy
+
+# Planning / control experiments (H0 MPC, ILOS+PID, future autonomy nodes).
+# Runs on Jetson in the field, or on the dev machine with the same workflow.
+#
+#   docker compose -f docker-compose.autonomy.yml up -d --build autonomy
+#   ./mini_bream_env.sh start autonomy
+#
+# Prerequisites:
+#   sim  → blueboat_sim (mini_bream_simulation) for --platform sim
+#   real → Pi frontseat + thrust_bridge for sensors / PWM
+
+services:
+  autonomy:
+    container_name: mini_bream_autonomy
+    image: mini-bream:autonomy
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.autonomy
+    network_mode: host
+    init: true
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - CYCLONEDDS_URI=${AUTONOMY_CYCLONEDDS_URI:-}
+    volumes:
+      - ../ros2_ws:/workspace/ros2_ws
+      - ../vrx_ws:/workspace/vrx_ws
+      - ../field_tests:/workspace/field_tests
+      - ../docker:/workspace/docker:ro
+      - ../docker/cyclonedds.xml:/etc/cyclonedds.xml:ro
+      - ../docker/cyclonedds.jetson.xml:/etc/cyclonedds.jetson.xml:ro
+    working_dir: /workspace/ros2_ws
+    stdin_open: true
+    tty: true
+    command: ["bash", "/start_autonomy.sh"]

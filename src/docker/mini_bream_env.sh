@@ -9,6 +9,7 @@
 #   ./mini_bream_env.sh start gs --h0-boat --sim-viz  # same + use_sim_time (Gazebo sim)
 #   ./mini_bream_env.sh stop pi               # remove Pi containers (compose down -v)
 #   ./mini_bream_env.sh stop jetson           # remove perception
+#   ./mini_bream_env.sh start autonomy       # Jetson/dev: H0 + ILOS + planning stack
 #   ./mini_bream_env.sh start sim            # BlueBoat Gazebo simulation (HAL)
 #   ./mini_bream_env.sh stop sim             # remove simulation container
 #
@@ -34,6 +35,7 @@ cd "${SCRIPT_DIR}"
 COMPOSE_FRONTSEAT="docker-compose.frontseat.yml"
 COMPOSE_GROUND="docker-compose.ground.yml"
 COMPOSE_SIMULATION="docker-compose.simulation.yml"
+COMPOSE_AUTONOMY="docker-compose.autonomy.yml"
 COMPOSE_TELEMETRY="docker-compose.ground.telemetry.yaml"
 
 LIDAR_NET_SCRIPT="../ros2_ws/src/frontseat/config/rslidar_airy/setup_network.sh"
@@ -61,7 +63,7 @@ die() { echo "[mini-bream] ERROR: $*" >&2; exit 1; }
 normalize_role() {
   case "$1" in
     ground|ground-station) echo gs ;;
-    pi|jetson|gs|sim) echo "$1" ;;
+    pi|jetson|gs|sim|autonomy) echo "$1" ;;
     *) return 1 ;;
   esac
 }
@@ -150,8 +152,8 @@ start_pi() {
     log "PWM dry_run enabled (no motor output)"
   fi
 
-  log "Bringing up pwm_daemon + radio_rx (detached)..."
-  compose -f "${COMPOSE_FRONTSEAT}" up -d $(build_flag) pwm_daemon radio_rx
+  log "Bringing up pwm_daemon + radio_rx + thrust_bridge (detached)..."
+  compose -f "${COMPOSE_FRONTSEAT}" up -d $(build_flag) pwm_daemon radio_rx thrust_bridge
 
   log "Starting frontseat..."
   if [[ "${DETACH_FRONTSEAT}" -eq 1 ]]; then
@@ -166,7 +168,7 @@ start_pi() {
 stop_pi() {
   need_docker
   log "Tearing down Pi stack..."
-  teardown_services "${COMPOSE_FRONTSEAT}" frontseat radio_rx pwm_daemon
+  teardown_services "${COMPOSE_FRONTSEAT}" frontseat radio_rx pwm_daemon thrust_bridge
   log "Pi stack removed"
 }
 
@@ -242,6 +244,21 @@ stop_sim() {
   log "Simulation removed"
 }
 
+start_autonomy() {
+  need_docker
+  log "Starting autonomy stack (ROS_DOMAIN_ID=${ROS_DOMAIN_ID})..."
+  compose -f "${COMPOSE_AUTONOMY}" up -d $(build_flag) autonomy
+  log "Autonomy started (attach: docker exec -it mini_bream_autonomy bash)"
+  log "Experiments: h0_boat/run_real_boat.sh or ilos_boat/run_real_boat.sh"
+}
+
+stop_autonomy() {
+  need_docker
+  log "Tearing down autonomy..."
+  teardown_services "${COMPOSE_AUTONOMY}" autonomy
+  log "Autonomy removed"
+}
+
 run_action() {
   case "${ACTION}:${ROLE}" in
     start:pi) start_pi ;;
@@ -252,6 +269,8 @@ run_action() {
     stop:gs) stop_gs ;;
     start:sim) start_sim ;;
     stop:sim) stop_sim ;;
+    start:autonomy) start_autonomy ;;
+    stop:autonomy) stop_autonomy ;;
     *) die "unknown action/role: ${ACTION} ${ROLE}" ;;
   esac
 }
@@ -263,7 +282,7 @@ while [[ $# -gt 0 ]]; do
       [[ -z "${ACTION}" ]] || die "action already set: ${ACTION}"
       ACTION="$1"
       ;;
-    pi|jetson|gs|sim|ground|ground-station)
+    pi|jetson|gs|sim|autonomy|ground|ground-station)
       [[ -z "${ROLE}" ]] || die "role already set: ${ROLE}"
       ROLE="$(normalize_role "$1")" || die "unknown role: $1"
       ;;
@@ -280,7 +299,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -n "${ACTION}" ]] || usage 1
-[[ -n "${ROLE}" ]] || die "missing role (pi, jetson, gs, or sim)"
+[[ -n "${ROLE}" ]] || die "missing role (pi, jetson, gs, sim, or autonomy)"
 
 if [[ "${ACTION}" == stop ]]; then
   if [[ "${BUILD}" -eq 1 || "${DRY_RUN}" -eq 1 || "${NO_TELEMETRY}" -eq 1 || "${DETACH_FRONTSEAT}" -eq 1 ]]; then

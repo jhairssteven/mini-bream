@@ -61,6 +61,24 @@ services:
         --port ${RADIO_SERIAL_PORT:-/dev/serial/by-id/usb-FTDI_FT231X_USB_UART_D30GKEF6-if00-port0}
         --baud ${RADIO_BAUD:-57600}
 
+  thrust_bridge:
+    container_name: mini_bream_thrust_bridge
+    image: mini-bream:frontseat
+    network_mode: host
+    init: true
+    restart: unless-stopped
+    depends_on:
+      - pwm_daemon
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - CYCLONEDDS_URI=file:///etc/cyclonedds.xml
+    volumes:
+      - ../ros2_ws:/workspace/ros2_ws
+      - ../docker:/workspace/docker:ro
+      - ../docker/cyclonedds.xml:/etc/cyclonedds.xml:ro
+    command: ["bash", "/workspace/docker/start_thrust_bridge.sh"]
+
   frontseat:
     container_name: mini_bream_frontseat
     image: mini-bream:frontseat

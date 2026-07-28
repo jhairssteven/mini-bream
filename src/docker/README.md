@@ -48,6 +48,8 @@ flowchart LR
 - `Dockerfile.teleop` builds `mini-bream:teleop` (`radio_rx`, `pwm_daemon` on the Pi).
 - `Dockerfile.frontseat` builds `mini-bream:frontseat` (Pi: motor control + RTK).
 - `Dockerfile.perception` builds `mini-bream:perception` (Jetson: RoboSense Airy + ZED 2i).
+- `Dockerfile.autonomy` builds `mini-bream:autonomy` (Jetson/dev: H0 MPC, ILOS+PID, planning experiments).
+- `Dockerfile.simulation` builds `mini-bream:simulation` (BlueBoat Gazebo HAL).
 
 ## Compose files
 
@@ -55,7 +57,9 @@ flowchart LR
 |--------------|------|----------|
 | `docker-compose.ground.telemetry.yaml` | Ground PC | `telemetry_tx` (emergency teleop radio) |
 | `docker-compose.ground.yml` | Ground PC (`.103`) | `ground_station` (RViz2) |
-| `docker-compose.frontseat.yml` | Pi / Jetson | Pi: `pwm_daemon`, `radio_rx`, `frontseat` · Jetson: `perception` |
+| `docker-compose.frontseat.yml` | Pi / Jetson | Pi: `pwm_daemon`, `radio_rx`, `thrust_bridge`, `frontseat` · Jetson: `perception` |
+| `docker-compose.autonomy.yml` | Jetson / dev PC | `autonomy` (H0 + ILOS experiments) |
+| `docker-compose.simulation.yml` | Dev PC | `simulation` (BlueBoat Gazebo) |
 
 ## Motor command priority
 
@@ -73,13 +77,58 @@ Use the role launcher (recommended):
 cd src/docker
 chmod +x mini_bream_env.sh
 
-./mini_bream_env.sh start pi       # pwm_daemon + radio_rx + frontseat
+./mini_bream_env.sh start pi       # pwm_daemon + radio_rx + thrust_bridge + frontseat
 ./mini_bream_env.sh start jetson   # LiDAR network + perception
 ./mini_bream_env.sh start gs       # telemetry_tx + RViz ground_station
+./mini_bream_env.sh start autonomy # H0 + ILOS experiment runner (Jetson or dev)
+./mini_bream_env.sh start sim      # BlueBoat Gazebo simulation
 
 ./mini_bream_env.sh stop pi        # remove Pi containers (compose down -v)
 ./mini_bream_env.sh stop jetson    # remove perception
 ./mini_bream_env.sh stop gs        # remove ground_station + telemetry_tx
+./mini_bream_env.sh stop autonomy  # remove autonomy container
+./mini_bream_env.sh stop sim       # remove simulation container
+```
+
+### Autonomy experiments (H0 + ILOS)
+
+All planning/control experiments run in `mini_bream_autonomy`. Python deps (dubins, osqp, scipy, scikit-optimize) are baked into the image at build time — no `pip install` during field tests.
+
+**Simulation (dev laptop):**
+
+```bash
+cd src/docker
+./mini_bream_env.sh start sim              # terminal 1: Gazebo
+./mini_bream_env.sh start autonomy --build # terminal 2: experiment runner
+
+cd ../ros2_ws/src/molo_wpt_follower/ilos_boat
+./run_real_boat.sh --platform sim
+
+# Optional RViz overlays:
+./mini_bream_env.sh start gs --h0-boat --sim-viz
+```
+
+**Field (Jetson + Pi):**
+
+```bash
+# On Pi:
+./mini_bream_env.sh start pi               # sensors + thrust_bridge (PWM)
+
+# On Jetson (or dev machine on robot LAN):
+./mini_bream_env.sh start autonomy --build
+cd ../ros2_ws/src/molo_wpt_follower/h0_boat
+./run_real_boat.sh --platform real
+```
+
+Field runs auto-apply `config/autonomy_overlay.yaml` (`thrust_bridge_enabled: false`); thrust conversion stays on the Pi via `mini_bream_thrust_bridge`.
+
+On Jetson, set `AUTONOMY_CYCLONEDDS_URI=file:///etc/cyclonedds.jetson.xml` if auto-detection does not pick the robot LAN. On a dev laptop (no `eth0`), DDS uses all interfaces automatically.
+
+Smoke-test the pipeline:
+
+```bash
+cd src/docker
+./test_autonomy_pipeline.sh
 ```
 
 Start options: `--build`, `--dry-run` (Pi PWM safe mode), `--no-telemetry` (GS RViz only), `--detach-frontseat`.

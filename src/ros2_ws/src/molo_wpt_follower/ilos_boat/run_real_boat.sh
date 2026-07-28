@@ -2,6 +2,7 @@
 # ILOS+PID lemniscate experiment launcher (all platforms).
 #
 # Pure ILOS heading + PID yaw rate + differential thrust (no MPC).
+# Algorithms run in mini_bream_autonomy (Jetson field + dev machine).
 #
 # Examples:
 #   ./run_real_boat.sh --platform sim
@@ -33,10 +34,12 @@ usage() {
   cat <<'EOF'
 Usage: ./run_real_boat.sh [options] [-- extra run_ilos_experiment.py args]
 
-Run the ILOS+PID lemniscate experiment (no MPC). Start the platform stack first:
+Run the ILOS+PID lemniscate experiment (no MPC). Start stacks first:
 
-  --platform sim    blueboat_sim: cd src/docker && ./mini_bream_env.sh start sim
-  --platform real   frontseat:   cd src/docker && ./mini_bream_env.sh start pi
+  --platform sim    sim + autonomy: cd src/docker && ./mini_bream_env.sh start sim
+                    (other terminal) ./mini_bream_env.sh start autonomy --build
+  --platform real   pi + autonomy: ./mini_bream_env.sh start pi
+                    (Jetson/dev)    ./mini_bream_env.sh start autonomy
   --platform bench  frontseat, motors idle (same as --bench)
 
 Options:
@@ -56,22 +59,9 @@ EOF
 log() { echo "[ilos-boat] $*"; }
 die() { echo "[ilos-boat] ERROR: $*" >&2; exit 1; }
 
-check_deps() {
-  local container="$1"
-  local rebuild_hint="$2"
-  if ! docker exec "${container}" python3 -c \
-      'import dubins, scipy, matplotlib, utm, transforms3d' 2>/dev/null; then
-    die "Python deps missing in ${container}. Rebuild the image:\n  ${rebuild_hint}"
-  fi
-}
-
-check_tune_deps() {
-  local container="$1"
-  check_deps "$@"
-  if ! docker exec "${container}" python3 -c 'import skopt' 2>/dev/null; then
-    die "scikit-optimize missing in ${container}. Install with:\n  docker exec ${container} pip3 install 'numpy<2' scikit-optimize"
-  fi
-}
+# shellcheck source=../../../../docker/experiment_common.sh
+source "${REPO_ROOT}/docker/experiment_common.sh"
+AUTONOMY_REBUILD_HINT="$(autonomy_rebuild_hint)"
 
 ros_topic_ready() {
   local topic="$1"
@@ -94,14 +84,9 @@ ros_topic_ready() {
 }
 
 run_in_container() {
-  local container="$1"
-  shift
-  docker exec "${container}" /workspace/docker/start_ilos_boat.sh "$@"
-}
-
-run_locally() {
-  cd "${SCRIPT_DIR}"
-  ./run_ilos_boat.sh "$@"
+  shift  # legacy: first arg was container name
+  require_autonomy_container
+  docker exec "${AUTONOMY_CONTAINER}" /workspace/docker/start_ilos_boat.sh "$@"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -163,39 +148,31 @@ if [[ "${TUNE}" -eq 1 ]]; then
   TUNE_CMD+=("${EXTRA_ARGS[@]}")
 
   if [[ "${PLATFORM}" == "sim" ]]; then
-    if docker ps --format '{{.Names}}' | grep -qx mini_bream_simulation; then
-      log "Running ILOS Bayesian tuning in mini_bream_simulation..."
-      check_tune_deps mini_bream_simulation \
-        "cd ${REPO_ROOT}/docker && docker compose -f docker-compose.simulation.yml build simulation"
-      CONTAINER_TUNE_OUT="/workspace/ros2_ws/src/molo_wpt_follower/ilos_boat/results/$(basename "${TUNE_OUT}")"
-      docker exec mini_bream_simulation mkdir -p "$(dirname "${CONTAINER_TUNE_OUT}")"
-      docker exec mini_bream_simulation bash -lc \
-        "source /opt/ros/humble/setup.bash && source /workspace/ros2_ws/install/setup.bash && \
-         python3 /workspace/ros2_ws/src/molo_wpt_follower/ilos_boat/tune_ilos.py \
-         --platform sim --out ${CONTAINER_TUNE_OUT} \
-         ${TUNE_ARGS[*]+"${TUNE_ARGS[*]}"} \
-         ${INSTALL_TUNED:+--install} \
-         ${EXTRA_ARGS[*]+"${EXTRA_ARGS[*]}"}"
-      TUNE_OUT="${SCRIPT_DIR}/results/$(basename "${TUNE_OUT}")"
-    elif command -v python3 >/dev/null 2>&1; then
-      log "Running ILOS Bayesian tuning locally..."
-      cd "${SCRIPT_DIR}"
-      ./run_ilos_boat.sh "${TUNE_CMD[@]}"
-    else
-      die "no environment for tuning. Start sim: cd ${REPO_ROOT}/docker && ./mini_bream_env.sh start sim"
-    fi
-  else
-    if ! docker ps --format '{{.Names}}' | grep -qx mini_bream_frontseat; then
-      die "mini_bream_frontseat not running. Start with: cd ${REPO_ROOT}/docker && ./mini_bream_env.sh start pi"
-    fi
-    check_tune_deps mini_bream_frontseat \
-      "cd ${REPO_ROOT}/docker && docker compose -f docker-compose.frontseat.yml build frontseat"
+    container_running "${SIM_CONTAINER}" || die "mini_bream_simulation not running. Start: cd ${REPO_ROOT}/docker && ./mini_bream_env.sh start sim"
+    require_autonomy_container
+    log "Running ILOS Bayesian tuning in ${AUTONOMY_CONTAINER}..."
+    check_ilos_tune_deps "${AUTONOMY_CONTAINER}" "${AUTONOMY_REBUILD_HINT}"
     CONTAINER_TUNE_OUT="/workspace/ros2_ws/src/molo_wpt_follower/ilos_boat/results/$(basename "${TUNE_OUT}")"
-    log "Running ILOS field tuning in mini_bream_frontseat..."
-    docker exec mini_bream_frontseat bash -lc \
-      "source /opt/ros/humble/setup.bash && source /workspace/ros2_ws/install/setup.bash && \
+    docker exec "${AUTONOMY_CONTAINER}" mkdir -p "$(dirname "${CONTAINER_TUNE_OUT}")"
+    docker exec "${AUTONOMY_CONTAINER}" bash -lc \
+      "source /opt/ros/humble/setup.bash && source /workspace/ros2_ws/install/setup.bash 2>/dev/null; \
+       python3 /workspace/ros2_ws/src/molo_wpt_follower/ilos_boat/tune_ilos.py \
+       --platform sim --out ${CONTAINER_TUNE_OUT} \
+       ${TUNE_ARGS[*]+"${TUNE_ARGS[*]}"} \
+       ${INSTALL_TUNED:+--install} \
+       ${EXTRA_ARGS[*]+"${EXTRA_ARGS[*]}"}"
+    TUNE_OUT="${SCRIPT_DIR}/results/$(basename "${TUNE_OUT}")"
+  else
+    container_running "${FRONTSEAT_CONTAINER}" || die "mini_bream_frontseat not running. Start: cd ${REPO_ROOT}/docker && ./mini_bream_env.sh start pi"
+    require_autonomy_container
+    check_ilos_tune_deps "${AUTONOMY_CONTAINER}" "${AUTONOMY_REBUILD_HINT}"
+    CONTAINER_TUNE_OUT="/workspace/ros2_ws/src/molo_wpt_follower/ilos_boat/results/$(basename "${TUNE_OUT}")"
+    log "Running ILOS field tuning in ${AUTONOMY_CONTAINER}..."
+    docker exec "${AUTONOMY_CONTAINER}" bash -lc \
+      "source /opt/ros/humble/setup.bash && source /workspace/ros2_ws/install/setup.bash 2>/dev/null; \
        python3 /workspace/ros2_ws/src/molo_wpt_follower/ilos_boat/tune_ilos.py \
        --platform ${PLATFORM} --out ${CONTAINER_TUNE_OUT} \
+       --overlay ${AUTONOMY_OVERLAY} \
        ${TUNE_ARGS[*]+"${TUNE_ARGS[*]}"} \
        ${INSTALL_TUNED:+--install} \
        ${EXTRA_ARGS[*]+"${EXTRA_ARGS[*]}"}"
@@ -220,26 +197,14 @@ RUN_ARGS+=("${EXTRA_ARGS[@]}")
 
 if [[ "${PLATFORM}" == "sim" ]]; then
   GPS_TOPIC="/blueboat/sensors/gps/gps/fix"
-  RUN_CONTAINER=""
-  if docker ps --format '{{.Names}}' | grep -qx mini_bream_simulation; then
-    RUN_CONTAINER="mini_bream_simulation"
-    log "Using mini_bream_simulation container"
-    check_deps mini_bream_simulation \
-      "cd ${REPO_ROOT}/docker && docker compose -f docker-compose.simulation.yml build simulation"
-  elif command -v ros2 >/dev/null 2>&1; then
-    log "Running experiment on host (sim must be publishing ${GPS_TOPIC})"
-  else
-    die "no ROS environment found. Start sim first:\n  cd ${REPO_ROOT}/docker && ./mini_bream_env.sh start sim"
-  fi
+  container_running "${SIM_CONTAINER}" || die "mini_bream_simulation not running. Start: cd ${REPO_ROOT}/docker && ./mini_bream_env.sh start sim"
+  require_autonomy_container
+  log "Using ${AUTONOMY_CONTAINER} (sim: ${SIM_CONTAINER})"
+  check_ilos_deps "${AUTONOMY_CONTAINER}" "${AUTONOMY_REBUILD_HINT}"
 
   log "Checking GPS on ${GPS_TOPIC}..."
-  if [[ -n "${RUN_CONTAINER}" ]]; then
-    ros_topic_ready "${GPS_TOPIC}" 20 "${RUN_CONTAINER}" \
-      || die "no GPS on ${GPS_TOPIC}. Start sim:\n  cd ${REPO_ROOT}/docker && ./mini_bream_env.sh start sim"
-  else
-    ros_topic_ready "${GPS_TOPIC}" 20 \
-      || die "no GPS on ${GPS_TOPIC}. Start sim:\n  ros2 launch blueboat_sim open_water.launch.py headless:=True"
-  fi
+  ros_topic_ready "${GPS_TOPIC}" 20 "${SIM_CONTAINER}" \
+    || die "no GPS on ${GPS_TOPIC}. Start sim: cd ${REPO_ROOT}/docker && ./mini_bream_env.sh start sim"
 
   if [[ "${SMOKE}" -eq 1 ]]; then
     RUN_ARGS+=(--warmup 5 --duration 20 --skip-initial 5)
@@ -249,40 +214,29 @@ if [[ "${PLATFORM}" == "sim" ]]; then
   log "Output (host): ${OUT_DIR}"
   log "RViz (other terminal, while experiment runs):"
   log "  cd ${REPO_ROOT}/docker && ./mini_bream_env.sh start gs --h0-boat --sim-viz"
-  if [[ -n "${RUN_CONTAINER}" ]]; then
-    log "Running experiment in ${RUN_CONTAINER}..."
-    run_in_container "${RUN_CONTAINER}" "${RUN_ARGS[@]}"
-  else
-    HOST_OUT="${OUT_DIR}"
-    LOCAL_ARGS=(--platform sim --out "${HOST_OUT}")
-    [[ "${DRY_RUN}" -eq 1 ]] && LOCAL_ARGS+=(--dry-run)
-    [[ "${NO_PLOT}" -eq 1 ]] && LOCAL_ARGS+=(--no-plot)
-    LOCAL_ARGS+=("${EXTRA_ARGS[@]}")
-    [[ "${SMOKE}" -eq 1 ]] && LOCAL_ARGS+=(--warmup 5 --duration 20 --skip-initial 5)
-    log "Running experiment locally..."
-    run_locally "${LOCAL_ARGS[@]}"
-  fi
+  log "Running experiment in ${AUTONOMY_CONTAINER}..."
+  run_in_container ignored "${RUN_ARGS[@]}"
 
 else
   GPS_TOPIC="/wamv/sensors/gps/gps/fix"
 
-  if ! docker ps --format '{{.Names}}' | grep -qx mini_bream_frontseat; then
-    die "mini_bream_frontseat not running. Start with: cd ${REPO_ROOT}/docker && ./mini_bream_env.sh start pi"
+  container_running "${FRONTSEAT_CONTAINER}" || die "mini_bream_frontseat not running. Start: cd ${REPO_ROOT}/docker && ./mini_bream_env.sh start pi"
+  require_autonomy_container
+
+  if ! docker exec "${AUTONOMY_CONTAINER}" test -d "${FIELD_TESTS_CONTAINER}"; then
+    die "field_tests mount missing in ${AUTONOMY_CONTAINER}. Recreate autonomy container."
   fi
 
-  if ! docker exec mini_bream_frontseat test -d "${FIELD_TESTS_CONTAINER}"; then
-    die "field_tests mount missing in container. Recreate frontseat:\n  cd ${REPO_ROOT}/docker && docker compose -f docker-compose.frontseat.yml up -d frontseat"
-  fi
+  log "Checking deps in ${AUTONOMY_CONTAINER}..."
+  check_ilos_deps "${AUTONOMY_CONTAINER}" "${AUTONOMY_REBUILD_HINT}"
 
-  log "Checking deps in frontseat container..."
-  check_deps mini_bream_frontseat \
-    "cd ${REPO_ROOT}/docker && docker compose -f docker-compose.frontseat.yml build frontseat"
-
-  docker exec mini_bream_frontseat pkill -f 'ilos_boat/stack_runner.py' 2>/dev/null || true
+  docker exec "${AUTONOMY_CONTAINER}" pkill -f 'ilos_boat/stack_runner.py' 2>/dev/null || true
 
   log "Checking GPS on ${GPS_TOPIC}..."
-  ros_topic_ready "${GPS_TOPIC}" 15 mini_bream_frontseat \
+  ros_topic_ready "${GPS_TOPIC}" 15 "${AUTONOMY_CONTAINER}" \
     || die "no GPS fix on ${GPS_TOPIC}"
+
+  RUN_ARGS+=(--overlay "${AUTONOMY_OVERLAY}")
 
   if [[ "${PLATFORM}" == "bench" ]]; then
     log "Bench mode: real sensors, thrust_mode=log_only"
@@ -293,8 +247,8 @@ else
   fi
 
   log "Output (host): ${OUT_DIR}"
-  log "Running experiment in mini_bream_frontseat..."
-  run_in_container mini_bream_frontseat "${RUN_ARGS[@]}"
+  log "Running experiment in ${AUTONOMY_CONTAINER}..."
+  run_in_container ignored "${RUN_ARGS[@]}"
 fi
 
 RESULT_JSON="${OUT_DIR}/ILOS_PID/result.json"

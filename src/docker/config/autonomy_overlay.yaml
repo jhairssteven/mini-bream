@@ -1,0 +1,5 @@
+# Overlay when experiments run in mini_bream_autonomy (Jetson or dev host).
+# Thrust PWM conversion stays on the Pi (mini_bream_thrust_bridge).
+boat_bridge:
+  thrust_bridge_enabled: false
+  velocity_odom_enabled: true
