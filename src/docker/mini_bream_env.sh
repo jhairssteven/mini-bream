@@ -152,8 +152,8 @@ start_pi() {
     log "PWM dry_run enabled (no motor output)"
   fi
 
-  log "Bringing up pwm_daemon + radio_rx + thrust_bridge (detached)..."
-  compose -f "${COMPOSE_FRONTSEAT}" up -d $(build_flag) pwm_daemon radio_rx thrust_bridge
+  log "Bringing up pwm_daemon + radio_rx (detached)..."
+  compose -f "${COMPOSE_FRONTSEAT}" up -d $(build_flag) pwm_daemon radio_rx
 
   log "Starting frontseat..."
   if [[ "${DETACH_FRONTSEAT}" -eq 1 ]]; then
@@ -168,7 +168,7 @@ start_pi() {
 stop_pi() {
   need_docker
   log "Tearing down Pi stack..."
-  teardown_services "${COMPOSE_FRONTSEAT}" frontseat radio_rx pwm_daemon thrust_bridge
+  teardown_services "${COMPOSE_FRONTSEAT}" frontseat radio_rx pwm_daemon
   log "Pi stack removed"
 }
 

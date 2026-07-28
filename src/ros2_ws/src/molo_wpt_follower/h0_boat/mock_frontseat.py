@@ -176,9 +176,8 @@ def main() -> None:
         topics = cfg.get("topics", {})
         gps_topic = topics.get("gps", gps_topic)
         imu_topic = topics.get("imu", imu_topic)
-        bridge = cfg.get("boat_bridge", {})
-        thrust_left = bridge.get("thrust_input_left", thrust_left)
-        thrust_right = bridge.get("thrust_input_right", thrust_right)
+        thrust_left = topics.get("left_thrust", thrust_left)
+        thrust_right = topics.get("right_thrust", thrust_right)
     else:
         if origin_lat is None or origin_lon is None:
             cfg = build_h0_boat_config()

@@ -8,7 +8,7 @@ name: mini-bream-autonomy
 #
 # Prerequisites:
 #   sim  → blueboat_sim (mini_bream_simulation) for --platform sim
-#   real → Pi frontseat + thrust_bridge for sensors / PWM
+#   real → Pi frontseat for sensors; controllers publish /pwm/* over DDS
 
 services:
   autonomy:

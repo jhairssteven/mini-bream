@@ -23,7 +23,6 @@ for path in (str(PKG_DIR), str(H0_DIR)):
 from config import bridge_topics, stack_components  # noqa: E402
 from ilos_follower import IlosFollowerNode  # noqa: E402
 from pose_trail_viz import PoseTrailViz  # noqa: E402
-from thrust_bridge import ThrustBridgeNode  # noqa: E402
 from velocity_odom import VelocityOdomNode  # noqa: E402
 
 
@@ -59,18 +58,6 @@ def main() -> None:
                 float(origin["lat"]),
                 float(origin["lon"]),
                 window_s=float(bridge.get("velocity_window_s", 0.4)),
-            )
-        )
-    if components["thrust_bridge"]:
-        nodes.append(
-            ThrustBridgeNode(
-                bridge.get("thrust_input_left", "/molo_boat/thrust_left"),
-                bridge.get("thrust_input_right", "/molo_boat/thrust_right"),
-                bridge.get("thrust_mode", "pwm_topics"),
-                bridge.get("pwm_left", "/pwm/left_thrust_cmd"),
-                bridge.get("pwm_right", "/pwm/right_thrust_cmd"),
-                bridge.get("pwm_daemon_host", "127.0.0.1"),
-                int(bridge.get("pwm_daemon_port", 5600)),
             )
         )
     nodes.append(

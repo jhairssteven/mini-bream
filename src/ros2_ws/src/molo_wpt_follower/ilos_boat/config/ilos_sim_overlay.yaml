@@ -23,7 +23,6 @@ topics:
 
 boat_bridge:
   velocity_odom_enabled: false
-  thrust_bridge_enabled: false
 
 viz:
   pose_topic: /molo_mpc/vehicle_pose

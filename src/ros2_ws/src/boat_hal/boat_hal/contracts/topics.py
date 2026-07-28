@@ -15,8 +15,6 @@ class TopicContract:
     ground_truth_odometry: str = "/blueboat/sensors/position/ground_truth_odometry"
     left_thrust: str = "/blueboat/thrusters/left/thrust"
     right_thrust: str = "/blueboat/thrusters/right/thrust"
-    pwm_left: str = "/pwm/left_thrust_cmd"
-    pwm_right: str = "/pwm/right_thrust_cmd"
     lidar_points: str = "/rslidar_points"
     lidar_points_filtered: str = "/rslidar_points/filtered"
     lidar_imu: str = "/rslidar_imu_data"
@@ -39,8 +37,6 @@ class TopicContract:
             "ground_truth_odometry": self.ground_truth_odometry,
             "left_thrust": self.left_thrust,
             "right_thrust": self.right_thrust,
-            "pwm_left": self.pwm_left,
-            "pwm_right": self.pwm_right,
             "lidar_points": self.lidar_points,
             "lidar_points_filtered": self.lidar_points_filtered,
             "lidar_imu": self.lidar_imu,

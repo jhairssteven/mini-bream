@@ -57,7 +57,7 @@ flowchart LR
 |--------------|------|----------|
 | `docker-compose.ground.telemetry.yaml` | Ground PC | `telemetry_tx` (emergency teleop radio) |
 | `docker-compose.ground.yml` | Ground PC (`.103`) | `ground_station` (RViz2) |
-| `docker-compose.frontseat.yml` | Pi / Jetson | Pi: `pwm_daemon`, `radio_rx`, `thrust_bridge`, `frontseat` · Jetson: `perception` |
+| `docker-compose.frontseat.yml` | Pi / Jetson | Pi: `pwm_daemon`, `radio_rx`, `frontseat` · Jetson: `perception` |
 | `docker-compose.autonomy.yml` | Jetson / dev PC | `autonomy` (H0 + ILOS experiments) |
 | `docker-compose.simulation.yml` | Dev PC | `simulation` (BlueBoat Gazebo) |
 
@@ -77,7 +77,7 @@ Use the role launcher (recommended):
 cd src/docker
 chmod +x mini_bream_env.sh
 
-./mini_bream_env.sh start pi       # pwm_daemon + radio_rx + thrust_bridge + frontseat
+./mini_bream_env.sh start pi       # pwm_daemon + radio_rx + frontseat
 ./mini_bream_env.sh start jetson   # LiDAR network + perception
 ./mini_bream_env.sh start gs       # telemetry_tx + RViz ground_station
 ./mini_bream_env.sh start autonomy # H0 + ILOS experiment runner (Jetson or dev)
@@ -112,7 +112,7 @@ cd ../ros2_ws/src/molo_wpt_follower/ilos_boat
 
 ```bash
 # On Pi:
-./mini_bream_env.sh start pi               # sensors + thrust_bridge (PWM)
+./mini_bream_env.sh start pi               # sensors + motor stack (PWM)
 
 # On Jetson (or dev machine on robot LAN):
 ./mini_bream_env.sh start autonomy --build
@@ -120,7 +120,7 @@ cd ../ros2_ws/src/molo_wpt_follower/h0_boat
 ./run_real_boat.sh --platform real
 ```
 
-Field runs auto-apply `config/autonomy_overlay.yaml` (`thrust_bridge_enabled: false`); thrust conversion stays on the Pi via `mini_bream_thrust_bridge`.
+Controllers publish thrust directly to `/pwm/*_thrust_cmd` over DDS; `motor_controller` on the Pi forwards to `pwm_daemon`.
 
 On Jetson, set `AUTONOMY_CYCLONEDDS_URI=file:///etc/cyclonedds.jetson.xml` if auto-detection does not pick the robot LAN. On a dev laptop (no `eth0`), DDS uses all interfaces automatically.
 

@@ -127,5 +127,4 @@ def stack_components(cfg: dict) -> Dict[str, bool]:
     sim = bool(cfg.get("sim_enable", False))
     return {
         "velocity_odom": bool(bridge.get("velocity_odom_enabled", not sim)),
-        "thrust_bridge": bool(bridge.get("thrust_bridge_enabled", not sim)),
     }

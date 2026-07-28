@@ -57,7 +57,7 @@ U_{\mathrm{cmd}} = U_c \cdot s_{\mathrm{head}}(\tilde\psi) \cdot \frac{1}{1 + k_
 \tau_R = \tau_{\mathrm{surge}} + \tau_{\mathrm{yaw}}
 \]
 
-On the real boat, \(\tau_{L,R}\) are published to `/molo_boat/thrust_*` and converted to PWM by `thrust_bridge`.
+On the real boat, \(\tau_{L,R}\) are published directly to `/pwm/left_thrust_cmd` and `/pwm/right_thrust_cmd` (configured in `topics` in the boat overlay).
 
 **Scoring:** RMSE of \(|e_y|\) from `/molo_mpc/cross_track_error` over the evaluate window. Target: **0.1 m**.
 
@@ -109,11 +109,11 @@ cd src/docker
 ```bash
 cd src/ros2_ws/src/molo_wpt_follower/ilos_boat
 ./run_real_boat.sh                    # full run (default: --platform real)
-./run_real_boat.sh --bench            # GPS/IMU live, thrust log_only (no motors)
+./run_real_boat.sh --bench            # GPS/IMU live, thrust to sink topics (no motors)
 ./run_real_boat.sh --smoke            # shortened evaluate window
 ```
 
-**Thrust path:** ILOS → `/molo_boat/thrust_*` → `thrust_bridge` → `/pwm/*_thrust_cmd` → `motor_controller` → `pwm_daemon`.
+**Thrust path:** ILOS → `/pwm/*_thrust_cmd` → `motor_controller` → `pwm_daemon`.
 
 **RViz** (ground station, while the run is active):
 
@@ -167,7 +167,7 @@ ilos_base.yaml          # algorithm + lemniscate mission
 |------|----------|
 | `config/ilos_sim_overlay.yaml` | Gazebo (`blueboat_sim`) |
 | `config/ilos_boat_overlay.yaml` | Real boat (`frontseat`) |
-| `config/ilos_bench_overlay.yaml` | Real boat, `log_only` thrust |
+| `config/ilos_bench_overlay.yaml` | Real boat, thrust to sink topics (no motors) |
 | `config/ilos_tuned_overlay.yaml` | BO best params (optional) |
 
 ---

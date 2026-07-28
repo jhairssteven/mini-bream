@@ -239,7 +239,7 @@ else
   RUN_ARGS+=(--overlay "${AUTONOMY_OVERLAY}")
 
   if [[ "${PLATFORM}" == "bench" ]]; then
-    log "Bench mode: real sensors, thrust_mode=log_only"
+    log "Bench mode: real sensors, thrust to sink topics (no motors)"
   fi
   if [[ "${SMOKE}" -eq 1 ]]; then
     RUN_ARGS+=(--warmup 8 --duration 15 --skip-initial 8)

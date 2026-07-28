@@ -1,12 +1,13 @@
-# Short bench run on the real boat: real GPS/IMU, no motor output (log_only thrust).
+# Short bench run on the real boat: real GPS/IMU, thrust to sink topics (no motors).
 # Applied on top of h0_boat_overlay.yaml via --platform bench or ./run_real_boat.sh --bench
 
 platform:
   name: real_boat_bench
   profile: bench
 
-boat_bridge:
-  thrust_mode: log_only
+topics:
+  left_thrust: /molo_boat/thrust_left
+  right_thrust: /molo_boat/thrust_right
 
 experiment:
   warmup_s: 8.0

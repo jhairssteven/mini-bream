@@ -17,23 +17,15 @@ topics:
   gps: /wamv/sensors/gps/gps/fix
   imu: /wamv/sensors/imu/imu/data
   odometry: /molo_boat/estimated_odometry
-  left_thrust: /molo_boat/thrust_left
-  right_thrust: /molo_boat/thrust_right
+  left_thrust: /pwm/left_thrust_cmd
+  right_thrust: /pwm/right_thrust_cmd
 
 boat_bridge:
   velocity_odom_enabled: true
-  thrust_bridge_enabled: true
   gps_topic: /wamv/sensors/gps/gps/fix
   imu_topic: /wamv/sensors/imu/imu/data
   estimated_odom_topic: /molo_boat/estimated_odometry
   velocity_window_s: 0.4
-  thrust_input_left: /molo_boat/thrust_left
-  thrust_input_right: /molo_boat/thrust_right
-  thrust_mode: pwm_topics
-  pwm_left: /pwm/left_thrust_cmd
-  pwm_right: /pwm/right_thrust_cmd
-  pwm_daemon_host: 127.0.0.1
-  pwm_daemon_port: 5600
 
 viz:
   pose_topic: /molo_mpc/vehicle_pose

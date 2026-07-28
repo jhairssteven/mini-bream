@@ -1,10 +1,11 @@
-# Bench run: real sensors, log_only thrust.
+# Bench run: real sensors, thrust to sink topics (no motors).
 platform:
   name: real_boat_bench
   profile: bench
 
-boat_bridge:
-  thrust_mode: log_only
+topics:
+  left_thrust: /molo_boat/thrust_left
+  right_thrust: /molo_boat/thrust_right
 
 experiment:
   warmup_s: 8.0

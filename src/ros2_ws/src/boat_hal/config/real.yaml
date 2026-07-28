@@ -15,10 +15,8 @@ topics:
   gps: /wamv/sensors/gps/gps/fix
   imu: /wamv/sensors/imu/imu/data
   ground_truth_odometry: /molo_boat/estimated_odometry
-  left_thrust: /molo_boat/thrust_left
-  right_thrust: /molo_boat/thrust_right
-  pwm_left: /pwm/left_thrust_cmd
-  pwm_right: /pwm/right_thrust_cmd
+  left_thrust: /pwm/left_thrust_cmd
+  right_thrust: /pwm/right_thrust_cmd
   lidar_points: /rslidar_points
   lidar_points_filtered: /rslidar_points/filtered
   lidar_imu: /rslidar_imu_data

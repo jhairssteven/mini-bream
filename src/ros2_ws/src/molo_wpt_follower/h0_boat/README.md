@@ -29,7 +29,7 @@ Runs the H0 lemniscate MPC baseline with the same algorithm and artifacts on eve
     └───────────────────┘   └─────────────────┘    └─────────────────┘
 ```
 
-Platform overlays (`config/h0_*_overlay.yaml`) set topic names, bridge nodes, and experiment timing. The stack runner starts only the helper nodes needed for each platform (velocity odom + thrust bridge on real boat; MPC-only on sim).
+Platform overlays (`config/h0_*_overlay.yaml`) set topic names, helper nodes, and experiment timing. The stack runner starts only the helper nodes needed for each platform (velocity odom on real boat; MPC-only on sim).
 
 ## Simulation (this machine)
 
@@ -109,7 +109,7 @@ cd src/ros2_ws/src/molo_wpt_follower/h0_boat
 ./run_real_boat.sh --smoke      # shortened evaluate window
 ```
 
-**Thrust path (real boat):** MPC → `/molo_boat/thrust_*` → `thrust_bridge` → `/pwm/*_thrust_cmd` → `motor_controller` → `pwm_daemon`.
+**Thrust path (real boat):** MPC → `/pwm/*_thrust_cmd` → `motor_controller` → `pwm_daemon`.
 
 Target RMSE: 0.1 m.
 
@@ -136,7 +136,7 @@ Platform overlays live in `config/`:
 |------|----------|
 | `h0_sim_hal_overlay.yaml` | Gazebo (`blueboat_sim`) |
 | `h0_boat_overlay.yaml` | Real boat (`frontseat`) |
-| `h0_bench_overlay.yaml` | Real boat, log_only thrust |
+| `h0_bench_overlay.yaml` | Real boat, thrust to sink topics (no motors) |
 | `h0_mock_overlay.yaml` | Mock sensor topics |
 
 ## RViz

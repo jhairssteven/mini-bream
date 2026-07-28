@@ -26,10 +26,9 @@ topics:
   left_thrust: /blueboat/thrusters/left/thrust
   right_thrust: /blueboat/thrusters/right/thrust
 
-# MPC publishes thrust directly to sim; no velocity odom or pwm bridge needed.
+# MPC publishes thrust directly to sim HAL; velocity odom not needed.
 boat_bridge:
   velocity_odom_enabled: false
-  thrust_bridge_enabled: false
 
 viz:
   pose_topic: /molo_mpc/vehicle_pose
