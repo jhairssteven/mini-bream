@@ -80,7 +80,7 @@ class PathFollowerConfigTests(unittest.TestCase):
 
         cfg = build_path_follower_config(controller="ilos", platform="sim", use_external_path=True)
         self.assertEqual(cfg["path"]["source"], "topic")
-        self.assertEqual(cfg["path"]["reference_path_topic"], "/molo_mpc/reference_path")
+        self.assertEqual(cfg["path"]["reference_path_topic"], "/plan")
 
 
 if __name__ == "__main__":

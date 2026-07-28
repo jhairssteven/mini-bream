@@ -108,7 +108,7 @@ class PathActivationManager:
         self._path_sub = None
 
         if self._source == "topic":
-            topic = str(path_cfg.get("reference_path_topic", "/molo_mpc/reference_path"))
+            topic = str(path_cfg.get("reference_path_topic", "/plan"))
             qos = QoSProfile(
                 depth=10,
                 reliability=ReliabilityPolicy.RELIABLE,

@@ -1,4 +1,4 @@
-# Overlay for following an external nav_msgs/Path (e.g. from molo_plan_v2).
+# Overlay for following Nav2 planned path (nav_msgs/Path on /plan).
 # Merge on top of any controller config (ilos_boat / h0_boat / mpc).
 
 frame_id: map
@@ -9,7 +9,7 @@ waypoints:
 
 path:
   source: topic
-  reference_path_topic: /molo_mpc/reference_path
+  reference_path_topic: /plan
   relative_to_start: false
   replan_on_update: true
   replan_min_interval_s: 0.0

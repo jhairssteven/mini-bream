@@ -99,24 +99,30 @@ All planning/control experiments run in `mini_bream_autonomy`. Python deps (dubi
 ```bash
 cd src/docker
 ./mini_bream_env.sh start sim              # terminal 1: Gazebo
-./mini_bream_env.sh start autonomy --build # terminal 2: experiment runner
+./mini_bream_env.sh start autonomy --build # terminal 2: Nav2 + ILOS/H0
 
-cd ../ros2_ws/src/molo_wpt_follower/ilos_boat
-./run_real_boat.sh --platform sim
+# Inside autonomy container:
+docker exec -it mini_bream_autonomy bash
+source /opt/ros/humble/setup.bash && source /workspace/ros2_ws/install/setup.bash
+colcon build --packages-select blueboat_nav2 mission_planner
+ros2 launch mission_planner molo_autonomy.launch.py platform:=blueboat_sim controller:=ilos
 
-# Optional RViz overlays:
-./mini_bream_env.sh start gs --h0-boat --sim-viz
+# RViz: 2D Goal Pose sends goals; Nav2 plans to /plan, ILOS follows
+rviz2 -d /workspace/docker/config/molo_autonomy.rviz --ros-args -p use_sim_time:=true
 ```
 
-**Field (Jetson + Pi):**
+**Field (real boat):**
 
 ```bash
-# On Pi:
-./mini_bream_env.sh start pi               # sensors + motor stack (PWM)
-
-# On Jetson (or dev machine on robot LAN):
 ./mini_bream_env.sh start autonomy --build
-cd ../ros2_ws/src/molo_wpt_follower/h0_boat
+ros2 launch mission_planner molo_autonomy.launch.py platform:=blueboat controller:=ilos use_sim_time:=false
+```
+
+Legacy standalone controller tuning (no Nav2):
+
+```bash
+cd ../ros2_ws/src/molo_wpt_follower/ilos_boat
+./run_real_boat.sh --platform sim
 ./run_real_boat.sh --platform real
 ```
 

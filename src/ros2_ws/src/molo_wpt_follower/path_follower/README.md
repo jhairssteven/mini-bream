@@ -1,41 +1,41 @@
 # path_follower — external path interface
 
-Thin integration layer that connects **any path provider** (mission planner, rosbag replay, test publishers) to **any follower controller** in `molo_wpt_follower`.
+Thin integration layer that connects **any path provider** (Nav2, rosbag replay, test publishers) to **any follower controller** in `molo_wpt_follower`.
 
 ## Contract
 
 | Item | Value |
 | --- | --- |
-| Input topic | `/molo_mpc/reference_path` (`nav_msgs/Path`) |
-| Frame | `map` (matches BlueBoat sim ground-truth odometry) |
+| Input topic | `/plan` (`nav_msgs/Path`) from Nav2 |
+| Frame | `map` |
 | Controllers | `ilos`, `h0` / `mpc` |
 
 Enable with `path.source: topic` in YAML (see `config/path_topic_overlay.yaml`). Controllers still run standalone with their existing experiment scripts when `path.source` is omitted.
 
-## Quick start (sim + external planner path)
+## Quick start (sim + Nav2)
 
 ```bash
 # Terminal 1 — simulation
-ros2 launch blueboat_sim lidar_obstacle_course.launch.py headless:=True
+cd src/docker && ./mini_bream_env.sh start sim
 
-# Terminal 2 — local planning (costmap + RRT*)
-ros2 launch mission_planner molo_planning.launch.py platform:=blueboat_sim
+# Terminal 2 — autonomy container
+./mini_bream_env.sh start autonomy
+docker exec -it mini_bream_autonomy bash
+source /opt/ros/humble/setup.bash && source /workspace/ros2_ws/install/setup.bash
+ros2 launch mission_planner molo_autonomy.launch.py platform:=blueboat_sim controller:=ilos
 
-# Terminal 3 — path follower (ILOS example)
-cd src/ros2_ws/src/molo_wpt_follower/path_follower
-python3 stack_runner.py --controller ilos --platform sim
-
-# RViz (sim: fixed frame `map`, use_sim_time true)
-rviz2 -d src/docker/config/molo_autonomy.rviz --ros-args -p use_sim_time:=true
-
-# Or H0 MPC:
-python3 stack_runner.py --controller h0 --platform sim
+# RViz (fixed frame `map`, use_sim_time true)
+rviz2 -d /workspace/docker/config/molo_autonomy.rviz --ros-args -p use_sim_time:=true
+# Use "2D Goal Pose" to send a navigation goal; Nav2 plans to /plan, ILOS follows.
 ```
+
+## Real boat
 
 ```bash
-# RViz (sim: fixed frame map, use_sim_time true)
-rviz2 -d src/docker/config/molo_autonomy.rviz --ros-args -p use_sim_time:=true
+ros2 launch mission_planner molo_autonomy.launch.py platform:=blueboat controller:=ilos use_sim_time:=false
 ```
+
+Requires LiDAR on `/rslidar_points` and odometry on `/molo_boat/estimated_odometry` (TF bridge in `config/blueboat/tf_bridge.json`).
 
 ## Controller selection
 
@@ -46,12 +46,6 @@ rviz2 -d src/docker/config/molo_autonomy.rviz --ros-args -p use_sim_time:=true
 
 Use `--internal-path` to keep the built-in YAML trajectory (lemniscate, etc.) for controller tuning without a planner.
 
-## Adding a new controller
-
-1. Implement a follower node that uses `PathActivationManager` from `mpc/path_activation.py`.
-2. Register the controller name in `path_follower/config.py` (`CONTROLLERS` dict).
-3. Add a branch in `stack_runner.py` if the new controller needs a custom process layout.
-
 ## Adding a new path provider
 
-Publish `nav_msgs/Path` on `/molo_mpc/reference_path` in the `map` frame. No follower changes required.
+Publish `nav_msgs/Path` on `/plan` in the `map` frame. No follower changes required if `path_topic_overlay.yaml` is merged.

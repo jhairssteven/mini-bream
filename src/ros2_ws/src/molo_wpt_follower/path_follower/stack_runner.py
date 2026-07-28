@@ -52,7 +52,7 @@ def main() -> None:
     parser.add_argument(
         "--internal-path",
         action="store_true",
-        help="Use YAML trajectory instead of external /molo_mpc/reference_path topic",
+        help="Use YAML trajectory instead of external /plan topic",
     )
     parser.add_argument("--config-out", default="", help="Write merged config and exit")
     args = parser.parse_args()

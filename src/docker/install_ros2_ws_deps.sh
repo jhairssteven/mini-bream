@@ -47,6 +47,14 @@ apt-get install -y --no-install-recommends \
   ros-humble-theora-image-transport \
   ros-humble-diagnostic-updater \
   ros-humble-xacro \
+  ros-humble-navigation2 \
+  ros-humble-nav2-bringup \
+  ros-humble-nav2-map-server \
+  ros-humble-nav2-planner \
+  ros-humble-nav2-costmap-2d \
+  ros-humble-nav2-lifecycle-manager \
+  ros-humble-nav2-smac-planner \
+  ros-humble-pointcloud-to-laserscan \
   gcc \
   g++ \
   git
