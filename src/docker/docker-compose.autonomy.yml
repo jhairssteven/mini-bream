@@ -17,6 +17,7 @@ services:
     build:
       context: ../
       dockerfile: docker/Dockerfile.autonomy
+      network: host
     network_mode: host
     init: true
     restart: unless-stopped
