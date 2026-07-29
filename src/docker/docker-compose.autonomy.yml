@@ -9,6 +9,9 @@ name: mini-bream-autonomy
 # Prerequisites:
 #   sim  → blueboat_sim (mini_bream_simulation) for --platform sim
 #   real → Pi frontseat for sensors; controllers publish /pwm/* over DDS
+#
+# start_autonomy.sh (mounted below) chmods ament PROGRAMS scripts and runs colcon
+# build on every container start — required because ros2_ws is bind-mounted.
 
 services:
   autonomy:
