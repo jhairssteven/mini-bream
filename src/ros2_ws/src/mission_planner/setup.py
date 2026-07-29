@@ -23,6 +23,7 @@ setup(
         'mission_planner.moloplanner',
         'mission_planner.geotiff_global_planner',
         'mission_planner.converters',
+        'mission_planner.tf_bridge',
     ],
     package_data={
         'mission_planner.moloplanner': ['assets/*', 'dependencies/*', 'config.yaml'],

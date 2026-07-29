@@ -5,7 +5,13 @@ from pathlib import Path
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription, OpaqueFunction
+from launch.actions import (
+    DeclareLaunchArgument,
+    ExecuteProcess,
+    IncludeLaunchDescription,
+    OpaqueFunction,
+    SetEnvironmentVariable,
+)
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import SetParameter
@@ -14,7 +20,15 @@ _LAUNCH_DIR = Path(__file__).resolve().parent
 if str(_LAUNCH_DIR) not in sys.path:
     sys.path.insert(0, str(_LAUNCH_DIR))
 
-from molo_tf_launch import molo_process_env, tf_bridge_action  # noqa: E402
+from molo_tf_launch import autonomy_launch_env, tf_bridge_action  # noqa: E402
+
+
+def _follower_platform(platform: str) -> str:
+    if platform == "blueboat_sim":
+        return "sim"
+    if platform == "blueboat":
+        return "real"
+    return platform
 
 
 def _path_follower_stack_runner() -> Path:
@@ -45,7 +59,11 @@ def _setup(context, *args, **kwargs):
     if use_sim:
         actions.append(SetParameter(name="use_sim_time", value=True))
 
-    tf_action = tf_bridge_action(platform, use_sim_time=use_sim)
+    tf_action = tf_bridge_action(
+        platform,
+        use_sim_time=use_sim,
+        additional_env=autonomy_launch_env(use_sim),
+    )
     if tf_action is not None:
         actions.append(tf_action)
 
@@ -76,7 +94,7 @@ def _follower_node(context, *args, **kwargs):
 
     controller = LaunchConfiguration("controller").perform(context)
     platform = LaunchConfiguration("platform").perform(context)
-    follower_platform = "sim" if platform == "blueboat_sim" else platform
+    follower_platform = _follower_platform(platform)
     use_sim = LaunchConfiguration("use_sim_time").perform(context).lower() in (
         "1",
         "true",
@@ -94,14 +112,23 @@ def _follower_node(context, *args, **kwargs):
             ],
             name="path_follower",
             output="screen",
-            additional_env=molo_process_env(use_sim),
+            additional_env=autonomy_launch_env(use_sim),
         )
+    ]
+
+
+def _environment_setup(context, *args, **kwargs):
+    return [
+        SetEnvironmentVariable(name=key, value=value)
+        for key, value in autonomy_launch_env(False).items()
+        if key != "MOLO_USE_SIM_TIME"
     ]
 
 
 def generate_launch_description():
     return LaunchDescription(
         [
+            OpaqueFunction(function=_environment_setup),
             DeclareLaunchArgument("platform", default_value="blueboat_sim"),
             DeclareLaunchArgument(
                 "controller",

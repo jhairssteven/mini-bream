@@ -13,7 +13,7 @@ RUN chmod +x /tmp/install_mpc_deps.sh /tmp/install_ros2_ws_deps.sh /tmp/install_
     && /tmp/install_ros2_ws_deps.sh \
     && /tmp/install_autonomy_deps.sh
 
-RUN apt-get update && apt-get install -y --no-install-recommends nano tmux \
+RUN apt-get update && apt-get install -y --no-install-recommends iproute2 nano tmux \
     && rm -rf /var/lib/apt/lists/*
 
 RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc && \

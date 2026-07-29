@@ -104,7 +104,6 @@ cd src/docker
 # Inside autonomy container:
 docker exec -it mini_bream_autonomy bash
 source /opt/ros/humble/setup.bash && source /workspace/ros2_ws/install/setup.bash
-colcon build --packages-select blueboat_nav2 mission_planner
 ros2 launch mission_planner molo_autonomy.launch.py platform:=blueboat_sim controller:=ilos
 
 # RViz: 2D Goal Pose sends goals; Nav2 plans to /plan, ILOS follows

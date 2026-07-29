@@ -32,16 +32,14 @@ def platform_config_dir(platform: str) -> Path:
 def tf_bridge_script_path() -> Path:
     candidates = [
         Path(
-            "/workspace/ros2_ws/src/mission_planner/mission_planner/moloplanner/molo_map/tf_bridge/tf_bridge_node.py"
+            "/workspace/ros2_ws/src/mission_planner/mission_planner/tf_bridge/tf_bridge_node.py"
         ),
         Path(__file__).resolve().parents[1]
         / "mission_planner"
-        / "moloplanner"
-        / "molo_map"
         / "tf_bridge"
         / "tf_bridge_node.py",
     ]
     for candidate in candidates:
         if candidate.is_file():
             return candidate
-    raise RuntimeError("tf_bridge_node.py not found in mission_planner/molo_map/tf_bridge")
+    raise RuntimeError("tf_bridge_node.py not found in mission_planner/tf_bridge")

@@ -29,6 +29,7 @@ services:
       - ../vrx_ws:/workspace/vrx_ws
       - ../field_tests:/workspace/field_tests
       - ../docker:/workspace/docker:ro
+      - ../docker/start_autonomy.sh:/start_autonomy.sh:ro
       - ../docker/cyclonedds.xml:/etc/cyclonedds.xml:ro
       - ../docker/cyclonedds.jetson.xml:/etc/cyclonedds.jetson.xml:ro
     working_dir: /workspace/ros2_ws

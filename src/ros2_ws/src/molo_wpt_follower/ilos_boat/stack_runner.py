@@ -24,6 +24,7 @@ for path in (str(PKG_DIR), str(H0_DIR)):
 from config import bridge_topics, stack_components  # noqa: E402
 from ilos_follower import IlosFollowerNode  # noqa: E402
 from pose_trail_viz import PoseTrailViz  # noqa: E402
+from trial_runner import wait_for_gps  # noqa: E402
 from velocity_odom import VelocityOdomNode  # noqa: E402
 
 
@@ -43,6 +44,22 @@ def main() -> None:
     origin = cfg.get("origin", {})
     viz = cfg.get("viz", {})
 
+    origin_lat = origin.get("lat")
+    origin_lon = origin.get("lon")
+    if origin_lat is None or origin_lon is None:
+        gps_topic = bridge.get("gps_topic", "/wamv/sensors/gps/gps/fix")
+        wait_s = float(cfg.get("experiment", {}).get("wait_for_gps_timeout_s", 60.0))
+        fix = wait_for_gps(wait_s, gps_topic, cfg)
+        if fix is None:
+            raise RuntimeError(
+                f"GPS origin unavailable on {gps_topic} after {wait_s:.0f}s; "
+                "start frontseat moving_base_rtk or pass origin lat/lon."
+            )
+        origin_lat, origin_lon = fix
+        cfg.setdefault("origin", {})
+        cfg["origin"]["lat"] = origin_lat
+        cfg["origin"]["lon"] = origin_lon
+
     init_args = []
     if cfg.get("use_sim_time") or os.environ.get("MOLO_USE_SIM_TIME", "").lower() in (
         "1",
@@ -60,8 +77,10 @@ def main() -> None:
                 bridge.get("gps_topic", "/wamv/sensors/gps/gps/fix"),
                 bridge.get("imu_topic", "/wamv/sensors/imu/imu/data"),
                 bridge.get("estimated_odom_topic", "/molo_boat/estimated_odometry"),
-                float(origin["lat"]),
-                float(origin["lon"]),
+                float(origin_lat),
+                float(origin_lon),
+                frame_id="map",
+                child_frame_id="base_link",
                 window_s=float(bridge.get("velocity_window_s", 0.4)),
             )
         )
