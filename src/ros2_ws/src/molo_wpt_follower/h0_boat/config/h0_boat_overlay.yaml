@@ -36,7 +36,7 @@ viz:
   recent_poses_topic: /molo_h0/recent_poses
   frame_id: world
   max_recent_poses: 40
-  rviz_config: /opt/ground_station/h0_boat.rviz
+  rviz_config: /workspace/docker/config/h0_boat.rviz
 
 experiment:
   warmup_s: 20.0

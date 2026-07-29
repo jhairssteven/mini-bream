@@ -28,17 +28,16 @@ services:
       - GROUND_WIFI_IFACE=${GROUND_WIFI_IFACE:-wlp5s0}
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - CYCLONEDDS_URI=file:///etc/cyclonedds.ground.xml
-      - RVIZ_CONFIG=${RVIZ_CONFIG:-/opt/ground_station/ground_station.rviz}
+      - RVIZ_CONFIG=${RVIZ_CONFIG:-/workspace/docker/config/molo_autonomy.rviz}
       - USE_SIM_TIME=${USE_SIM_TIME:-0}
     volumes:
       - ../ros2_ws:/workspace/ros2_ws
       - ../field_tests:/workspace/field_tests
       - ../docker:/workspace/docker:ro
+      - ../docker/config:/workspace/docker/config:rw
       - ../docker/record_rosbag.sh:/usr/local/bin/record_rosbag:ro
       - ../docker/cyclonedds.ground.xml:/etc/cyclonedds.ground.xml:ro
       - ../docker/start_ground_station.sh:/start_ground_station.sh:ro
-      - ../docker/config/ground_station.rviz:/opt/ground_station/ground_station.rviz:ro
-      - ../docker/config/h0_boat.rviz:/opt/ground_station/h0_boat.rviz:ro
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
     working_dir: /workspace/ros2_ws
     stdin_open: true

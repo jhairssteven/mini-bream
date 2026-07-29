@@ -16,8 +16,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tmux \
     && rm -rf /var/lib/apt/lists/*
 
-COPY docker/config/ground_station.rviz /opt/ground_station/ground_station.rviz
-COPY docker/config/h0_boat.rviz /opt/ground_station/h0_boat.rviz
 COPY docker/start_ground_station.sh /start_ground_station.sh
 RUN chmod +x /start_ground_station.sh
 

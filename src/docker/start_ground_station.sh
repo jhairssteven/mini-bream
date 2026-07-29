@@ -16,7 +16,7 @@ if ! pgrep -f '[r]obot_state_publisher' >/dev/null 2>&1; then
   sleep 2
 fi
 
-RVIZ_CONFIG="${RVIZ_CONFIG:-/opt/ground_station/ground_station.rviz}"
+RVIZ_CONFIG="${RVIZ_CONFIG:-/workspace/docker/config/molo_autonomy.rviz}"
 RVIZ_ARGS=()
 if [[ "${USE_SIM_TIME:-0}" == "1" ]]; then
   RVIZ_ARGS+=(--ros-args -p use_sim_time:=true)

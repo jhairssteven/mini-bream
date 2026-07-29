@@ -201,7 +201,7 @@ start_gs() {
   setup_ground_display
 
   if [[ "${H0_BOAT_RVIZ}" -eq 1 ]]; then
-    export RVIZ_CONFIG=/opt/ground_station/h0_boat.rviz
+    export RVIZ_CONFIG=/workspace/docker/config/h0_boat.rviz
     log "Using boat experiment RViz config (${RVIZ_CONFIG})"
   fi
 
