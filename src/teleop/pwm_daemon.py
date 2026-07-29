@@ -124,7 +124,7 @@ class PwmDaemon:
                     if source != self._active:
                         logger.info("Active source → %s", source)
                         self._active = source
-                    self.motors.set_thrust(left, right)
+                    self.motors.set_thrust(left*0.4, -right*0.4)
                     next_tick = now + self.tick_period
                 timeout = max(0.0, next_tick - time.monotonic())
                 select.select([self.sock], [], [], timeout)
