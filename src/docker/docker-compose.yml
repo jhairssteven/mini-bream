@@ -11,12 +11,14 @@ services:
     privileged: true
 
     environment: 
+      - TZ=${TZ:-}
       - DISPLAY=$DISPLAY
       - QT_X11_NO_MITSHM=1
       - UDEV=1
       - NVIDIA_DRIVER_CAPABILITIES=all
       - NVIDIA_VISIBLE_DEVICES=all
     volumes:
+      - ${LOCALTIME_PATH:-/etc/localtime}:/etc/localtime:ro
       - ../:/workspace			              # code development
 
       - /var/run/docker.sock:/var/run/docker.sock

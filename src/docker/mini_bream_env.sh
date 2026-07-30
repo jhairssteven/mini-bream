@@ -43,6 +43,29 @@ LIDAR_NET_SCRIPT="../ros2_ws/src/frontseat/config/rslidar_airy/setup_network.sh"
 ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
 export ROS_DOMAIN_ID
 
+# Propagate host timezone into containers (images default to UTC; RTC may read as 1970).
+export_host_tz() {
+  if [[ -n "${TZ:-}" ]]; then
+    return 0
+  fi
+  if [[ -f /etc/timezone ]]; then
+    TZ="$(tr -d '[:space:]' < /etc/timezone)"
+  elif command -v timedatectl >/dev/null 2>&1; then
+    TZ="$(timedatectl show -p Timezone --value 2>/dev/null || true)"
+  fi
+  if [[ -n "${TZ:-}" ]]; then
+    export TZ
+    log "Container TZ=${TZ} (from host)"
+  fi
+}
+export_host_tz
+
+# Bind-mount resolved zoneinfo (host /etc/localtime is often a symlink).
+if [[ -z "${LOCALTIME_PATH:-}" && -e /etc/localtime ]]; then
+  LOCALTIME_PATH="$(readlink -f /etc/localtime)"
+  export LOCALTIME_PATH
+fi
+
 ACTION=""
 ROLE=""
 BUILD=0

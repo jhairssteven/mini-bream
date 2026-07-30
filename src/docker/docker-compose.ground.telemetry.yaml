@@ -22,10 +22,12 @@ services:
     restart: unless-stopped
     privileged: true
     environment:
+      - TZ=${TZ:-}
       - JOY_DEVICE=${JOY_DEVICE:-/dev/input/js0}
       - RADIO_SERIAL_PORT=${RADIO_SERIAL_PORT:-/dev/ttyUSB0}
       - RADIO_BAUD=${RADIO_BAUD:-57600}
     volumes:
+      - ${LOCALTIME_PATH:-/etc/localtime}:/etc/localtime:ro
       - ../teleop:/opt/teleop
       - /dev:/dev
     devices:

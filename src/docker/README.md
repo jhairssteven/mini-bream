@@ -61,6 +61,10 @@ flowchart LR
 | `docker-compose.autonomy.yml` | Jetson / dev PC | `autonomy` (H0 + ILOS experiments) |
 | `docker-compose.simulation.yml` | Dev PC | `simulation` (BlueBoat Gazebo) |
 
+All stacks mount the host `/etc/localtime` and pass `TZ` so container clocks match the host
+(ROS images default to UTC; without this, logs and LiDAR stamps can look like epoch/1970).
+`mini_bream_env.sh` auto-exports `TZ` from the host; set `TZ` in `.env` for manual compose.
+
 ## Motor command priority
 
 `pwm_daemon` chooses one source:
