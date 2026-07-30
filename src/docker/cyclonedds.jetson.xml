@@ -16,7 +16,7 @@
       <Peers>
         <Peer address="192.168.0.100"/>
         <Peer address="192.168.0.101"/>
-        <Peer address="192.168.0.103"/> <!-- alienware pc -->
+        <Peer address="192.168.0.103"/> <!-- pc -->
         <Peer address="192.168.0.104"/> <!-- c2 -->
       </Peers>
     </Discovery>

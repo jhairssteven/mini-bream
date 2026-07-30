@@ -6,6 +6,7 @@ __pycache__/
 dqn_ws/
 logs/
 .vscode/
+src/docker/.env
 src/field_tests/*
 !src/field_tests/rosbags/
 !src/field_tests/rosbags/**

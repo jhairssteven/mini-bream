@@ -71,6 +71,12 @@ flowchart LR
 
 ## Start commands
 
+Copy `src/docker/.env.example` to `src/docker/.env` and uncomment overrides for your dev laptop. Production hosts leave `.env` absent or fully commented.
+
+```bash
+cp src/docker/.env.example src/docker/.env   # once, on dev machine
+```
+
 Use the role launcher (recommended):
 
 ```bash
@@ -127,7 +133,7 @@ cd ../ros2_ws/src/molo_wpt_follower/ilos_boat
 
 Controllers publish thrust directly to `/pwm/*_thrust_cmd` over DDS; `motor_controller` on the Pi forwards to `pwm_daemon`.
 
-On Jetson, autonomy uses `cyclonedds.jetson.xml` by default (same as perception). On a dev laptop, set `AUTONOMY_CYCLONEDDS_URI=file:///etc/cyclonedds.xml` in `.env` or export before `compose up`.
+DDS overrides for autonomy live in `src/docker/.env` (see `.env.example`). Production Jetson uses `cyclonedds.jetson.xml` by default; on a dev laptop uncomment `AUTONOMY_CYCLONEDDS_URI=file:///etc/cyclonedds.xml` or `AUTONOMY_CYCLONEDDS_URI=` for local sim.
 
 Verify DDS from autonomy (should list Pi GPS + Jetson perception topics):
 
