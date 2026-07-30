@@ -23,7 +23,7 @@ point_clouds:
 hull:
   enabled: true
   center: {x: 0.0, y: 0.0, z: -0.23}
-  size: {x: 1.22, y: 0.95, z: 0.48}
+  size: {x: 4.22, y: 4.95, z: 2.48}
   rpy: [0.0, 0.0, 0.0]
 
 # Vertical support bars from deck (z=0) to sensor link origins (blueboat_extrinsics.yaml).
