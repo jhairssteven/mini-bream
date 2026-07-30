@@ -59,7 +59,7 @@ global_costmap:
       height: 60
       resolution: 0.25
       track_unknown_space: false
-      transform_tolerance: 1.0
+      transform_tolerance: 2.0
       footprint: "[[0.65, 0.33], [0.65, -0.33], [-0.65, -0.33], [-0.65, 0.33]]"
       plugins: ["obstacle_layer", "inflation_layer"]
       obstacle_layer:

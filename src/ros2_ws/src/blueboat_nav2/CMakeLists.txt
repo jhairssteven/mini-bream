@@ -8,6 +8,7 @@ ament_python_install_package(${PROJECT_NAME})
 
 install(PROGRAMS
   blueboat_nav2/goal_path_planner.py
+  blueboat_nav2/scan_stamp_sync.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

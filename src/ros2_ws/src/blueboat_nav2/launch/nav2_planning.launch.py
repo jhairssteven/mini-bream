@@ -52,8 +52,14 @@ def _launch_setup(context, *args, **kwargs):
                 parameters=[configured_params],
                 remappings=[
                     ("cloud_in", "/rslidar_points"),
-                    ("scan", "/scan"),
+                    ("scan", "/scan_raw"),
                 ],
+            ),
+            Node(
+                package="blueboat_nav2",
+                executable="scan_stamp_sync.py",
+                name="scan_stamp_sync",
+                output="screen",
             ),
             Node(
                 package="nav2_planner",

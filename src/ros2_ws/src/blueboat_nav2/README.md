@@ -7,8 +7,10 @@ Low-level control is **not** handled by Nav2. The ILOS or H0 follower in `molo_w
 ## Stack
 
 ```
+```
 /rslidar_points
-  → pointcloud_to_laserscan → /scan
+  → pointcloud_to_laserscan → /scan_raw
+  → scan_stamp_sync → /scan   # align scan time with odom/TF (field LiDAR stamp lag)
   → Nav2 global costmap (rolling, 60×60 m @ 0.25 m)
   → SmacPlannerHybrid (Dubins, min turn radius 3 m, footprint 1.3×0.66 m)
   → goal_path_planner (RViz /goal_pose → ComputePathToPose)
@@ -41,6 +43,15 @@ In RViz, use **2D Goal Pose** (publishes `/goal_pose`). The planner replans at 1
 - `config/nav2_blueboat_real.yaml` — field / real boat
 
 Footprint matches hull envelope (~1.3 m × 0.66 m). Adjust `minimum_turning_radius` for your operating speed.
+
+### `/scan observation buffer` warnings (real boat)
+
+If planning works at first then stops with `observation buffer has not been updated` or
+`Message Filter dropping message … earlier than all the data in the transform cache`, the
+Airy point cloud header stamp is lagging estimated odometry by tens of seconds. Nav2 needs
+`/scan` header time aligned with `/molo_boat/estimated_odometry` / TF. The launch file runs
+`scan_stamp_sync` to publish `/scan` with the node clock; ensure `use_lidar_clock: false` in
+`frontseat/config/rslidar_airy/airy.yaml` as well.
 
 ## Dependencies
 
