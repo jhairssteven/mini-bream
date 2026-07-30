@@ -32,6 +32,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${SCRIPT_DIR}"
 
+log() { echo "[mini-bream] $*"; }
+die() { echo "[mini-bream] ERROR: $*" >&2; exit 1; }
+
 COMPOSE_FRONTSEAT="docker-compose.frontseat.yml"
 COMPOSE_GROUND="docker-compose.ground.yml"
 COMPOSE_SIMULATION="docker-compose.simulation.yml"
@@ -79,9 +82,6 @@ usage() {
   sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
-
-log() { echo "[mini-bream] $*"; }
-die() { echo "[mini-bream] ERROR: $*" >&2; exit 1; }
 
 normalize_role() {
   case "$1" in
