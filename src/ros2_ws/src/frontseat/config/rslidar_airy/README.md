@@ -77,6 +77,22 @@ docker exec mini_bream_perception bash -lc '
 | Driver up, no points | Another host owns `192.168.1.102`, or LiDAR dest ≠ `host_address` |
 | No IMU topic | Rebuild with `-DENABLE_IMU_DATA_PARSE=ON` |
 | Low frame rate | Cyclone DDS (`RMW_IMPLEMENTATION=rmw_cyclonedds_cpp`) |
+| Nav2 `/scan observation buffer` warnings, no plan | `use_lidar_clock` must be `false` in `airy.yaml` for field use so LiDAR stamps match host/odometry time (see below) |
+
+### Nav2 / costmap time sync
+
+For real-boat operation (`use_sim_time:=false`), `airy.yaml` sets `use_lidar_clock: false`.
+With `use_lidar_clock: true`, the Airy stamps point clouds with the sensor uptime clock while
+`molo_tf_bridge` and `/molo_boat/estimated_odometry` use host time. Nav2 then cannot transform
+`/scan` into `map` and logs `The /scan observation buffer has not been updated`.
+
+After changing this setting, restart the LiDAR tmux session in perception:
+
+```bash
+docker exec mini_bream_perception bash -lc 'tmux kill-session -t airy_lidar; tmux new-session -d -s airy_lidar "bash -lc \"source /opt/ros/humble/setup.bash && source /opt/zed_ws/install/setup.bash && source /workspace/ros2_ws/install/setup.bash && exec ros2 launch frontseat airy_lidar.launch.py\""'
+```
+
+Then restart Nav2 planning in the autonomy container (tmux session with `molo_autonomy.launch.py`).
 
 ## References
 
