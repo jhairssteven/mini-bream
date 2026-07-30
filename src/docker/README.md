@@ -127,7 +127,16 @@ cd ../ros2_ws/src/molo_wpt_follower/ilos_boat
 
 Controllers publish thrust directly to `/pwm/*_thrust_cmd` over DDS; `motor_controller` on the Pi forwards to `pwm_daemon`.
 
-On Jetson, set `AUTONOMY_CYCLONEDDS_URI=file:///etc/cyclonedds.jetson.xml` if auto-detection does not pick the robot LAN. On a dev laptop (no `eth0`), DDS uses all interfaces automatically.
+On Jetson, autonomy uses `cyclonedds.jetson.xml` by default (same as perception). On a dev laptop, set `AUTONOMY_CYCLONEDDS_URI=file:///etc/cyclonedds.xml` in `.env` or export before `compose up`.
+
+Verify DDS from autonomy (should list Pi GPS + Jetson perception topics):
+
+```bash
+docker exec mini_bream_autonomy bash -lc \
+  'source /opt/ros/humble/setup.bash && ros2 topic list | grep -E fix|wamv|pwm|rslidar'
+```
+
+GPS topics use reliable QoS; if `ros2 topic echo` shows no data, add `--qos-reliability reliable`.
 
 Smoke-test the pipeline:
 
@@ -197,7 +206,14 @@ Requirements:
 
 1. **Same RMW** — `frontseat`, `perception`, and `ground_station` use `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp`. Fast DDS and Cyclone cannot talk to each other.
 2. **Same domain** — set the same `ROS_DOMAIN_ID` on all hosts (default `0`).
-3. **Static peers** — `cyclonedds.xml` (Pi), `cyclonedds.jetson.xml` (Jetson, pin `192.168.0.102`), `cyclonedds.ground.xml` (ground station, Wi-Fi). Mount the correct file per host.
+3. **Static peers** — `cyclonedds.xml` (Pi), `cyclonedds.jetson.xml` (Jetson perception + autonomy, pin `192.168.0.102`), `cyclonedds.ground.xml` (ground station, Wi-Fi). Mount the correct file per host.
+
+Verify from autonomy (Jetson):
+
+```bash
+docker exec mini_bream_autonomy bash -lc \
+  'source /opt/ros/humble/setup.bash && ros2 topic list | grep -E fix|wamv|pwm|rslidar'
+```
 
 Verify from ground station:
 
@@ -276,17 +292,16 @@ docker exec -it mini_bream_frontseat bash -lc \
    ros2 launch frontseat rosbag.launch.py bag_storage:=mcap bag_suffix:=rtk_test'
 ```
 
-Launch args: `record_bag`, `bag_suffix`, `bag_storage` (`mcap` default, or `sqlite3`). Bags are written to
+Launch args: `record_bag`, `bag_suffix`, `bag_storage` (`mcap` default, or `sqlite3`), `record_perception` (`true` default; set `false` to skip LiDAR/ZED). Bags are written to
 `/workspace/field_tests/rosbags/YYYY-MM-DD/rosbag_YYYY-MM-DD_HH-MM-SS[_suffix]/`.
 
-On Jetson, ZED topics are `/zed/zed/rgb/color/rect/image`, etc. The launch file sources
+On Humble, `ros2 bag record` defaults to sqlite3 — pass **`-s mcap`** for MCAP. On Jetson, ZED topics are `/zed/zed/rgb/color/rect/image`, etc. The launch file sources
 `/opt/zed_ws` so `zed_msgs` types resolve. Manual recording:
 
 ```bash
 docker exec -it mini_bream_perception record_rosbag bag_suffix:=zed_test
 # or
-docker exec -it mini_bream_perception bash -lc \
-  'source /opt/zed_ws/install/setup.bash && source /workspace/ros2_ws/install/setup.bash && \
-   ros2 bag record -s mcap -o /workspace/field_tests/rosbags/$(date +%F)/manual_zed \
-   /zed/zed/rgb/color/rect/image /zed/zed/point_cloud/cloud_registered /tf /tf_static'
+docker exec -it mini_bream_autonomy bash -lc \
+  'source /opt/ros/humble/setup.bash && source /workspace/ros2_ws/install/setup.bash && \
+   ros2 bag record -s mcap -a -o /workspace/field_tests/rosbags/$(date +%F)/manual_all'
 ```

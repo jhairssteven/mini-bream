@@ -27,7 +27,8 @@ services:
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-      - CYCLONEDDS_URI=${AUTONOMY_CYCLONEDDS_URI:-}
+      # Same robot-LAN DDS profile as perception (override on dev laptop via .env).
+      - CYCLONEDDS_URI=${AUTONOMY_CYCLONEDDS_URI:-file:///etc/cyclonedds.jetson.xml}
     volumes:
       - ../ros2_ws:/workspace/ros2_ws
       - ../vrx_ws:/workspace/vrx_ws

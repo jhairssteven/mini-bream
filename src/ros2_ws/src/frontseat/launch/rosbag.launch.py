@@ -3,6 +3,7 @@
 Usage:
   ros2 launch frontseat rosbag.launch.py
   ros2 launch frontseat rosbag.launch.py bag_storage:=mcap bag_suffix:=zed_lidar
+  ros2 launch frontseat rosbag.launch.py record_perception:=false bag_suffix:=rtk_only
   ros2 launch frontseat rosbag.launch.py record_bag:=false   # dry run / args only
 
 On Jetson, source overlays before recording (or use this launch file, which does it):
@@ -19,41 +20,54 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, ExecuteProcess, LogInfo, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 
-TOPICS_TO_RECORD = [
-    # Motors / teleop
+CORE_TOPICS = [
     '/pwm/left_thrust_cmd',
     '/pwm/right_thrust_cmd',
-    '/wamv/thrusters/left/thrust',
-    '/wamv/thrusters/right/thrust',
-    '/radio/thrusters/left_cmd',
-    '/radio/thrusters/right_cmd',
-    '/radio/on_ctrl',
-    # GPS / RTK (apt ublox driver + frontseat remaps)
+    # GPS / RTK
     '/fix/rover',
     '/fix/base',
-    '/fix/center/avg',
     '/wamv/sensors/gps/gps/fix',
-    '/wamv/sensors/gps/centered_gps/fix',
     '/wamv/sensors/imu/imu/data',
-    '/wamv/sensors/imu/imu/data/estimated',
-    '/baseline/heading',
     '/heading/deg',
-    '/navstatus',
-    '/navsvin',
-    '/navrelposned',
     '/navheading',
-    # LiDAR (Jetson perception)
+    '/navrelposned',
+    '/navstatus',
+    # TF
+    '/tf',
+    '/tf_static',
+    # Odometry (autonomy)
+    '/molo_boat/estimated_odometry',
+]
+
+LIDAR_TOPICS = [
     '/rslidar_points',
-    '/rslidar_packets',
     '/rslidar_imu_data',
-    # ZED 2i (Jetson perception — namespace/camera_name both "zed", zed_wrapper v5.x)
+    '/rslidar_points/filtered',
+]
+
+ZED_TOPICS = [
     '/zed/zed/rgb/color/rect/image',
     '/zed/zed/rgb/color/rect/camera_info',
     '/zed/zed/point_cloud/cloud_registered',
-    # Frames
-    '/tf',
-    '/tf_static',
 ]
+
+PERCEPTION_TOPICS = LIDAR_TOPICS + ZED_TOPICS
+
+
+def _topics_to_record(record_perception: bool) -> list[str]:
+    topics = list(CORE_TOPICS)
+    if record_perception:
+        topics.extend(PERCEPTION_TOPICS)
+    return topics
+
+
+def _parse_bool(value: str, name: str) -> bool:
+    normalized = value.strip().lower()
+    if normalized in ('true', '1', 'yes'):
+        return True
+    if normalized in ('false', '0', 'no'):
+        return False
+    raise RuntimeError(f"{name} must be 'true' or 'false', got '{value}'")
 
 
 def _bag_root() -> str:
@@ -80,9 +94,9 @@ def _bag_output_path(suffix: str) -> str:
     return bag_dir
 
 
-def _record_shell_command(storage: str, bag_name: str) -> str:
+def _record_shell_command(storage: str, bag_name: str, topics: list[str]) -> str:
     """Build a shell command that sources ROS overlays then runs ros2 bag record."""
-    topic_args = ' '.join(shlex.quote(t) for t in TOPICS_TO_RECORD)
+    topic_args = ' '.join(shlex.quote(t) for t in topics)
     parts = [
         'set -e',
         'source /opt/ros/humble/setup.bash',
@@ -109,11 +123,21 @@ def _launch_setup(context, *args, **kwargs):
     if storage not in ('sqlite3', 'mcap'):
         raise RuntimeError(f"bag_storage must be 'sqlite3' or 'mcap', got '{storage}'")
 
-    bag_name = _bag_output_path(suffix)
-    record_cmd = ['bash', '-lc', _record_shell_command(storage, bag_name)]
+    record_perception = _parse_bool(
+        LaunchConfiguration('record_perception').perform(context),
+        'record_perception',
+    )
+    topics = _topics_to_record(record_perception)
 
+    bag_name = _bag_output_path(suffix)
+    record_cmd = ['bash', '-lc', _record_shell_command(storage, bag_name, topics)]
+
+    perception_note = 'with perception' if record_perception else 'without perception (LiDAR + ZED)'
     return [
-        LogInfo(msg=[f'[rosbag] Recording to: {bag_name} (storage: {storage})']),
+        LogInfo(msg=[
+            f'[rosbag] Recording to: {bag_name} (storage: {storage}, {perception_note}, '
+            f'{len(topics)} topics)',
+        ]),
         ExecuteProcess(cmd=record_cmd, output='screen'),
     ]
 
@@ -134,6 +158,11 @@ def generate_launch_description():
             'bag_storage',
             default_value='mcap',
             description="rosbag2 storage backend: 'mcap' (default) or 'sqlite3'.",
+        ),
+        DeclareLaunchArgument(
+            'record_perception',
+            default_value='true',
+            description='Record LiDAR and ZED topics. Set false for smaller GPS/RTK-only bags.',
         ),
         OpaqueFunction(function=_launch_setup),
     ])

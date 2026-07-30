@@ -36,6 +36,9 @@ configure_cyclonedds
 
 export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
 
+_dds_shell_setup='source /workspace/docker/dds_env.sh && configure_cyclonedds'
+grep -qxF "${_dds_shell_setup}" ~/.bashrc 2>/dev/null || echo "${_dds_shell_setup}" >> ~/.bashrc
+
 echo "[autonomy] workspace built (blueboat_nav2, mission_planner)"
 echo "[autonomy] ready — launch experiments with:"
 echo "  docker exec -it mini_bream_autonomy bash"

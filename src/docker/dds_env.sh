@@ -4,7 +4,17 @@
 configure_cyclonedds() {
   export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
 
+  # Compose may pass CYCLONEDDS_URI="" — treat as unset so auto-detection runs.
+  if [[ -z "${CYCLONEDDS_URI:-}" ]]; then
+    unset CYCLONEDDS_URI
+  fi
+
   if [[ -n "${CYCLONEDDS_URI:-}" ]]; then
+    return 0
+  fi
+
+  if [[ -n "${AUTONOMY_CYCLONEDDS_URI:-}" ]]; then
+    export CYCLONEDDS_URI="${AUTONOMY_CYCLONEDDS_URI}"
     return 0
   fi
 
