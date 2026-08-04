@@ -32,7 +32,7 @@ transforms:
     translation: {x: -0.64135, y: 0.0, z: 0.0}
     rpy: [0.0, 0.0, 0.0]
 
-  # Midpoint between antennas (used by moving_base_rtk averaged fix).
+  # Midpoint between antennas (used by rel_pos_heading averaged fix).
   - parent: base_link
     child: gps_center_link
     translation: {x: 0.0, y: 0.0, z: 0.0}

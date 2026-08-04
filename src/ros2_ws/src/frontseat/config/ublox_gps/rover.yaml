@@ -1,9 +1,54 @@
-ublox_gps_node:
+# ZED-F9P rover (moving-base RTK secondary).
+# Physical link: base UART2 TX -> rover UART1 RX (RTCM only on that wire).
+# Host link: USB (/dev/ttyACM0).
+#
+# config_on_startup=true applies YAML settings to receiver RAM each launch.
+# save_on_shutdown=false ensures nothing is written to flash.
+ublox_gps_rover:
   ros__parameters:
-    debug: 1                    # Range 0-4 (0 means no debug statements will print)
+    debug: 1 # Range 0-4 (0 means no debug statements will print)
     device: /dev/ttyACM0
     frame_id: gps_rover
+
+    config_on_startup: true
+    save_on_shutdown: false
+    clear_bbr: false
+
+    # Match base rate.
+    rate: 8.0
+    nav_rate: 1
+
+    dynamic_model: portable
+    fix_mode: auto
+    dgnss_mode: 2  # RTK fixed
+
+    # Moving-base rover: TMODE3 disabled (corrections received on UART1).
+    tmode3: 0
+
+    # USB to host: UBX only (keep config channel, disable NMEA/RTCM on USB).
+    # PROTO_UBX=1, PROTO_NMEA=2, PROTO_RTCM3=32
+    usb.in: 1
+    usb.out: 1
+
+    # Physical UART1 from base: RTCM in only.
+    uart1:
+      baudrate: 460800
+      in: 32
+      out: 0
+
+    inf:
+      all: false
+      error: true
+      warning: true
+
     publish:
+      all: false
+      nmea: false
       nav:
-        all: true
-    config_on_startup: false
+        all: false
+        pvt: true
+        relposned: true
+        heading: true
+      rxm:
+        all: false
+        rtcm: false
