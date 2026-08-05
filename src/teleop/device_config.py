@@ -20,6 +20,7 @@ class DeviceConfig:
     ros_timeout_s: float = 0.5
     daemon_host: str = "127.0.0.1"
     daemon_port: int = 5600
+    thrust_scale: float = 0.7
 
     @classmethod
     def from_dict(cls, data: dict) -> "DeviceConfig":
@@ -32,6 +33,7 @@ class DeviceConfig:
             ros_timeout_s=float(data.get("ros_timeout_s", 0.5)),
             daemon_host=str(data.get("daemon_host", "127.0.0.1")),
             daemon_port=int(data.get("daemon_port", 5600)),
+            thrust_scale=float(data.get("thrust_scale", 0.7)),
         )
 
 

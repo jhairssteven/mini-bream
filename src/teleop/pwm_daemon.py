@@ -42,10 +42,12 @@ class PwmDaemon:
         right_pin: int,
         radio_timeout_s: float,
         ros_timeout_s: float,
+        thrust_scale: float,
         tick_hz: float,
     ) -> None:
         self.radio_timeout_s = radio_timeout_s
         self.ros_timeout_s = ros_timeout_s
+        self.thrust_scale = thrust_scale
         self.tick_period = 1.0 / tick_hz
 
         self._radio: IpcCommand | None = None
@@ -124,7 +126,9 @@ class PwmDaemon:
                     if source != self._active:
                         logger.info("Active source → %s", source)
                         self._active = source
-                    self.motors.set_thrust(left*0.4, -right*0.4)
+                    self.motors.set_thrust(
+                        left * self.thrust_scale, -right * self.thrust_scale
+                    )
                     next_tick = now + self.tick_period
                 timeout = max(0.0, next_tick - time.monotonic())
                 select.select([self.sock], [], [], timeout)
@@ -162,6 +166,7 @@ def main() -> None:
         right_pin=cfg.right_pin,
         radio_timeout_s=cfg.radio_timeout_s,
         ros_timeout_s=cfg.ros_timeout_s,
+        thrust_scale=cfg.thrust_scale,
         tick_hz=args.rate,
     ).run()
 
