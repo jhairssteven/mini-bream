@@ -1,14 +1,14 @@
 # ZED-F9P moving-base (primary / correction source).
 # Physical link: base UART2 TX -> rover UART1 RX.
 # RTCM MSM4 output on UART2 stays in u-center (driver tmode3=0 does not push
-# rtcm.ids to the receiver). Host link: USB (/dev/ttyACM1).
+# rtcm.ids to the receiver). Host link: USB (/dev/ttyACM0).
 #
 # config_on_startup=true applies YAML settings to receiver RAM each launch.
 # save_on_shutdown=false ensures nothing is written to flash.
 ublox_gps_base:
   ros__parameters:
     debug: 1 # Range 0-4 (0 means no debug statements will print)
-    device: /dev/ttyACM1
+    device: /dev/ttyACM0
     frame_id: gps_base
 
     config_on_startup: true

@@ -60,11 +60,14 @@ def generate_launch_description():
         parameters=[{'config_path': tf_config}],
     )
 
+    filtering_config = os.path.join(config_dir, 'heading', 'filtering.yaml')
+
     rel_pos_heading = Node(
         package='frontseat',
         executable='rel_pos_heading',
         name='rel_pos_heading',
         output='screen',
+        parameters=[filtering_config],
         remappings=[
             ('/fix/center', '/wamv/sensors/gps/gps/fix'),
             ('/baseline/heading', '/wamv/sensors/imu/imu/data'),
@@ -72,11 +75,41 @@ def generate_launch_description():
         ],
     )
 
+    heading_ekf = Node(
+        package='frontseat',
+        executable='heading_ekf',
+        name='heading_ekf',
+        output='screen',
+        parameters=[filtering_config],
+        remappings=[
+            ('/baseline/heading', '/wamv/sensors/imu/imu/data'),
+            ('/baseline/heading/deg', '/heading/deg'),
+        ],
+    )
+
+    gps_map_odom = Node(
+        package='frontseat',
+        executable='gps_map_odom',
+        name='gps_map_odom',
+        output='screen',
+        parameters=[{
+            'gps_topic': '/wamv/sensors/gps/gps/fix',
+            'heading_topic': '/baseline/heading/raw',
+            'map_frame': 'map',
+            'base_frame': 'base_link',
+            'odom_topic': '/odom',
+            'publish_tf': True,
+            'min_fix_status': 0,
+        }],
+    )
+
     return LaunchDescription([
         gps_rover,
         gps_base,
         static_tf,
         rel_pos_heading,
+        heading_ekf,
+        gps_map_odom,
         RegisterEventHandler(
             event_handler=launch.event_handlers.OnProcessExit(
                 target_action=gps_rover,

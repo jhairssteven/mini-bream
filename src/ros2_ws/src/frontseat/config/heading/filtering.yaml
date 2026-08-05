@@ -1,0 +1,23 @@
+# Field-test overlay: enable EKF so raw, low-pass, and EKF markers publish together.
+# EKF tuned to track NAV-RELPOSNED closely; IMU only smooths between ~8 Hz GPS updates.
+
+/**:
+  ros__parameters:
+    low_pass:
+      enabled: true
+      alpha: 0.25
+    ekf:
+      enabled: true
+      process_noise_var: 0.0001
+      max_variance_rad2: 0.005
+      gps_variance_scale: 0.02
+      max_innovation_reset_deg: 20.0
+      imu_timeout_s: 0.15
+      use_imu_predict: true
+      imu_topic: /zed/zed/imu/data
+      gps_heading_topic: /baseline/heading/raw
+      output_imu_topic: /baseline/heading
+      output_deg_topic: /baseline/heading/deg
+      output_marker_topic: /baseline/heading/marker/ekf
+      publish_rate_hz: 50.0
+      gyro_z_max_rad_s: 3.0

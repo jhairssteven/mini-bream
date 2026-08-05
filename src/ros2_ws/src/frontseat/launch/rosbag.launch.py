@@ -29,6 +29,9 @@ CORE_TOPICS = [
     '/wamv/sensors/gps/gps/fix',
     '/wamv/sensors/imu/imu/data',
     '/heading/deg',
+    '/baseline/heading/marker/raw',
+    '/baseline/heading/marker/lfp',
+    '/baseline/heading/marker/ekf',
     '/navheading',
     '/navrelposned',
     '/navstatus',
@@ -49,6 +52,7 @@ ZED_TOPICS = [
     '/zed/zed/rgb/color/rect/image',
     '/zed/zed/rgb/color/rect/camera_info',
     '/zed/zed/point_cloud/cloud_registered',
+    '/zed/zed/imu/data',
 ]
 
 PERCEPTION_TOPICS = LIDAR_TOPICS + ZED_TOPICS

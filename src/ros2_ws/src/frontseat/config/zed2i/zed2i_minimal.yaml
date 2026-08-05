@@ -1,4 +1,4 @@
-# Minimal ZED 2i publishing: RGB + camera_info + point cloud only.
+# Minimal ZED 2i publishing: RGB + camera_info + point cloud + IMU only.
 /**:
   ros__parameters:
     general:
@@ -19,7 +19,7 @@
       publish_stereo: false
 
     sensors:
-      publish_imu: false
+      publish_imu: true
       publish_imu_raw: false
       publish_cam_imu_transf: false
       publish_mag: false

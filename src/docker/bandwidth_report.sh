@@ -11,7 +11,7 @@
 #   PI_SSH_USER=pi  JETSON_SSH_USER=orin-nano  GROUND_SSH_USER=steven
 #   GROUND_REPO=/path/on/ground/to/mini-bream/src/docker
 #   MEASURE_SEC=25  IPERF_SEC=12  ROUTER_MODEL="TP-Link TL-WR841N"
-#   GROUND_WIFI_IFACE=wlp5s0  PI_ETH_IFACE=eth0
+#   GROUND_IFACE=wlp5s0  PI_ETH_IFACE=eth0
 #   SKIP_IPERF=1  SKIP_GROUND=1  SKIP_JETSON=1
 #
 # SSH auth: prefer keys. For password auth, set (not recommended for commits):
@@ -43,7 +43,7 @@ IPERF_SEC="${IPERF_SEC:-12}"
 ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
 ROUTER_MODEL="${ROUTER_MODEL:-TP-Link TL-WR841N}"
 
-GROUND_WIFI_IFACE="${GROUND_WIFI_IFACE:-wlp5s0}"
+GROUND_IFACE="${GROUND_IFACE:-wlp5s0}"
 PI_ETH_IFACE="${PI_ETH_IFACE:-eth0}"
 
 PERCEPTION_CONTAINER="${PERCEPTION_CONTAINER:-mini_bream_perception}"
@@ -252,17 +252,17 @@ declare -A GROUND_WIFI_MBS=()
 declare -A GROUND_ROS_MBS=()
 
 if [[ "${SKIP_GROUND:-0}" != "1" ]]; then
-  section "3. Ground station receive (${GROUND_IP}, Wi‑Fi ${GROUND_WIFI_IFACE})"
+  section "3. Ground station receive (${GROUND_IP}, ${GROUND_IFACE})"
 
   GROUND_REPO_RESOLVED="$(detect_ground_repo)"
   echo "Ground docker config: ${GROUND_REPO_RESOLVED}/${GROUND_DDS_FILE}"
 
   subsection "Wi‑Fi link"
-  ssh_ground "iw dev ${GROUND_WIFI_IFACE} link 2>/dev/null || ip -br addr show ${GROUND_WIFI_IFACE}" 2>/dev/null || echo "  (could not read Wi‑Fi info)"
+  ssh_ground "iw dev ${GROUND_IFACE} link 2>/dev/null || ip -br addr show ${GROUND_IFACE}" 2>/dev/null || echo "  (could not read Wi‑Fi info)"
 
   for topic in "${HEAVY_TOPICS[@]}"; do
     subsection "${topic}"
-    if OUT="$(ground_ros_bw "${topic}" "${GROUND_REPO_RESOLVED}" "${GROUND_WIFI_IFACE}" 2>/dev/null || true)"; then
+    if OUT="$(ground_ros_bw "${topic}" "${GROUND_REPO_RESOLVED}" "${GROUND_IFACE}" 2>/dev/null || true)"; then
       ros_line="$(echo "${OUT}" | grep '^ROS_LINE:' | cut -d: -f2- | sed 's/^://')"
       wifi_mbs="$(echo "${OUT}" | grep '^WIFI_MBS:' | cut -d: -f2-)"
       if [[ -n "${ros_line}" ]]; then

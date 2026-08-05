@@ -1,16 +1,17 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<!-- Ground station: bind DDS to robot Wi-Fi.
-     Override if interface name differs: GROUND_WIFI_IFACE=wlp5s0 -->
+<!-- Ground station fallback (start_ground_station.sh generates runtime config).
+     Override via GROUND_IFACE or GROUND_DDS_ADDRESS. -->
 <CycloneDDS xmlns="https://cdds.io/config">
   <Domain>
     <General>
       <Interfaces>
-        <NetworkInterface name="enp4s0" multicast="true"/>
+        <NetworkInterface address="192.168.0.104" multicast="true"/>
       </Interfaces>
       <AllowMulticast>true</AllowMulticast>
     </General>
     <Discovery>
       <ParticipantIndex>auto</ParticipantIndex>
+      <MaxAutoParticipantIndex>120</MaxAutoParticipantIndex>
       <Peers>
         <Peer address="192.168.0.100"/>
         <Peer address="192.168.0.102"/>

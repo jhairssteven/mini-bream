@@ -41,7 +41,15 @@ def build_heading_marker(
     arrow_length: float = 3.0,
     shaft_width: float = 0.25,
     color: tuple[float, float, float, float] = (0.1, 0.8, 0.2, 1.0),
+    position_offset: tuple[float, float, float] = (0.0, 0.0, 0.0),
+    body_aligned: bool = False,
 ) -> Marker:
+    """Build an RViz ARROW marker.
+
+    By default yaw_rad is applied in frame_id (ENU geographic heading in that frame).
+    With body_aligned=True, yaw_rad is a small body-frame offset from +X (bow); identity
+  means the arrow points along the boat traversal axis.
+    """
     marker = Marker()
     marker.header.stamp = stamp
     marker.header.frame_id = frame_id
@@ -49,6 +57,9 @@ def build_heading_marker(
     marker.id = marker_id
     marker.type = Marker.ARROW
     marker.action = Marker.ADD
+    marker.pose.position.x = position_offset[0]
+    marker.pose.position.y = position_offset[1]
+    marker.pose.position.z = position_offset[2]
     marker.pose.orientation = yaw_to_quaternion(yaw_rad)
     marker.scale.x = arrow_length
     marker.scale.y = shaft_width

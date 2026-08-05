@@ -5,7 +5,7 @@
 #   ./mini_bream_env.sh start pi              # pwm_daemon + radio_rx + frontseat
 #   ./mini_bream_env.sh start jetson          # LiDAR + ZED perception
 #   ./mini_bream_env.sh start gs              # telemetry_tx + RViz ground_station
-#   ./mini_bream_env.sh start gs --h0-boat    # RViz with boat path overlays (world frame)
+#   ./mini_bream_env.sh start gs --heading-compare  # RViz: raw vs LPF vs EKF heading arrows
 #   ./mini_bream_env.sh start gs --h0-boat --sim-viz  # same + use_sim_time (Gazebo sim)
 #   ./mini_bream_env.sh stop pi               # remove Pi containers (compose down -v)
 #   ./mini_bream_env.sh stop jetson           # remove perception
@@ -23,7 +23,7 @@
 # Environment (optional):
 #   ROS_DOMAIN_ID=0      Must match on all hosts (default 0)
 #   LIDAR_IFACE=eth0     Jetson LiDAR NIC (default eth0)
-#   GROUND_WIFI_IFACE=wlp5s0
+#   GROUND_IFACE=wlp5s0
 #   RADIO_SERIAL_PORT=...  SiK radio by-id path
 #   PWM_BACKEND_OVERRIDE=dry_run
 
@@ -77,6 +77,7 @@ NO_TELEMETRY=0
 DETACH_FRONTSEAT=0
 H0_BOAT_RVIZ=0
 SIM_VIZ=0
+HEADING_COMPARE_RVIZ=0
 
 usage() {
   sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'
@@ -153,6 +154,24 @@ setup_ground_display() {
   fi
 }
 
+detect_ground_dds_address() {
+  if [[ -n "${GROUND_IFACE:-}" ]]; then
+    return 0
+  fi
+  if [[ -n "${GROUND_DDS_ADDRESS:-}" ]]; then
+    if ip -4 addr show | grep -q "inet ${GROUND_DDS_ADDRESS}/"; then
+      return 0
+    fi
+    log "warning: GROUND_DDS_ADDRESS=${GROUND_DDS_ADDRESS} not on this host; auto-detecting"
+  fi
+  local detected
+  detected="$(ip -4 route get 192.168.0.100 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i=="src") print $(i+1)}' | head -1)"
+  if [[ -n "${detected}" ]]; then
+    export GROUND_DDS_ADDRESS="${detected}"
+    log "GROUND_DDS_ADDRESS=${GROUND_DDS_ADDRESS} (auto-detected for robot LAN)"
+  fi
+}
+
 verify_ros_topics() {
   local container="$1"
   local pattern="${2:-rslidar|zed|fix}"
@@ -222,10 +241,16 @@ start_gs() {
   log "Starting ground station (ROS_DOMAIN_ID=${ROS_DOMAIN_ID})..."
 
   setup_ground_display
+  detect_ground_dds_address
 
   if [[ "${H0_BOAT_RVIZ}" -eq 1 ]]; then
     export RVIZ_CONFIG=/workspace/docker/config/h0_boat.rviz
     log "Using boat experiment RViz config (${RVIZ_CONFIG})"
+  fi
+
+  if [[ "${HEADING_COMPARE_RVIZ}" -eq 1 ]]; then
+    export RVIZ_CONFIG=/workspace/docker/config/heading_compare.rviz
+    log "Using heading comparison RViz config (${RVIZ_CONFIG})"
   fi
 
   if [[ "${SIM_VIZ}" -eq 1 ]]; then
@@ -315,6 +340,7 @@ while [[ $# -gt 0 ]]; do
     --detach-frontseat) DETACH_FRONTSEAT=1 ;;
     --h0-boat|--ilos-boat) H0_BOAT_RVIZ=1 ;;
     --sim-viz) SIM_VIZ=1 ;;
+    --heading-compare) HEADING_COMPARE_RVIZ=1 ;;
     -h|--help) usage 0 ;;
     *) die "unknown argument: $1 (try --help)" ;;
   esac

@@ -1,13 +1,13 @@
 # ZED-F9P rover (moving-base RTK secondary).
 # Physical link: base UART2 TX -> rover UART1 RX (RTCM only on that wire).
-# Host link: USB (/dev/ttyACM0).
+# Host link: USB (/dev/ttyACM1).
 #
 # config_on_startup=true applies YAML settings to receiver RAM each launch.
 # save_on_shutdown=false ensures nothing is written to flash.
 ublox_gps_rover:
   ros__parameters:
     debug: 1 # Range 0-4 (0 means no debug statements will print)
-    device: /dev/ttyACM0
+    device: /dev/ttyACM1
     frame_id: gps_rover
 
     config_on_startup: true

@@ -19,6 +19,7 @@
         <Peer address="192.168.0.102"/>
         <Peer address="192.168.0.103"/> <!-- pc -->
         <Peer address="192.168.0.104"/> <!-- c2 -->
+        <Peer address="192.168.0.105"/> <!-- c2 (ethernet) -->
       </Peers>
     </Discovery>
   </Domain>

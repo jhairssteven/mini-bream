@@ -1,10 +1,11 @@
 # ZED 2i (Jetson perception container)
 
-Runs in the Jetson `perception` service (`mini-bream:perception` image). Publishes only:
+Runs in the Jetson `perception` service (`mini-bream:perception` image). Publishes:
 
 - `/zed/zed/rgb/color/rect/image` (`sensor_msgs/Image`)
 - `/zed/zed/rgb/color/rect/camera_info` (`sensor_msgs/CameraInfo`)
 - `/zed/zed/point_cloud/cloud_registered` (`sensor_msgs/PointCloud2`)
+- `/zed/zed/imu/data` (`sensor_msgs/Imu`, ~100 Hz — used by `heading_ekf` when enabled)
 
 ## Offline calibration file
 

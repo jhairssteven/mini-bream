@@ -27,7 +27,7 @@ start_launch() {
 }
 
 start_launch motor_control motor_control.launch.py
-start_launch moving_base_rtk moving_base_rtk.launch.py
+start_launch rel_pos_heading rel_pos_heading.launch.py
 
 echo "[frontseat] sessions: $(tmux ls 2>/dev/null || echo none)"
 

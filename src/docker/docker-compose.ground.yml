@@ -1,8 +1,10 @@
 name: mini-bream-ground
 
-# Ground station RViz2 viewer (192.168.0.103). Subscribes to robot topics over DDS.
-# Also runs gps_rtk_ground_viz → /ground/rtk/* (GPS paths + heading in map frame).
-# Requires host networking + Cyclone DDS peers (see cyclonedds.xml).
+# Ground station RViz2 viewer. Subscribes to robot topics over DDS.
+#
+# Heading comparison field test:
+#   RVIZ_CONFIG=/workspace/docker/config/heading_compare.rviz \
+#     docker compose -f docker-compose.ground.yml up ground_station
 #
 # On the ground-station PC (with a display):
 #   xhost +local:docker
@@ -27,9 +29,9 @@ services:
       - QT_X11_NO_MITSHM=1
       - XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-/tmp/runtime-root}
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}  # must match Pi/Jetson (default 0)
-      - GROUND_WIFI_IFACE=${GROUND_WIFI_IFACE:-wlp5s0}
+      - GROUND_IFACE=${GROUND_IFACE:-}
+      - GROUND_DDS_ADDRESS=${GROUND_DDS_ADDRESS:-}
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-      - CYCLONEDDS_URI=file:///etc/cyclonedds.ground.xml
       - RVIZ_CONFIG=${RVIZ_CONFIG:-/workspace/docker/config/molo_autonomy.rviz}
       - USE_SIM_TIME=${USE_SIM_TIME:-0}
     volumes:
