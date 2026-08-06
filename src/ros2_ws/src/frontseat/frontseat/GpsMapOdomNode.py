@@ -3,12 +3,16 @@
 
 from __future__ import annotations
 
+from collections import deque
+
 import rclpy
-from geometry_msgs.msg import TransformStamped
+from geometry_msgs.msg import Point, TransformStamped
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from sensor_msgs.msg import Imu, NavSatFix
+from std_msgs.msg import ColorRGBA
 from tf2_ros import TransformBroadcaster
+from visualization_msgs.msg import Marker
 
 from frontseat.heading.angles import yaw_from_quaternion
 from frontseat.heading.geo import latlon_to_local_enu
@@ -27,6 +31,9 @@ class GpsMapOdomNode(Node):
         self.declare_parameter('odom_topic', '/odom')
         self.declare_parameter('publish_tf', True)
         self.declare_parameter('min_fix_status', 0)
+        self.declare_parameter('flatten_z', True)
+        self.declare_parameter('recent_path_max_points', 150)
+        self.declare_parameter('recent_path_topic', '/gps/center/recent_path')
 
         gps_topic = self.get_parameter('gps_topic').value
         heading_topic = self.get_parameter('heading_topic').value
@@ -34,26 +41,32 @@ class GpsMapOdomNode(Node):
         self._base_frame = self.get_parameter('base_frame').value
         self._publish_tf = bool(self.get_parameter('publish_tf').value)
         self._min_fix_status = int(self.get_parameter('min_fix_status').value)
+        self._flatten_z = bool(self.get_parameter('flatten_z').value)
+        self._recent_path_max = max(2, int(self.get_parameter('recent_path_max_points').value))
+        recent_path_topic = self.get_parameter('recent_path_topic').value
 
         self._origin_lat: float | None = None
         self._origin_lon: float | None = None
         self._origin_alt: float | None = None
         self._last_yaw_rad: float | None = None
         self._last_position_enu: tuple[float, float, float] | None = None
-        self._last_stamp = None
+        self._recent_points: deque[tuple[float, float]] = deque(maxlen=self._recent_path_max)
 
         self._tf_broadcaster = TransformBroadcaster(self)
         self._odom_pub = self.create_publisher(
             Odometry, self.get_parameter('odom_topic').value, best_effort_volatile_qos
         )
+        self._recent_path_pub = self.create_publisher(Marker, recent_path_topic, 10)
 
         self.create_subscription(NavSatFix, gps_topic, self._gps_cb, best_effort_volatile_qos)
         self.create_subscription(Imu, heading_topic, self._heading_cb, best_effort_volatile_qos)
         self.create_timer(0.1, self._republish_cb)
 
+        z_mode = 'flattened (2D)' if self._flatten_z else 'GPS altitude'
         self.get_logger().info(
             f'gps_map_odom: GPS={gps_topic}, heading={heading_topic}, '
-            f'{self._map_frame}->{self._base_frame}'
+            f'{self._map_frame}->{self._base_frame}, z={z_mode}, '
+            f'recent_path={recent_path_topic} (max {self._recent_path_max})'
         )
 
     def _gps_cb(self, msg: NavSatFix) -> None:
@@ -83,11 +96,9 @@ class GpsMapOdomNode(Node):
             self._origin_lon,
             self._origin_alt,
         )
-        self._last_stamp = msg.header.stamp
         self._publish()
 
     def _heading_cb(self, msg: Imu) -> None:
-        # build_imu_msg marks roll/pitch unknown (cov[0,4]=-1); yaw variance is at [8].
         if msg.orientation_covariance[8] < 0.0:
             return
         self._last_yaw_rad = yaw_from_quaternion(
@@ -107,8 +118,14 @@ class GpsMapOdomNode(Node):
 
         stamp = self.get_clock().now().to_msg()
         east, north, up = self._last_position_enu
+        if self._flatten_z:
+            up = 0.0
+
         yaw_rad = self._last_yaw_rad if self._last_yaw_rad is not None else 0.0
         quat = yaw_to_quaternion(yaw_rad)
+
+        self._recent_points.append((east, north))
+        self._publish_recent_path(stamp)
 
         odom = Odometry()
         odom.header.stamp = stamp
@@ -136,6 +153,30 @@ class GpsMapOdomNode(Node):
         tf_msg.transform.translation.z = up
         tf_msg.transform.rotation = quat
         self._tf_broadcaster.sendTransform(tf_msg)
+
+    def _publish_recent_path(self, stamp) -> None:
+        if len(self._recent_points) < 2:
+            return
+
+        marker = Marker()
+        marker.header.stamp = stamp
+        marker.header.frame_id = self._map_frame
+        marker.ns = 'gps_center_recent'
+        marker.id = 0
+        marker.type = Marker.LINE_STRIP
+        marker.action = Marker.ADD
+        marker.scale.x = 0.08
+        marker.color = ColorRGBA(r=1.0, g=0.65, b=0.1, a=0.9)
+        marker.pose.orientation.w = 1.0
+
+        for x, y in self._recent_points:
+            point = Point()
+            point.x = x
+            point.y = y
+            point.z = 0.05
+            marker.points.append(point)
+
+        self._recent_path_pub.publish(marker)
 
 
 def main(args=None) -> None:

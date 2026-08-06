@@ -100,6 +100,9 @@ def generate_launch_description():
             'odom_topic': '/odom',
             'publish_tf': True,
             'min_fix_status': 0,
+            'flatten_z': True,
+            'recent_path_max_points': 150,
+            'recent_path_topic': '/gps/center/recent_path',
         }],
     )
 

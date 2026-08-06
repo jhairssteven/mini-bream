@@ -29,6 +29,8 @@ CORE_TOPICS = [
     '/wamv/sensors/gps/gps/fix',
     '/wamv/sensors/imu/imu/data',
     '/heading/deg',
+    '/odom',
+    '/gps/center/recent_path',
     '/baseline/heading/marker/raw',
     '/baseline/heading/marker/lfp',
     '/baseline/heading/marker/ekf',
