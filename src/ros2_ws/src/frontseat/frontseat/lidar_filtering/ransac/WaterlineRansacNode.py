@@ -22,14 +22,14 @@ from std_msgs.msg import ColorRGBA, Header
 from tf2_ros import Buffer, TransformException, TransformListener
 from visualization_msgs.msg import Marker, MarkerArray
 
-from frontseat.ransac.plane import (
+from frontseat.lidar_filtering.ransac.plane import (
     PlaneFit,
     RansacParams,
     fit_sequential_planes,
     inlier_extents,
     radial_mask,
 )
-from frontseat.self_filter import read_xyz_grid
+from frontseat.lidar_filtering.self_filter import read_xyz_grid
 
 
 class WaterlineRansacNode(Node):
@@ -38,7 +38,7 @@ class WaterlineRansacNode(Node):
 
         default_config = os.path.join(
             get_package_share_directory('frontseat'),
-            'config', 'ransac', 'waterline.yaml',
+            'config', 'lidar_filtering', 'ransac', 'waterline.yaml',
         )
         self.declare_parameter('config_path', default_config)
         config_path = self.get_parameter('config_path').get_parameter_value().string_value
@@ -46,7 +46,9 @@ class WaterlineRansacNode(Node):
             config_path = default_config
         self._config = self._load_config(config_path)
 
-        self._input_topic = str(self._config.get('input_topic', '/rslidar_points'))
+        self._input_topic = str(
+            self._config.get('input_topic', '/rslidar_points/self_filtered'),
+        )
         self._fit_frame = str(self._config.get('fit_frame', 'base_link'))
         self._up_axis = np.array(
             self._config.get('up_axis', [0.0, 0.0, 1.0]), dtype=np.float64,

@@ -3,7 +3,7 @@
 See ``README.md`` in this directory for the leftover-cloud pipeline and YAML.
 """
 
-from frontseat.ransac.plane import (
+from frontseat.lidar_filtering.ransac.plane import (
     PlaneFit,
     RansacParams,
     fit_sequential_planes,

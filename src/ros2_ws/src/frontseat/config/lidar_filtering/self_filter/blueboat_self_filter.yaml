@@ -13,10 +13,11 @@ debug:
   markers_topic: /self_filter/debug_markers
   publish_removed_cloud: true
 
+# Stage 1 of lidar_filtering.launch.py. Output feeds waterline RANSAC.
 point_clouds:
   - input_topic: /rslidar_points
-    output_topic: /rslidar_points/filtered
-    removed_topic: /rslidar_points/removed
+    output_topic: /rslidar_points/self_filtered
+    removed_topic: /rslidar_points/self_removed
 
 # Hull envelope below deck (1.20 m × 0.93 m × 0.46 m).
 # deck_padding extends the box slightly above z=0 for deck-surface returns.

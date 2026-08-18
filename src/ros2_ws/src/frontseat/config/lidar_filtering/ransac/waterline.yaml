@@ -1,9 +1,9 @@
-# Sequential multi-plane RANSAC. Each pass is fit on leftover in-radius
-# points (previous inliers removed). Plane 1 is water. The removed cloud
-# is the leftover after all passes. Fit frame is REP-103 +Z up (base_link).
+# Sequential multi-plane RANSAC (stage 2 of lidar_filtering.launch.py).
+# Input is self-filter output. removed_topic (leftover after all passes)
+# feeds clustering. Fit frame is REP-103 +Z up (base_link).
 # Published clouds keep the input frame_id.
 
-input_topic: /rslidar_points
+input_topic: /rslidar_points/self_filtered
 colored_topic: /rslidar_points/waterline_colored
 removed_topic: /rslidar_points/waterline_removed
 markers_topic: /waterline_ransac/debug_markers

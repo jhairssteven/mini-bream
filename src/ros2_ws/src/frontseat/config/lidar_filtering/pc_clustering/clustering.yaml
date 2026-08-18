@@ -1,9 +1,10 @@
-# DBSCAN noise filter on waterline leftovers. Sparse spray is dropped only if
-# it is not density-reachable: min_samples must be >1. min_samples: 1 makes
-# every point a core and glues the 4 m cylinder into one cluster (removed=0).
+# Stage 3 of lidar_filtering.launch.py. Input is waterline leftovers.
+# output_topic is the pipeline product consumed by other modules.
+# Sparse spray is dropped only if it is not density-reachable: min_samples
+# must be >1. min_samples: 1 glues the 4 m cylinder into one cluster.
 
 input_topic: /rslidar_points/waterline_removed
-output_topic: /rslidar_points/clustered
+output_topic: /rslidar_points/filtered
 removed_topic: /rslidar_points/clustered_removed
 markers_topic: /pc_clustering/debug_markers
 

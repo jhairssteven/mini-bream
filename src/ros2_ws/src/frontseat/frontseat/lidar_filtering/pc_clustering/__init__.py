@@ -3,7 +3,7 @@
 See ``README.md`` in this directory for topics, YAML knobs, and launch.
 """
 
-from frontseat.pc_clustering.dbscan import (
+from frontseat.lidar_filtering.pc_clustering.dbscan import (
     ClusterBox,
     ClusterParams,
     ClusterResult,

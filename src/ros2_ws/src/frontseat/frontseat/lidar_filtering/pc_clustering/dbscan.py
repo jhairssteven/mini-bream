@@ -14,7 +14,7 @@ from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
 from scipy.spatial import cKDTree
 
-from frontseat.ransac.plane import radial_mask
+from frontseat.lidar_filtering.ransac.plane import radial_mask
 
 _MIN_BOX = 0.05
 

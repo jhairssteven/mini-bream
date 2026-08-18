@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from frontseat.pc_clustering.dbscan import (
+from frontseat.lidar_filtering.pc_clustering.dbscan import (
     ClusterParams,
     apply_size_filter,
     cluster_points,

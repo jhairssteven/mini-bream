@@ -27,7 +27,8 @@ normal tilts more than `max_tilt_deg` from `up_axis`.
 
 The `*_removed` cloud is the leftover after **every** successful pass: all
 fitted-plane inliers are stripped. Points that never entered RANSAC (outside
-the z-band / radius cylinder) stay in that cloud.
+the z-band / radius cylinder) stay in that cloud. That leftover is the input
+to clustering (stage 3). Overview: [`../README.md`](../README.md).
 
 ```
 candidates
@@ -50,8 +51,9 @@ candidates
 |------|------|
 | `plane.py` | RANSAC + sequential leftover-cloud fitting |
 | `WaterlineRansacNode.py` | ROS 2 node (TF, colorize, strip all inliers, markers) |
-| `config/ransac/waterline.yaml` | Topics and per-pass knobs |
-| `launch/waterline_ransac.launch.py` | Node only; play bags separately |
+| `config/lidar_filtering/ransac/waterline.yaml` | Topics and per-pass knobs |
+| `launch/waterline_ransac.launch.py` | This node only |
+| `launch/lidar_filtering.launch.py` | Full pipeline |
 
 ## Topics
 
@@ -70,6 +72,7 @@ the candidate cylinder.
 ## Launch
 
 ```bash
+ros2 launch frontseat lidar_filtering.launch.py use_sim_time:=true
 ros2 launch frontseat waterline_ransac.launch.py use_sim_time:=true
 ```
 

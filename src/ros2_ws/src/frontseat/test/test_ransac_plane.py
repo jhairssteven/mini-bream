@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from frontseat.ransac.plane import (
+from frontseat.lidar_filtering.ransac.plane import (
     RansacParams,
     fit_sequential_planes,
     fit_waterline_plane,

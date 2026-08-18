@@ -20,7 +20,7 @@ from std_msgs.msg import ColorRGBA, Header
 from tf2_ros import Buffer, TransformException, TransformListener
 from visualization_msgs.msg import Marker, MarkerArray
 
-from frontseat.self_filter import (
+from . import (
     build_keep_mask,
     load_filter_boxes,
     read_xyz_grid,
@@ -33,7 +33,7 @@ class SelfFilterNode(Node):
 
         default_config = os.path.join(
             get_package_share_directory('frontseat'),
-            'config', 'self_filter', 'blueboat_self_filter.yaml',
+            'config', 'lidar_filtering', 'self_filter', 'blueboat_self_filter.yaml',
         )
         self.declare_parameter('config_path', default_config)
         self.declare_parameter('debug_enabled', False)

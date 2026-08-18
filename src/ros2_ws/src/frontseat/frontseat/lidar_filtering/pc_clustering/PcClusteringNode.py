@@ -24,13 +24,13 @@ from std_msgs.msg import ColorRGBA, Header
 from tf2_ros import Buffer, TransformException, TransformListener
 from visualization_msgs.msg import Marker, MarkerArray
 
-from frontseat.pc_clustering.dbscan import (
+from frontseat.lidar_filtering.pc_clustering.dbscan import (
     ClusterBox,
     ClusterParams,
     cluster_points,
 )
-from frontseat.ransac.plane import radial_mask
-from frontseat.self_filter import read_xyz_grid
+from frontseat.lidar_filtering.ransac.plane import radial_mask
+from frontseat.lidar_filtering.self_filter import read_xyz_grid
 
 
 class PcClusteringNode(Node):
@@ -39,7 +39,7 @@ class PcClusteringNode(Node):
 
         default_config = os.path.join(
             get_package_share_directory('frontseat'),
-            'config', 'pc_clustering', 'clustering.yaml',
+            'config', 'lidar_filtering', 'pc_clustering', 'clustering.yaml',
         )
         self.declare_parameter('config_path', default_config)
         self.declare_parameter('debug_enabled', False)
@@ -66,10 +66,10 @@ class PcClusteringNode(Node):
         )
 
         self._input_topic = str(
-            self._config.get('input_topic', '/rslidar_points'),
+            self._config.get('input_topic', '/rslidar_points/waterline_removed'),
         )
         self._output_topic = str(
-            self._config.get('output_topic', '/rslidar_points/clustered'),
+            self._config.get('output_topic', '/rslidar_points/filtered'),
         )
         cluster_cfg = self._config.get('cluster', {})
         eps_default = cluster_cfg.get('cluster_tolerance', 0.45)

@@ -10,17 +10,20 @@ filtered cloud keeps the same `frame_id` as the input (typically `rslidar`).
 
 | Input | Output | Debug (optional) |
 |-------|--------|------------------|
-| `/rslidar_points` | `/rslidar_points/filtered` | `/rslidar_points/removed` |
+| `/rslidar_points` | `/rslidar_points/self_filtered` | `/rslidar_points/self_removed` |
 
 When `debug.enabled` is true in YAML (or `debug_enabled:=true` at launch):
 - `/self_filter/debug_markers` — RViz cube markers for filter volumes
-- `/rslidar_points/removed` — points removed by the filter (inverse of filtered)
+- `/rslidar_points/self_removed` — points removed by the filter (inverse of self_filtered)
+
+This is stage 1 of the LiDAR pipeline. Overview: [`lidar_filtering/README.md`](../../../frontseat/lidar_filtering/README.md).
 
 Set `debug.enabled: false` in production to skip marker/removed-cloud overhead.
 
 ## Launch
 
 ```bash
+ros2 launch frontseat lidar_filtering.launch.py
 ros2 launch frontseat self_filter.launch.py
 ros2 launch frontseat self_filter.launch.py debug_enabled:=true
 ```

@@ -37,8 +37,9 @@ input cloud
     out-of-radius ──────────────────────────────────────────► output (passthrough)
 ```
 
-Chain after self-filter or waterline RANSAC by pointing `input_topic` at
-`/rslidar_points/filtered` or `/rslidar_points/waterline_removed`.
+This is stage 3 of the LiDAR pipeline. Input is the RANSAC leftover; output
+`/rslidar_points/filtered` is what other modules subscribe to. Overview:
+[`../README.md`](../README.md).
 
 ## Files
 
@@ -46,8 +47,9 @@ Chain after self-filter or waterline RANSAC by pointing `input_topic` at
 |------|------|
 | `dbscan.py` | DBSCAN + size gate + AABB boxes |
 | `PcClusteringNode.py` | ROS 2 node (filtered cloud, optional debug) |
-| `config/pc_clustering/clustering.yaml` | Topics and knobs |
-| `launch/pc_clustering.launch.py` | Node only; play bags separately |
+| `config/lidar_filtering/pc_clustering/clustering.yaml` | Topics and knobs |
+| `launch/pc_clustering.launch.py` | This node only |
+| `launch/lidar_filtering.launch.py` | Full pipeline |
 
 ## Topics
 
@@ -66,6 +68,7 @@ marker and removed-cloud publishing.
 ## Launch
 
 ```bash
+ros2 launch frontseat lidar_filtering.launch.py use_sim_time:=true
 ros2 launch frontseat pc_clustering.launch.py use_sim_time:=true
 ros2 launch frontseat pc_clustering.launch.py use_sim_time:=true debug_enabled:=true
 ```
