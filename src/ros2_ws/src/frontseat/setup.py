@@ -20,6 +20,8 @@ setup(
         ('share/' + package_name + '/config' + '/heading', glob('config/heading/*')),
         ('share/' + package_name + '/config' + '/tf', glob('config/tf/*')),
         ('share/' + package_name + '/config' + '/self_filter', glob('config/self_filter/*')),
+        ('share/' + package_name + '/config' + '/ransac', glob('config/ransac/*')),
+        ('share/' + package_name + '/config' + '/pc_clustering', glob('config/pc_clustering/*')),
         ('share/' + package_name + '/urdf', glob('urdf/*')),
         ('share/' + package_name + '/meshes/blueboat', glob('meshes/blueboat/*')),
     ],
@@ -41,6 +43,8 @@ setup(
             'odom_tf_broadcaster = frontseat.OdomTfBroadcasterNode:main',
             'static_tf_broadcaster = frontseat.StaticTfBroadcasterNode:main',
             'self_filter = frontseat.SelfFilterNode:main',
+            'waterline_ransac = frontseat.ransac.WaterlineRansacNode:main',
+            'pc_clustering = frontseat.pc_clustering.PcClusteringNode:main',
         ],
     },
 )

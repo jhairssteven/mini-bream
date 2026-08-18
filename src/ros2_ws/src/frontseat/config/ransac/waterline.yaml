@@ -1,0 +1,45 @@
+# Sequential multi-plane RANSAC. Each pass is fit on leftover in-radius
+# points (previous inliers removed). Plane 1 is water. The removed cloud
+# is the leftover after all passes. Fit frame is REP-103 +Z up (base_link).
+# Published clouds keep the input frame_id.
+
+input_topic: /rslidar_points
+colored_topic: /rslidar_points/waterline_colored
+removed_topic: /rslidar_points/waterline_removed
+markers_topic: /waterline_ransac/debug_markers
+
+fit_frame: base_link
+up_axis: [0.0, 0.0, 1.0]
+max_radius: 4.0              # XY meters from base_link origin; <=0 disables
+
+ransac:
+  num_planes: 3              # 1 = water only; each extra plane uses leftovers
+  z_min: -2.0                # candidate band in fit_frame
+  z_max: 0.35
+  random_seed: -1            # <0 = nondeterministic
+  first:                     # water plane
+    distance_threshold: 0.22   # meters; loosen for chop
+    max_iterations: 250
+    max_tilt_deg: 12.0         # reject walls / boat sides
+    min_inliers: 100
+    min_inlier_ratio: 0.08
+  second:                    # leftover after water is removed
+    distance_threshold: 0.32
+    max_iterations: 250
+    max_tilt_deg: 12.0
+    min_inliers: 10
+    min_inlier_ratio: 0.08
+  third:                     # leftover after water and plane 2
+    distance_threshold: 0.22
+    max_iterations: 250
+    max_tilt_deg: 12.0
+    min_inliers: 10
+    min_inlier_ratio: 0.08
+
+debug:
+  max_marker_points: 2500
+  plane_thickness: 0.04
+  water_rgb: [30, 144, 255]
+  second_rgb: [50, 205, 50]
+  third_rgb: [255, 215, 0]
+  other_rgb: [255, 140, 0]
