@@ -1,0 +1,23 @@
+# DBSCAN noise filter on waterline leftovers. Sparse spray is dropped only if
+# it is not density-reachable: min_samples must be >1. min_samples: 1 makes
+# every point a core and glues the 4 m cylinder into one cluster (removed=0).
+
+input_topic: /rslidar_points/waterline_removed
+output_topic: /rslidar_points/clustered
+removed_topic: /rslidar_points/clustered_removed
+markers_topic: /pc_clustering/debug_markers
+
+radius_frame: base_link
+max_radius: 4.0              # XY meters from radius_frame; <=0 clusters whole cloud
+
+cluster:
+  eps: 0.25                 # neighbor radius; leftover spray is often <0.45 m apart
+  min_samples: 4            # MUST be >1; core point needs this many neighbors (incl. self)
+  min_cluster_size: 10      # drop clusters smaller than this
+  max_cluster_size: 0       # <=0 disables the oversized-cluster cap
+  voxel_size: 0.0           # 0 = cluster original points (voxel stitching hides spray)
+
+debug:
+  enabled: true
+  publish_markers: true
+  publish_removed_cloud: true

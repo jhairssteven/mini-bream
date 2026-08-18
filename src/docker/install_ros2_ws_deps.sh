@@ -17,6 +17,7 @@ apt-get install -y --no-install-recommends \
   git \
   python3-pip \
   python3-numpy \
+  python3-sklearn \
   python3-colcon-common-extensions \
   python3-rosdep \
   libasio-dev \
