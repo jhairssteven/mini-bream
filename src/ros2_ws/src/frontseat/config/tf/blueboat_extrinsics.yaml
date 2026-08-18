@@ -18,7 +18,7 @@ transforms:
   # RoboSense Airy — middle aft hull, 1 m above boat top, Z down, X yawed 30° toward port.
   - parent: base_link
     child: rslidar
-    translation: {x: -0.33655, y: 0.0, z: 0.7104}
+    translation: {x: -0.27655, y: -0.02, z: 0.7604}
     rpy: [3.14159265, 0.0, 0.523598775]
 
   # Dual RTK antennas (moving base): rover = front, base = aft, on centerline.
