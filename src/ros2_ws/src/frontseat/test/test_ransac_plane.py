@@ -177,35 +177,6 @@ def test_third_plane_fits_leftover_after_second():
 
 
 def test_radial_mask_keeps_near_points():
-    rng = np.random.default_rng(4)
-    xy_water = rng.uniform(-3.0, 3.0, size=(500, 2))
-    water = np.column_stack((xy_water[:, 0], xy_water[:, 1], rng.normal(0.0, 0.02, 500)))
-    xy_small = rng.uniform(-1.0, 1.0, size=(20, 2))
-    leftover = np.column_stack((
-        xy_small[:, 0], xy_small[:, 1], 0.40 + rng.normal(0.0, 0.01, 20),
-    ))
-    points = np.vstack((water, leftover))
-    fits = fit_sequential_planes(
-        points,
-        num_planes=2,
-        first=RansacParams(
-            distance_threshold=0.08,
-            min_inliers=100,
-            min_inlier_ratio=0.05,
-        ),
-        second=RansacParams(
-            distance_threshold=0.08,
-            min_inliers=10,
-            min_inlier_ratio=0.01,
-        ),
-        rng=rng,
-    )
-    assert len(fits) == 2
-    assert fits[0].inlier_count >= 400
-    assert 10 <= fits[1].inlier_count < 100
-
-
-def test_radial_mask_keeps_near_points():
     points = np.array([
         [1.0, 0.0, 0.0],
         [3.0, 4.0, 0.0],
@@ -214,3 +185,14 @@ def test_radial_mask_keeps_near_points():
     mask = radial_mask(points, 5.0)
     assert mask.tolist() == [True, True, False]
     assert radial_mask(points, 0.0).all()
+
+
+def test_radial_mask_uses_offset_center():
+    points = np.array([
+        [3.0, 0.0, 0.0],
+        [10.0, 0.0, 0.0],
+        [3.0, 4.0, 0.0],
+    ], dtype=np.float64)
+    center = np.array([3.0, 0.0], dtype=np.float64)
+    mask = radial_mask(points, 5.0, center)
+    assert mask.tolist() == [True, False, True]

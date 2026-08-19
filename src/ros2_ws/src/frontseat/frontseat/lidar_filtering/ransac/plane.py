@@ -64,16 +64,27 @@ class PlaneFit:
         return float(-self.offset / nz)
 
 
-def radial_mask(points: np.ndarray, max_radius: float) -> np.ndarray:
-    """True for points whose XY range from the origin is <= ``max_radius``.
+def radial_mask(
+    points: np.ndarray,
+    max_radius: float,
+    center_xy: np.ndarray | None = None,
+) -> np.ndarray:
+    """True for points whose XY distance from ``center_xy`` is <= ``max_radius``.
 
-    ``max_radius <= 0`` disables the gate (all True).
+    ``center_xy`` is ``(x, y)`` in the same frame as ``points``. When omitted,
+    the center is the origin. ``max_radius <= 0`` disables the gate (all True).
     """
     if points.ndim != 2 or points.shape[1] < 2:
         return np.zeros(0, dtype=bool)
     if max_radius <= 0.0:
         return np.ones(len(points), dtype=bool)
-    return np.hypot(points[:, 0], points[:, 1]) <= float(max_radius)
+    center = (
+        np.zeros(2, dtype=np.float64)
+        if center_xy is None
+        else np.asarray(center_xy, dtype=np.float64).reshape(2)
+    )
+    delta = points[:, :2] - center
+    return np.hypot(delta[:, 0], delta[:, 1]) <= float(max_radius)
 
 
 def fit_waterline_plane(
