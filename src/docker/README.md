@@ -127,13 +127,15 @@ rviz2 -d /workspace/docker/config/molo_autonomy.rviz --ros-args -p use_sim_time:
 ros2 launch mission_planner molo_autonomy.launch.py platform:=blueboat controller:=ilos use_sim_time:=false
 ```
 
-Legacy standalone controller tuning (no Nav2):
+Standalone ILOS controller (no Nav2), from inside `mini_bream_autonomy`:
 
 ```bash
-cd ../ros2_ws/src/molo_wpt_follower/ilos_boat
+cd /workspace/ros2_ws/src/molo_wpt_follower/ilos_boat
 ./run_real_boat.sh --platform sim
 ./run_real_boat.sh --platform real
 ```
+
+The launcher waits for GPS/IMU on the ROS graph (and `motor_controller` on real).
 
 Controllers publish thrust directly to `/pwm/*_thrust_cmd` over DDS; `motor_controller` on the Pi forwards to `pwm_daemon`.
 

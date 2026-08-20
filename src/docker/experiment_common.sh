@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Shared helpers for H0 / ILOS experiment launchers (mini_bream_autonomy).
+# Shared helpers for H0 experiment launchers (mini_bream_autonomy).
 set -euo pipefail
 
 AUTONOMY_CONTAINER="${AUTONOMY_CONTAINER:-mini_bream_autonomy}"
@@ -29,24 +29,6 @@ check_tune_deps() {
   local container="$1"
   local rebuild_hint="$2"
   check_mpc_deps "${container}" "${rebuild_hint}"
-  if ! docker exec "${container}" python3 -c 'import skopt' 2>/dev/null; then
-    die "scikit-optimize missing in ${container}. Rebuild:\n  ${rebuild_hint}"
-  fi
-}
-
-check_ilos_deps() {
-  local container="$1"
-  local rebuild_hint="$2"
-  if ! docker exec "${container}" python3 -c \
-      'import dubins, scipy, matplotlib, utm, transforms3d' 2>/dev/null; then
-    die "ILOS Python deps missing in ${container}. Rebuild:\n  ${rebuild_hint}"
-  fi
-}
-
-check_ilos_tune_deps() {
-  local container="$1"
-  local rebuild_hint="$2"
-  check_ilos_deps "${container}" "${rebuild_hint}"
   if ! docker exec "${container}" python3 -c 'import skopt' 2>/dev/null; then
     die "scikit-optimize missing in ${container}. Rebuild:\n  ${rebuild_hint}"
   fi

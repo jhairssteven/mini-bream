@@ -21,8 +21,7 @@ RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc && \
 
 COPY docker/start_autonomy.sh /start_autonomy.sh
 COPY docker/start_h0_boat.sh /workspace/docker/start_h0_boat.sh
-COPY docker/start_ilos_boat.sh /workspace/docker/start_ilos_boat.sh
-RUN chmod +x /start_autonomy.sh /workspace/docker/start_h0_boat.sh /workspace/docker/start_ilos_boat.sh
+RUN chmod +x /start_autonomy.sh /workspace/docker/start_h0_boat.sh
 
 ENV DEBIAN_FRONTEND=dialog
 WORKDIR /workspace/ros2_ws
