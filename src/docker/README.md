@@ -137,7 +137,8 @@ cd ../ros2_ws/src/molo_wpt_follower/ilos_boat
 
 Controllers publish thrust directly to `/pwm/*_thrust_cmd` over DDS; `motor_controller` on the Pi forwards to `pwm_daemon`.
 
-DDS overrides for autonomy live in `src/docker/.env` (see `.env.example`). Production Jetson uses `cyclonedds.jetson.xml` by default; on a dev laptop uncomment `AUTONOMY_CYCLONEDDS_URI=file:///etc/cyclonedds.xml` or `AUTONOMY_CYCLONEDDS_URI=` for local sim.
+DDS overrides for autonomy live in `src/docker/.env` (see `.env.example`). Production Jetson uses `cyclonedds.jetson.xml` by default; laptop conected to robot LAN `AUTONOMY_CYCLONEDDS_URI=file:///etc/cyclonedds.xml` or `AUTONOMY_CYCLONEDDS_URI=` for local sim.
+
 
 Verify DDS from autonomy (should list Pi GPS + Jetson perception topics):
 
