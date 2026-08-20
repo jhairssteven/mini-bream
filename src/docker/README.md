@@ -65,6 +65,18 @@ All stacks mount the host `/etc/localtime` and pass `TZ` so container clocks mat
 (ROS images default to UTC; without this, logs and LiDAR stamps can look like epoch/1970).
 `mini_bream_env.sh` auto-exports `TZ` from the host; set `TZ` in `.env` for manual compose.
 
+**Host wall clock** still matters: Pi GPS/odom and Jetson LiDAR stamp with each host’s time.
+Before field stacks, push GS time to both robots:
+
+```bash
+cd src/docker
+./sync_field_time.sh
+```
+
+`start pi|jetson|autonomy` runs `preflight_host_clock.sh` and aborts if the host
+looks like Unix epoch / before 2024. Override with `SKIP_CLOCK_PREFLIGHT=1` only if
+intentional.
+
 ## Motor command priority
 
 `pwm_daemon` chooses one source:

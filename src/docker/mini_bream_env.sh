@@ -26,6 +26,7 @@
 #   GROUND_IFACE=wlp5s0
 #   RADIO_SERIAL_PORT=...  SiK radio by-id path
 #   PWM_BACKEND_OVERRIDE=dry_run
+#   SKIP_CLOCK_PREFLIGHT=1  Skip epoch clock check on start pi|jetson|autonomy
 
 set -euo pipefail
 
@@ -34,6 +35,13 @@ cd "${SCRIPT_DIR}"
 
 log() { echo "[mini-bream] $*"; }
 die() { echo "[mini-bream] ERROR: $*" >&2; exit 1; }
+
+# shellcheck source=preflight_host_clock.sh
+source "${SCRIPT_DIR}/preflight_host_clock.sh"
+
+require_sane_host_clock() {
+  preflight_host_clock || die "fix host clock before starting (see sync_field_time.sh)"
+}
 
 COMPOSE_FRONTSEAT="docker-compose.frontseat.yml"
 COMPOSE_GROUND="docker-compose.ground.yml"
@@ -187,6 +195,7 @@ verify_ros_topics() {
 
 start_pi() {
   need_docker
+  require_sane_host_clock
   log "Starting Pi stack (ROS_DOMAIN_ID=${ROS_DOMAIN_ID})..."
 
   if [[ "${DRY_RUN}" -eq 1 ]]; then
@@ -216,6 +225,7 @@ stop_pi() {
 
 start_jetson() {
   need_docker
+  require_sane_host_clock
   log "Starting Jetson perception (ROS_DOMAIN_ID=${ROS_DOMAIN_ID})..."
 
   setup_jetson_lidar_network
@@ -294,6 +304,7 @@ stop_sim() {
 
 start_autonomy() {
   need_docker
+  require_sane_host_clock
   log "Starting autonomy stack (ROS_DOMAIN_ID=${ROS_DOMAIN_ID})..."
   compose -f "${COMPOSE_AUTONOMY}" up -d $(build_flag) autonomy
   log "Autonomy started (attach: docker exec -it mini_bream_autonomy bash)"
