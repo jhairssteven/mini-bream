@@ -7,12 +7,16 @@ Default Xbox mapping (from js_dump):
   axis[1]  → left thrust
   axis[4]  → right thrust
   button[5] → deadman (must hold to arm thrusters)
+
+Stick softness (expo / optional gain) is applied here only. Boat-wide ESC
+ceiling is pwm_daemon max_thrust.
 """
 
 from __future__ import annotations
 
 import argparse
 import logging
+import math
 import os
 import signal
 import sys
@@ -30,11 +34,20 @@ logging.basicConfig(
 logger = logging.getLogger("teleop.joy_to_serial")
 
 
-def apply_deadband(value: float, deadband: float) -> float:
-    """Zero values inside ±deadband; optionally rescale outside (snap to zero only)."""
+def shape_axis(value: float, deadband: float, expo: float, gain: float) -> float:
+    """Deadband → rescale to [0,1] → expo curve → optional gain.
+
+    expo=1 is linear; expo>1 softens mid-stick (typical 2.0–2.5).
+    Full stick still reaches ±gain (≤1), then daemon max_thrust caps ESC.
+    """
+    value = max(-1.0, min(1.0, float(value)))
     if abs(value) <= deadband:
         return 0.0
-    return value
+    # Remap deadband..1 → 0..1 so the first motion past deadband is continuous.
+    mag = (abs(value) - deadband) / max(1e-6, 1.0 - deadband)
+    shaped = math.pow(mag, expo)
+    signed = shaped if value > 0.0 else -shaped
+    return max(-1.0, min(1.0, signed * gain))
 
 
 def map_thrust(
@@ -44,6 +57,8 @@ def map_thrust(
     right_axis: int,
     deadman_button: int,
     deadband: float = 0.09,
+    expo: float = 2.0,
+    gain: float = 1.0,
 ) -> tuple[float, float, bool]:
     if deadman_button >= len(buttons) or not buttons[deadman_button]:
         return 0.0, 0.0, False
@@ -51,8 +66,8 @@ def map_thrust(
     left = axes[left_axis] if left_axis < len(axes) else 0.0
     right = axes[right_axis] if right_axis < len(axes) else 0.0
     # Linux js axes: stick up is typically negative; invert so up = forward thrust (+)
-    left = apply_deadband(max(-1.0, min(1.0, -left)), deadband)
-    right = apply_deadband(max(-1.0, min(1.0, -right)), deadband)
+    left = shape_axis(-left, deadband=deadband, expo=expo, gain=gain)
+    right = shape_axis(-right, deadband=deadband, expo=expo, gain=gain)
     return left, right, True
 
 
@@ -74,8 +89,25 @@ def main() -> None:
         default=float(os.environ.get("JOY_DEADBAND", "0.09")),
         help="Zero thrust when |axis| <= this (default 0.09)",
     )
+    parser.add_argument(
+        "--expo",
+        type=float,
+        default=float(os.environ.get("JOY_EXPO", "2.0")),
+        help="Stick expo (>1 softens mid-stick; 1=linear). Default 2.0",
+    )
+    parser.add_argument(
+        "--gain",
+        type=float,
+        default=float(os.environ.get("JOY_GAIN", "1.0")),
+        help="Max stick command in [0,1] before daemon max_thrust (default 1.0)",
+    )
     parser.add_argument("--rate", type=float, default=30.0)
     args = parser.parse_args()
+
+    if args.expo < 1.0:
+        raise SystemExit("--expo must be >= 1.0")
+    if not (0.0 < args.gain <= 1.0):
+        raise SystemExit("--gain must be in (0, 1]")
 
     import serial
 
@@ -83,7 +115,8 @@ def main() -> None:
     ser = serial.Serial(args.port, args.baud, timeout=0)
     logger.info(
         "Joystick %s (%d axes, %d buttons) → serial %s @ %d  "
-        "[left=axis[%d] right=axis[%d] deadman=button[%d] deadband=±%.2f]",
+        "[left=axis[%d] right=axis[%d] deadman=button[%d] "
+        "deadband=±%.2f expo=%.2f gain=%.2f]",
         args.joy_device,
         len(joy.axes),
         len(joy.buttons),
@@ -93,6 +126,8 @@ def main() -> None:
         args.right_axis,
         args.deadman_button,
         args.deadband,
+        args.expo,
+        args.gain,
     )
 
     running = True
@@ -118,6 +153,8 @@ def main() -> None:
                 args.right_axis,
                 args.deadman_button,
                 deadband=args.deadband,
+                expo=args.expo,
+                gain=args.gain,
             )
             if arm != last_arm:
                 logger.info("Deadman %s", "ARMED" if arm else "disarmed")
