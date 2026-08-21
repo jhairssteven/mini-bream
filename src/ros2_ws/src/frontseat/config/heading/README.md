@@ -47,12 +47,12 @@ flowchart TB
 | Topic | Publisher | Consumer(s) | Content |
 |-------|-----------|-------------|---------|
 | `/navrelposned` | `ublox_gps_rover` | `rel_pos_heading` | Raw u-blox relative position + heading |
-| `/baseline/heading/raw` | `rel_pos_heading` | `heading_ekf`, `gps_map_odom`, RViz | NAV-RELPOSNED yaw (ENU) |
+| `/baseline/heading/raw` | `rel_pos_heading` | `heading_ekf`, RViz | NAV-RELPOSNED yaw (ENU) |
 | `/baseline/heading/lfp` | `rel_pos_heading` | RViz | Low-pass yaw |
 | `/baseline/heading` | `heading_ekf` *or* `rel_pos_heading` | → `/wamv/sensors/imu/imu/data` | **Nav-stack heading** |
 | `/heading/deg` | `heading_ekf` | debug | EKF yaw (degrees) |
 | `/baseline/heading/marker/{raw,lfp,ekf}` | `rel_pos_heading`, `heading_ekf` | RViz | Body-frame comparison arrows |
-| `/odom`, `map`→`base_link` | `gps_map_odom` | RViz, loggers | Position + **raw** yaw in `map` |
+| `/odom`, `map`→`base_link` | `gps_map_odom` | RViz, Nav2, loggers | Position + **definitive** yaw in `map` |
 
 \*Launch remaps `/baseline/heading` → `/wamv/sensors/imu/imu/data` in `rel_pos_heading.launch.py`.
 
@@ -60,7 +60,7 @@ flowchart TB
 
 There is **no** single `output_mode: raw|lpf|ekf` parameter. Selection is implicit:
 
-### Nav stack (`/wamv/sensors/imu/imu/data`)
+### Definitive heading (`/wamv/sensors/imu/imu/data`)
 
 | `ekf.enabled` | `low_pass.enabled` | Source |
 |:-------------:|:------------------:|--------|
@@ -70,17 +70,12 @@ There is **no** single `output_mode: raw|lpf|ekf` parameter. Selection is implic
 
 When `ekf.enabled: true`, `rel_pos_heading` stops publishing `/baseline/heading` so it does not collide with `heading_ekf`.
 
-### Map pose (`/odom`, `map`→`base_link` TF)
+**Consumers of this topic:** controllers (ILOS/MPC/`velocity_odom`), and `gps_map_odom`
+(`map`→`base_link` / Nav2 pose). Change the source later by toggling the flags above in
+`filtering.yaml` — do not point `gps_map_odom` at `/baseline/heading/raw` or `/lfp`
+unless you intentionally want TF decoupled from the nav IMU.
 
-**Always raw** — `gps_map_odom` is launched with `heading_topic: /baseline/heading/raw` in `rel_pos_heading.launch.py`.
-
-Chosen for the **heading comparison field test**:
-
-- Raw NAV-RELPOSNED is the reference.
-- Purple raw marker uses yaw = 0 in `base_link` (bow). With raw heading on `map`→`base_link`, the boat model and purple arrow align with RTK heading in `map`.
-- Green (EKF) and blue (LPF) arrows show filter error as body-frame offsets.
-
-**Consequence:** nav stack can use EKF while map pose uses raw (~0.2° difference after tuning). For production, set `gps_map_odom.heading_topic` to match nav (e.g. `/baseline/heading` when EKF is on).
+Raw/LPF/EKF **markers** still publish in parallel for RViz comparison.
 
 ## Configuration
 
