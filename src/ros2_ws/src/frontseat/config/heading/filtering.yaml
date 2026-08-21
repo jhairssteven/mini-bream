@@ -1,5 +1,8 @@
-# Field-test overlay: enable EKF so raw, low-pass, and EKF markers publish together.
+# Heading filter overlay for rel_pos_heading + heading_ekf.
 # EKF tuned to track NAV-RELPOSNED closely; IMU only smooths between ~8 Hz GPS updates.
+#
+# Toggle ekf.enabled / low_pass.enabled to select the definitive heading on
+# /wamv/sensors/imu/imu/data (controllers + gps_map_odom / Nav2). See heading/README.md.
 
 /**:
   ros__parameters:

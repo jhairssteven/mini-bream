@@ -1,7 +1,7 @@
 {
   "world_frame": "map",
   "parent_frame_aliases": ["world", "odom"],
-  "broadcast_odom_tf": true,
+  "broadcast_odom_tf": false,
   "odometry_topic": "/molo_boat/estimated_odometry",
   "static_transforms": [
     {
