@@ -115,7 +115,7 @@ Only `left_thrust` and `right_thrust` change; GPS/IMU topics stay from the boat 
 | `ilos_boat_overlay.yaml` | Real Pi | `sim_enable: false`, `/wamv/*` + `/pwm/*` topics, longer warmup, GPS origin=null (wait for fix) |
 | `ilos_bench_overlay.yaml` | Safe testing | Thrust → sink topics, shorter evaluate window |
 | `ilos_tuned_overlay.yaml` | BO results | Only tuned params: `path`, `ilos`, `pid`, `guidance`, `thrust`, `speed` |
-| `autonomy_overlay.yaml` | Optional extra overlay | Ensures `velocity_odom_enabled: true` when the file is present |
+| `autonomy_overlay.yaml` | Optional extra overlay | Autonomy-host overrides (pose from `/odom`) |
 
 Sim vs real is mostly **which ROS topics to subscribe/publish**, not different control math.
 

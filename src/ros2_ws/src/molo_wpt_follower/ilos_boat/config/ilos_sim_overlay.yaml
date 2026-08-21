@@ -8,22 +8,12 @@ sim_enable: true
 use_sim_time: true
 frame_id: map
 
-feedback:
-  use_ground_truth_pose: true
-
-origin:
-  lat: 40.448417
-  lon: -86.86775
-
 topics:
   gps: /blueboat/sensors/gps/gps/fix
   imu: /blueboat/sensors/imu/imu/data
   odometry: /blueboat/sensors/position/ground_truth_odometry
   left_thrust: /blueboat/thrusters/left/thrust
   right_thrust: /blueboat/thrusters/right/thrust
-
-boat_bridge:
-  velocity_odom_enabled: false
 
 viz:
   pose_topic: /molo_mpc/vehicle_pose

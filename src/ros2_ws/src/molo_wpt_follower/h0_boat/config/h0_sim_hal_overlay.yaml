@@ -11,13 +11,7 @@ platform:
 
 sim_enable: true
 use_sim_time: true
-
-feedback:
-  use_ground_truth_pose: true
-
-origin:
-  lat: 40.448417
-  lon: -86.86775
+frame_id: map
 
 topics:
   gps: /blueboat/sensors/gps/gps/fix
@@ -26,14 +20,10 @@ topics:
   left_thrust: /blueboat/thrusters/left/thrust
   right_thrust: /blueboat/thrusters/right/thrust
 
-# MPC publishes thrust directly to sim HAL; velocity odom not needed.
-boat_bridge:
-  velocity_odom_enabled: false
-
 viz:
   pose_topic: /molo_mpc/vehicle_pose
   recent_poses_topic: /molo_h0/recent_poses
-  frame_id: world
+  frame_id: map
   max_recent_poses: 40
 
 experiment:

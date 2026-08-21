@@ -9,9 +9,6 @@ frame_id: map
 sim_enable: true
 control_rate_hz: 10.0
 
-feedback:
-  use_ground_truth_pose: true
-
 waypoints:
   relative_to_start: true
   points: []

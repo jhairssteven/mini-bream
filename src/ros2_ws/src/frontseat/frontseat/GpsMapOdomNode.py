@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import math
 from collections import deque
 
 import rclpy
@@ -14,7 +15,7 @@ from std_msgs.msg import ColorRGBA
 from tf2_ros import TransformBroadcaster
 from visualization_msgs.msg import Marker
 
-from frontseat.heading.angles import yaw_from_quaternion
+from frontseat.heading.angles import normalize_angle, yaw_from_quaternion
 from frontseat.heading.geo import latlon_to_local_enu
 from frontseat.heading.ros_msgs import yaw_to_quaternion
 from frontseat.qos_profiles import best_effort_volatile_qos
@@ -24,7 +25,7 @@ class GpsMapOdomNode(Node):
     def __init__(self) -> None:
         super().__init__('gps_map_odom')
 
-        self.declare_parameter('gps_topic', '/fix/center')
+        self.declare_parameter('gps_topic', '/gps/center')
         self.declare_parameter('heading_topic', '/baseline/heading/raw')
         self.declare_parameter('map_frame', 'map')
         self.declare_parameter('base_frame', 'base_link')
@@ -34,6 +35,7 @@ class GpsMapOdomNode(Node):
         self.declare_parameter('flatten_z', True)
         self.declare_parameter('recent_path_max_points', 150)
         self.declare_parameter('recent_path_topic', '/gps/center/recent_path')
+        self.declare_parameter('velocity_window_s', 0.4)
 
         gps_topic = self.get_parameter('gps_topic').value
         heading_topic = self.get_parameter('heading_topic').value
@@ -43,6 +45,7 @@ class GpsMapOdomNode(Node):
         self._min_fix_status = int(self.get_parameter('min_fix_status').value)
         self._flatten_z = bool(self.get_parameter('flatten_z').value)
         self._recent_path_max = max(2, int(self.get_parameter('recent_path_max_points').value))
+        self._velocity_window_s = max(0.1, float(self.get_parameter('velocity_window_s').value))
         recent_path_topic = self.get_parameter('recent_path_topic').value
 
         self._origin_lat: float | None = None
@@ -50,6 +53,12 @@ class GpsMapOdomNode(Node):
         self._origin_alt: float | None = None
         self._last_yaw_rad: float | None = None
         self._last_position_enu: tuple[float, float, float] | None = None
+        self._prev_xy: tuple[float, float] | None = None
+        self._prev_yaw: float | None = None
+        self._prev_t: float | None = None
+        self._u = 0.0
+        self._v = 0.0
+        self._r = 0.0
         self._recent_points: deque[tuple[float, float]] = deque(maxlen=self._recent_path_max)
 
         self._tf_broadcaster = TransformBroadcaster(self)
@@ -68,6 +77,9 @@ class GpsMapOdomNode(Node):
             f'{self._map_frame}->{self._base_frame}, z={z_mode}, '
             f'recent_path={recent_path_topic} (max {self._recent_path_max})'
         )
+
+    def _now_sec(self) -> float:
+        return self.get_clock().now().nanoseconds * 1e-9
 
     def _gps_cb(self, msg: NavSatFix) -> None:
         if msg.status.status < self._min_fix_status:
@@ -96,6 +108,9 @@ class GpsMapOdomNode(Node):
             self._origin_lon,
             self._origin_alt,
         )
+        east, north, _ = self._last_position_enu
+        self._recent_points.append((east, north))
+        self._update_twist(east, north)
         self._publish()
 
     def _heading_cb(self, msg: Imu) -> None:
@@ -107,7 +122,31 @@ class GpsMapOdomNode(Node):
             msg.orientation.z,
             msg.orientation.w,
         )
+        if msg.angular_velocity.z != 0.0:
+            self._r = float(msg.angular_velocity.z)
         self._publish()
+
+    def _update_twist(self, east: float, north: float) -> None:
+        t = self._now_sec()
+        yaw = self._last_yaw_rad if self._last_yaw_rad is not None else 0.0
+        if self._prev_xy is not None and self._prev_t is not None:
+            dt = t - self._prev_t
+            if dt > 1e-3:
+                vx = (east - self._prev_xy[0]) / dt
+                vy = (north - self._prev_xy[1]) / dt
+                c = math.cos(yaw)
+                s = math.sin(yaw)
+                u_raw = c * vx + s * vy
+                v_raw = -s * vx + c * vy
+                alpha = min(1.0, dt / self._velocity_window_s)
+                self._u = (1.0 - alpha) * self._u + alpha * u_raw
+                self._v = (1.0 - alpha) * self._v + alpha * v_raw
+                if self._prev_yaw is not None:
+                    r_raw = normalize_angle(yaw - self._prev_yaw) / dt
+                    self._r = (1.0 - alpha) * self._r + alpha * r_raw
+        self._prev_xy = (east, north)
+        self._prev_yaw = yaw
+        self._prev_t = t
 
     def _republish_cb(self) -> None:
         self._publish()
@@ -124,7 +163,6 @@ class GpsMapOdomNode(Node):
         yaw_rad = self._last_yaw_rad if self._last_yaw_rad is not None else 0.0
         quat = yaw_to_quaternion(yaw_rad)
 
-        self._recent_points.append((east, north))
         self._publish_recent_path(stamp)
 
         odom = Odometry()
@@ -139,6 +177,9 @@ class GpsMapOdomNode(Node):
         odom.pose.covariance[7] = 0.25
         odom.pose.covariance[14] = 0.25
         odom.pose.covariance[35] = 0.05
+        odom.twist.twist.linear.x = self._u
+        odom.twist.twist.linear.y = self._v
+        odom.twist.twist.angular.z = self._r
         self._odom_pub.publish(odom)
 
         if not self._publish_tf:

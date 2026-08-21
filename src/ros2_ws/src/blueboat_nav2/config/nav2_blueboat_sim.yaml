@@ -61,7 +61,8 @@ global_costmap:
       resolution: 0.25
       track_unknown_space: false
       transform_tolerance: 1.0
-      footprint: "[[0.65, 0.33], [0.65, -0.33], [-0.65, -0.33], [-0.65, 0.33]]"
+      # BlueBoat deployed hull (Blue Robotics): 1.20 m × 0.93 m.
+      footprint: "[[0.6, 0.465], [0.6, -0.465], [-0.6, -0.465], [-0.6, 0.465]]"
       plugins: ["obstacle_layer", "inflation_layer"]
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
@@ -86,7 +87,8 @@ global_costmap:
           obstacle_min_range: 0.8
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        inflation_radius: 0.75
+        # Same policy as real: ≥ circumscribed radius (~0.76 m) + small margin.
+        inflation_radius: 1.0
         cost_scaling_factor: 5.0
       always_send_full_costmap: true
 

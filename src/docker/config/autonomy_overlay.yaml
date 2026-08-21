@@ -1,4 +1,2 @@
-# Overlay when experiments run in mini_bream_autonomy (Jetson or dev host).
-# Controllers publish thrust directly to /pwm/* (see boat overlay topics).
-boat_bridge:
-  velocity_odom_enabled: true
+# Reserved for autonomy-host overrides.
+# Pose/twist come from frontseat gps_map_odom (/odom)

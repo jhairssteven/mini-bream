@@ -1,5 +1,6 @@
 # Hardware overlay for H0 lemniscate experiment on the real boat (frontseat).
 # Algorithm parameters come from mpc/experiments/results/lemniscate_validation/H0_baseline/config.yaml.
+# Pose from frontseat gps_map_odom (/odom).
 
 platform:
   name: real_boat
@@ -7,34 +8,19 @@ platform:
   prerequisites: frontseat
 
 sim_enable: false
-
-feedback:
-  use_ground_truth_pose: false
-
-# Set lat/lon to your deployment site, or leave null and let run_h0_experiment.py
-# capture the first GPS fix before starting MPC.
-origin:
-  lat: null
-  lon: null
+frame_id: map
 
 topics:
   gps: /wamv/sensors/gps/gps/fix
   imu: /wamv/sensors/imu/imu/data
-  odometry: /molo_boat/estimated_odometry
+  odometry: /odom
   left_thrust: /pwm/left_thrust_cmd
   right_thrust: /pwm/right_thrust_cmd
-
-boat_bridge:
-  velocity_odom_enabled: true
-  gps_topic: /wamv/sensors/gps/gps/fix
-  imu_topic: /wamv/sensors/imu/imu/data
-  estimated_odom_topic: /molo_boat/estimated_odometry
-  velocity_window_s: 0.4
 
 viz:
   pose_topic: /molo_mpc/vehicle_pose
   recent_poses_topic: /molo_h0/recent_poses
-  frame_id: world
+  frame_id: map
   max_recent_poses: 40
   rviz_config: /workspace/docker/config/h0_boat.rviz
 

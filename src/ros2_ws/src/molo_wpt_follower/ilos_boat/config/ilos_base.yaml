@@ -11,9 +11,6 @@ control_rate_hz: 10.0
 control:
   approach: ilos_pid
 
-feedback:
-  use_ground_truth_pose: false
-
 waypoints:
   relative_to_start: true
   trajectory:

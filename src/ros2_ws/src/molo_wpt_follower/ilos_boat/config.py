@@ -106,15 +106,3 @@ def prepare_run_config(
     with open(run_dir / "config.yaml", "w", encoding="utf-8") as f:
         yaml.safe_dump(out, f, sort_keys=False)
     return out
-
-
-def bridge_topics(cfg: dict) -> dict:
-    return cfg.get("boat_bridge", {})
-
-
-def stack_components(cfg: dict) -> Dict[str, bool]:
-    bridge = bridge_topics(cfg)
-    sim = bool(cfg.get("sim_enable", False))
-    return {
-        "velocity_odom": bool(bridge.get("velocity_odom_enabled", not sim)),
-    }

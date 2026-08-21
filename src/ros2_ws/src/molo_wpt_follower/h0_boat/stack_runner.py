@@ -20,9 +20,12 @@ for path in (str(PKG_DIR), str(MPC_DIR)):
     if path not in sys.path:
         sys.path.insert(0, path)
 
-from config import bridge_topics, load_yaml, stack_components  # noqa: E402
 from pose_trail_viz import PoseTrailViz  # noqa: E402
-from velocity_odom import VelocityOdomNode  # noqa: E402
+
+
+def load_yaml(path: Path | str) -> dict:
+    with open(path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f) or {}
 
 
 def main() -> None:
@@ -31,9 +34,6 @@ def main() -> None:
     args = parser.parse_args()
 
     cfg = load_yaml(args.config)
-    bridge = bridge_topics(cfg)
-    components = stack_components(cfg)
-    origin = cfg.get("origin", {})
     viz = cfg.get("viz", {})
 
     init_args = []
@@ -41,31 +41,18 @@ def main() -> None:
         init_args = ["--ros-args", "-p", "use_sim_time:=true"]
     rclpy.init(args=init_args if init_args else None)
     executor = MultiThreadedExecutor(num_threads=6)
-    nodes = []
-
-    if components["velocity_odom"]:
-        nodes.append(
-            VelocityOdomNode(
-                bridge.get("gps_topic", "/wamv/sensors/gps/gps/fix"),
-                bridge.get("imu_topic", "/wamv/sensors/imu/imu/data"),
-                bridge.get("estimated_odom_topic", "/molo_boat/estimated_odometry"),
-                float(origin["lat"]),
-                float(origin["lon"]),
-                window_s=float(bridge.get("velocity_window_s", 0.4)),
-            )
-        )
-    nodes.append(
-        PoseTrailViz(
-            viz.get("pose_topic", "/molo_mpc/vehicle_pose"),
-            viz.get("recent_poses_topic", "/molo_h0/recent_poses"),
-            viz.get("frame_id", "world"),
-            max_poses=int(viz.get("max_recent_poses", 40)),
-        )
-    )
 
     from mpc import MpcFollowerNode  # noqa: E402
 
-    nodes.append(MpcFollowerNode(cfg))
+    nodes = [
+        PoseTrailViz(
+            viz.get("pose_topic", "/molo_mpc/vehicle_pose"),
+            viz.get("recent_poses_topic", "/molo_h0/recent_poses"),
+            viz.get("frame_id", "map"),
+            max_poses=int(viz.get("max_recent_poses", 40)),
+        ),
+        MpcFollowerNode(cfg),
+    ]
 
     for node in nodes:
         executor.add_node(node)

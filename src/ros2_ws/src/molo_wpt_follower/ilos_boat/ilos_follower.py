@@ -13,12 +13,10 @@ from typing import List, Optional, Tuple
 
 import numpy as np
 import rclpy
-import utm
 import yaml
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from rclpy.qos import QoSDurabilityPolicy, QoSProfile, QoSReliabilityPolicy
-from sensor_msgs.msg import Imu, NavSatFix
 from std_msgs.msg import Float64, Float32
 from tf_transformations import euler_from_quaternion
 
@@ -49,11 +47,6 @@ def load_config(path: str) -> dict:
         return yaml.safe_load(f)
 
 
-def gps_to_local(lat: float, lon: float, origin: Tuple[float, float]) -> Tuple[float, float]:
-    x, y, _, _ = utm.from_latlon(lat, lon)
-    return x - origin[0], y - origin[1]
-
-
 class IlosFollowerNode(Node):
     def __init__(self, config: dict):
         super().__init__("molo_ilos_follower")
@@ -61,12 +54,6 @@ class IlosFollowerNode(Node):
         self.frame_id = config.get("frame_id", "world")
         self.sim_enable = bool(config.get("sim_enable", True))
         topics = config.get("topics", {})
-
-        origin = config.get("origin", {})
-        self.origin_utm = utm.from_latlon(
-            float(origin.get("lat", 40.448417)),
-            float(origin.get("lon", -86.867750)),
-        )[:2]
 
         dubins_cfg = config.get("dubins", {})
         self._dubins = DubinsPlanner(
@@ -130,18 +117,8 @@ class IlosFollowerNode(Node):
             depth=5,
         )
 
-        self.create_subscription(
-            NavSatFix, topics.get("gps", "/wamv/sensors/gps/gps/fix"), self._gps_cb, qos_s
-        )
-        self.create_subscription(
-            Imu, topics.get("imu", "/wamv/sensors/imu/imu/data"), self._imu_cb, qos_s
-        )
-        self.create_subscription(
-            Odometry,
-            topics.get("odometry", "/wamv/sensors/position/ground_truth_odometry"),
-            self._odom_cb,
-            qos_s,
-        )
+        odom_topic = topics.get("odometry", "/odom")
+        self.create_subscription(Odometry, odom_topic, self._odom_cb, qos_s)
 
         thrust_t = Float64 if self.sim_enable else Float32
         self._left_pub = self.create_publisher(
@@ -161,8 +138,6 @@ class IlosFollowerNode(Node):
         self._ilos: Optional[ILOSFollower] = None
         self._path_ready = False
         self._path_idx = 0
-        fb = config.get("feedback", {})
-        self._use_gt_pose = bool(fb.get("use_ground_truth_pose", False))
 
         self._path_activation = PathActivationManager(
             self,
@@ -174,39 +149,21 @@ class IlosFollowerNode(Node):
 
         self._rate = float(config.get("control_rate_hz", 10.0))
         self.create_timer(1.0 / self._rate, self._control_loop)
-        self.get_logger().info("molo_ilos_follower ready (ILOS+PID, no MPC)")
-
-    def _yaw_from_imu(self, msg: Imu) -> float:
-        q = (msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w)
-        _, _, yaw = euler_from_quaternion(q)
-        return float(yaw)
-
-    def _gps_cb(self, msg: NavSatFix) -> None:
-        if msg.latitude == 0.0 and msg.longitude == 0.0:
-            return
-        x, y = gps_to_local(msg.latitude, msg.longitude, self.origin_utm)
-        if self._psi is None:
-            self._psi = 0.0
-        if not self._use_gt_pose:
-            self._x, self._y = x, y
-        if self._path_activation.pending and not self._use_gt_pose and self._psi is not None:
-            self._path_activation.notify_pose(x, y, self._psi)
-
-    def _imu_cb(self, msg: Imu) -> None:
-        self._psi = self._yaw_from_imu(msg)
+        self.get_logger().info(
+            f"molo_ilos_follower ready (ILOS+PID, pose from {odom_topic})"
+        )
 
     def _odom_cb(self, msg: Odometry) -> None:
+        self._x = float(msg.pose.pose.position.x)
+        self._y = float(msg.pose.pose.position.y)
+        q = msg.pose.pose.orientation
+        _, _, yaw = euler_from_quaternion((q.x, q.y, q.z, q.w))
+        self._psi = float(yaw)
         self._u = float(msg.twist.twist.linear.x)
         self._v = float(msg.twist.twist.linear.y)
         self._r = float(msg.twist.twist.angular.z)
-        if self._use_gt_pose:
-            self._x = float(msg.pose.pose.position.x)
-            self._y = float(msg.pose.pose.position.y)
-            q = msg.pose.pose.orientation
-            _, _, yaw = euler_from_quaternion((q.x, q.y, q.z, q.w))
-            self._psi = float(yaw)
-            if self._path_activation.pending:
-                self._path_activation.notify_pose(self._x, self._y, self._psi)
+        if self._path_activation.pending:
+            self._path_activation.notify_pose(self._x, self._y, self._psi)
 
     def _on_path_ready(
         self,

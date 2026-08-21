@@ -70,7 +70,7 @@ There is **no** single `output_mode: raw|lpf|ekf` parameter. Selection is implic
 
 When `ekf.enabled: true`, `rel_pos_heading` stops publishing `/baseline/heading` so it does not collide with `heading_ekf`.
 
-**Consumers of this topic:** controllers (ILOS/MPC/`velocity_odom`), and `gps_map_odom`
+**Consumers of this topic:** controllers (ILOS/MPC), and `gps_map_odom`
 (`map`→`base_link` / Nav2 pose). Change the source later by toggling the flags above in
 `filtering.yaml` — do not point `gps_map_odom` at `/baseline/heading/raw` or `/lfp`
 unless you intentionally want TF decoupled from the nav IMU.

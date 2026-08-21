@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import copy
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Dict, List, Tuple
 
 import yaml
 
@@ -115,16 +115,3 @@ def prepare_run_config(
     with open(run_dir / "config.yaml", "w", encoding="utf-8") as f:
         yaml.safe_dump(out, f, sort_keys=False)
     return out
-
-
-def bridge_topics(cfg: dict) -> Dict[str, Any]:
-    return cfg.get("boat_bridge", {})
-
-
-def stack_components(cfg: dict) -> Dict[str, bool]:
-    """Which helper nodes stack_runner should start for this platform."""
-    bridge = bridge_topics(cfg)
-    sim = bool(cfg.get("sim_enable", False))
-    return {
-        "velocity_odom": bool(bridge.get("velocity_odom_enabled", not sim)),
-    }
