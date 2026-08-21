@@ -7,6 +7,6 @@
   "ros_timeout_s": 0.5,
   "daemon_host": "127.0.0.1",
   "daemon_port": 5600,
-  "thrust_scale": 0.7,
-  "notes": "Pi 4 BCM GPIO 19 (phys pin 35) left + GPIO 12 (phys pin 32) right. Avoid GPIO 13 — pigpio hardware_PWM does not toggle on Pi 4 rev 1.5 even with audio off."
+  "max_thrust": 0.7,
+  "notes": "Pi 4 BCM GPIO 19 (phys pin 35) left + GPIO 12 (phys pin 32) right. Avoid GPIO 13 — pigpio hardware_PWM does not toggle on Pi 4 rev 1.5 even with audio off. max_thrust is the single boat-wide ESC ceiling (radio + ROS)."
 }

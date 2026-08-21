@@ -122,7 +122,9 @@ def main() -> None:
         f"  base config:{BASE_CONFIG}\n"
         f"  output:     {run_dir}\n"
         f"  path_pts:   {meta['path_points']}\n"
-        f"  cruise:     {meta['cruise_speed_mps']} m/s",
+        f"  cruise:     {meta['cruise_speed_mps']} m/s\n"
+        f"  timing:     warmup={warmup_s:.0f}s  evaluate={evaluate_s:.0f}s  "
+        f"skip_initial={skip_initial_s:.0f}s",
         flush=True,
     )
 

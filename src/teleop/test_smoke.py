@@ -37,8 +37,10 @@ def test_protocol() -> None:
 def test_device_configs() -> None:
     rpi = load_device_config("rpi")
     assert rpi.backend == "pigpio" and rpi.left_pin == 19 and rpi.right_pin == 12
+    assert abs(rpi.max_thrust - 0.7) < 1e-9
     jetson = load_device_config("jetson")
     assert jetson.backend == "jetson" and jetson.left_pin == 33 and jetson.right_pin == 32
+    assert abs(jetson.max_thrust - 0.7) < 1e-9
     print("OK device configs", rpi.name, jetson.name)
 
 
@@ -98,7 +100,8 @@ def test_daemon_mux_docker() -> None:
     assert "Active source → radio" in out
     assert "Active source → ros" in out
     assert "Active source → none" in out
-    assert "L=0.300" in out or "L=0.3" in out
+    # radio 0.3 * max_thrust 0.7 → 0.210 (dry-run logs post-cap thrust)
+    assert "L=0.210" in out or "L=0.21" in out
     print("OK daemon mux\n" + "\n".join(out.strip().splitlines()[-12:]))
 
 

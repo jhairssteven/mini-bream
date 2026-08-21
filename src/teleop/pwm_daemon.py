@@ -42,12 +42,12 @@ class PwmDaemon:
         right_pin: int,
         radio_timeout_s: float,
         ros_timeout_s: float,
-        thrust_scale: float,
+        max_thrust: float,
         tick_hz: float,
     ) -> None:
         self.radio_timeout_s = radio_timeout_s
         self.ros_timeout_s = ros_timeout_s
-        self.thrust_scale = thrust_scale
+        self.max_thrust = max(0.0, min(1.0, float(max_thrust)))
         self.tick_period = 1.0 / tick_hz
 
         self._radio: IpcCommand | None = None
@@ -63,12 +63,13 @@ class PwmDaemon:
         self.sock.bind((host, port))
         self.sock.setblocking(False)
         logger.info(
-            "Listening on udp://%s:%d backend=%s pins L=%d R=%d",
+            "Listening on udp://%s:%d backend=%s pins L=%d R=%d max_thrust=%.2f",
             host,
             port,
             backend,
             left_pin,
             right_pin,
+            self.max_thrust,
         )
 
     def stop(self, *_args) -> None:
@@ -126,8 +127,10 @@ class PwmDaemon:
                     if source != self._active:
                         logger.info("Active source → %s", source)
                         self._active = source
+                    # ±1 command = full allowed authority; max_thrust caps ESC fraction.
+                    # Right inverted to match vehicle wiring / teleop convention.
                     self.motors.set_thrust(
-                        left * self.thrust_scale, -right * self.thrust_scale
+                        left * self.max_thrust, -right * self.max_thrust
                     )
                     next_tick = now + self.tick_period
                 timeout = max(0.0, next_tick - time.monotonic())
@@ -166,7 +169,7 @@ def main() -> None:
         right_pin=cfg.right_pin,
         radio_timeout_s=cfg.radio_timeout_s,
         ros_timeout_s=cfg.ros_timeout_s,
-        thrust_scale=cfg.thrust_scale,
+        max_thrust=cfg.max_thrust,
         tick_hz=args.rate,
     ).run()
 

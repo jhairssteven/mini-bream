@@ -57,6 +57,10 @@ class WaterlineRansacNode(Node):
             self._config.get('up_axis', [0.0, 0.0, 1.0]), dtype=np.float64,
         )
         self._max_radius = float(self._config.get('max_radius', 4.0))
+        self._radius_center_xy = np.array(
+            self._config.get('radius_center_xy', [-0.27655, -0.02]),
+            dtype=np.float64,
+        ).reshape(2)
 
         ransac_cfg = self._config.get('ransac', {})
         self._num_planes = int(ransac_cfg.get('num_planes', ransac_cfg.get('num_passes', 2)))
@@ -113,8 +117,9 @@ class WaterlineRansacNode(Node):
         self.get_logger().info(
             f'Waterline RANSAC listening on {self._input_topic}; '
             f'fit_frame={self._fit_frame}; max_radius={self._max_radius:.2f} m; '
-            f'num_planes={self._num_planes}; debug_enabled={self._debug_enabled}; '
-            f'config={config_path}'
+            f'radius_center=({self._radius_center_xy[0]:.3f}, '
+            f'{self._radius_center_xy[1]:.3f}) in {self._fit_frame}; '
+            f'num_planes={self._num_planes}; debug_enabled={self._debug_enabled}; config={config_path}'
         )
 
     def _load_config(self, config_path: str) -> dict:
@@ -149,10 +154,11 @@ class WaterlineRansacNode(Node):
         ))
         xyz_fit = (transform @ points_h.T).T[:, :3]
 
+        in_radius = radial_mask(xyz_fit, self._max_radius, self._radius_center_xy)
         candidate = (
             (xyz_fit[:, 2] >= self._z_min)
             & (xyz_fit[:, 2] <= self._z_max)
-            & radial_mask(xyz_fit, self._max_radius)
+            & in_radius
         )
         fits: list[PlaneFit] = []
         if int(candidate.sum()) >= 3:
@@ -274,7 +280,9 @@ class WaterlineRansacNode(Node):
         markers = MarkerArray()
         markers.markers.append(_delete_marker(header, 0))
         water_fit = fits[0] if fits else None
-        markers.markers.extend(self._radius_markers(header, water_fit))
+        markers.markers.extend(
+            self._radius_markers(header, water_fit),
+        )
         plane_colors = [
             ColorRGBA(r=0.12, g=0.56, b=1.0, a=0.35),
             ColorRGBA(r=0.2, g=0.8, b=0.2, a=0.35),
@@ -307,6 +315,8 @@ class WaterlineRansacNode(Node):
         if self._max_radius <= 0.0:
             return []
 
+        cx, cy = float(self._radius_center_xy[0]), float(self._radius_center_xy[1])
+
         height = 0.0 if fit is None else fit.height_at_origin()
         if height is None:
             height = 0.0
@@ -321,7 +331,7 @@ class WaterlineRansacNode(Node):
         cylinder.type = Marker.CYLINDER
         cylinder.action = Marker.ADD
         cylinder.pose = Pose(
-            position=Point(x=0.0, y=0.0, z=float(0.5 * (z_lo + z_hi))),
+            position=Point(x=cx, y=cy, z=float(0.5 * (z_lo + z_hi))),
             orientation=Quaternion(w=1.0),
         )
         cylinder.scale = Vector3(
@@ -347,8 +357,8 @@ class WaterlineRansacNode(Node):
         angles = np.linspace(0.0, 2.0 * np.pi, 65)
         ring.points = [
             Point(
-                x=float(self._max_radius * np.cos(angle)),
-                y=float(self._max_radius * np.sin(angle)),
+                x=float(cx + self._max_radius * np.cos(angle)),
+                y=float(cy + self._max_radius * np.sin(angle)),
                 z=float(height),
             )
             for angle in angles
