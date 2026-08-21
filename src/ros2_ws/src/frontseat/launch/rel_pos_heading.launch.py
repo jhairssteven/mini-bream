@@ -94,7 +94,7 @@ def generate_launch_description():
         output='screen',
         parameters=[{
             'gps_topic': '/wamv/sensors/gps/gps/fix',
-            'heading_topic': '/baseline/heading/raw',
+            'heading_topic': '/wamv/sensors/imu/imu/data',
             'map_frame': 'map',
             'base_frame': 'base_link',
             'odom_topic': '/odom',
