@@ -62,12 +62,13 @@ Defaults below match `waterline.yaml`. Change the YAML if you chain nodes.
 | Direction | Topic | Contents |
 |-----------|-------|----------|
 | Input | `input_topic` | XYZ (optional intensity) PointCloud2 |
-| Output | `colored_topic` | Same points, RGB by plane |
 | Output | `removed_topic` | Input minus inliers of every fitted plane |
-| Output | `markers_topic` | Fitted planes, inliers, 4 m radius cylinder |
+| Debug | `colored_topic` | Same points, RGB by plane |
+| Debug | `markers_topic` | Fitted planes, inliers, 4 m radius cylinder |
 
-Colors: blue = water, green = plane 2, gold = plane 3, orange = other / outside
-the candidate cylinder.
+Set `debug.enabled: false` (or omit `debug_enabled:=true` at launch) to skip
+the colored cloud and markers. `removed_topic` is the pipeline product for
+clustering and is always published.
 
 ## Launch
 

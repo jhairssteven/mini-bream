@@ -7,6 +7,7 @@ See ``README.md`` in this package for the pipeline, topics, and YAML knobs.
 from __future__ import annotations
 
 import os
+import time
 from typing import Optional
 
 import numpy as np
@@ -30,6 +31,7 @@ from frontseat.lidar_filtering.ransac.plane import (
     radial_mask,
 )
 from frontseat.lidar_filtering.self_filter import read_xyz_grid
+from frontseat.qos_profiles import best_effort_volatile_qos
 
 
 class WaterlineRansacNode(Node):
@@ -41,6 +43,7 @@ class WaterlineRansacNode(Node):
             'config', 'lidar_filtering', 'ransac', 'waterline.yaml',
         )
         self.declare_parameter('config_path', default_config)
+        self.declare_parameter('debug_enabled', False)
         config_path = self.get_parameter('config_path').get_parameter_value().string_value
         if not config_path:
             config_path = default_config
@@ -64,6 +67,8 @@ class WaterlineRansacNode(Node):
         self._rng = None if seed < 0 else np.random.default_rng(seed)
 
         debug_cfg = self._config.get('debug', {})
+        param_debug = self.get_parameter('debug_enabled').get_parameter_value().bool_value
+        self._debug_enabled = param_debug or bool(debug_cfg.get('enabled', False))
         self._max_marker_points = int(debug_cfg.get('max_marker_points', 2500))
         self._plane_thickness = float(debug_cfg.get('plane_thickness', 0.04))
         self._water_rgb = _rgb_uint32(debug_cfg.get('water_rgb', [30, 144, 255]))
@@ -72,11 +77,8 @@ class WaterlineRansacNode(Node):
         self._other_rgb = _rgb_uint32(debug_cfg.get('other_rgb', [255, 140, 0]))
         self._plane_rgbs = [self._water_rgb, self._second_rgb, self._third_rgb]
 
-        sensor_qos = QoSProfile(
-            reliability=QoSReliabilityPolicy.RELIABLE,
-            durability=QoSDurabilityPolicy.VOLATILE,
-            depth=5,
-        )
+        cloud_sub_qos = best_effort_volatile_qos
+        cloud_pub_qos = best_effort_volatile_qos
         marker_qos = QoSProfile(
             reliability=QoSReliabilityPolicy.RELIABLE,
             durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
@@ -85,29 +87,34 @@ class WaterlineRansacNode(Node):
 
         self._tf_buffer = Buffer()
         self._tf_listener = TransformListener(self._tf_buffer, self)
-        self._colored_pub = self.create_publisher(
-            PointCloud2,
-            str(self._config.get('colored_topic', '/rslidar_points/waterline_colored')),
-            sensor_qos,
-        )
+        self._colored_pub = None
+        if self._debug_enabled:
+            self._colored_pub = self.create_publisher(
+                PointCloud2,
+                str(self._config.get('colored_topic', '/rslidar_points/waterline_colored')),
+                cloud_pub_qos,
+            )
         self._removed_pub = self.create_publisher(
             PointCloud2,
             str(self._config.get('removed_topic', '/rslidar_points/waterline_removed')),
-            sensor_qos,
+            cloud_pub_qos,
         )
-        self._marker_pub = self.create_publisher(
-            MarkerArray,
-            str(self._config.get('markers_topic', '/waterline_ransac/debug_markers')),
-            marker_qos,
-        )
+        self._marker_pub = None
+        if self._debug_enabled:
+            self._marker_pub = self.create_publisher(
+                MarkerArray,
+                str(self._config.get('markers_topic', '/waterline_ransac/debug_markers')),
+                marker_qos,
+            )
 
         self.create_subscription(
-            PointCloud2, self._input_topic, self._cloud_callback, sensor_qos,
+            PointCloud2, self._input_topic, self._cloud_callback, cloud_sub_qos,
         )
         self.get_logger().info(
             f'Waterline RANSAC listening on {self._input_topic}; '
             f'fit_frame={self._fit_frame}; max_radius={self._max_radius:.2f} m; '
-            f'num_planes={self._num_planes}; config={config_path}'
+            f'num_planes={self._num_planes}; debug_enabled={self._debug_enabled}; '
+            f'config={config_path}'
         )
 
     def _load_config(self, config_path: str) -> dict:
@@ -115,6 +122,7 @@ class WaterlineRansacNode(Node):
             return yaml.safe_load(config_file) or {}
 
     def _cloud_callback(self, msg: PointCloud2) -> None:
+        t0 = time.perf_counter()
         xyz = read_xyz_grid(msg)
         if xyz.size == 0:
             return
@@ -170,15 +178,6 @@ class WaterlineRansacNode(Node):
         for fit in fits:
             stripped |= fit.inlier_mask
 
-        rgb = np.full(len(xyz_valid), self._other_rgb, dtype=np.uint32)
-        for index, fit in enumerate(fits):
-            color = (
-                self._plane_rgbs[index]
-                if index < len(self._plane_rgbs)
-                else self._other_rgb
-            )
-            rgb[fit.inlier_mask] = color
-        self._colored_pub.publish(_create_xyzrgb_cloud(colored_header, xyz_valid, rgb))
         leftover = ~stripped
         self._removed_pub.publish(
             _create_xyzi_cloud(
@@ -187,10 +186,24 @@ class WaterlineRansacNode(Node):
                 None if intensity_valid is None else intensity_valid[leftover],
             )
         )
-        self._marker_pub.publish(
-            self._build_markers(marker_header, xyz_fit, fits)
-        )
+        if self._colored_pub is not None:
+            rgb = np.full(len(xyz_valid), self._other_rgb, dtype=np.uint32)
+            for index, fit in enumerate(fits):
+                color = (
+                    self._plane_rgbs[index]
+                    if index < len(self._plane_rgbs)
+                    else self._other_rgb
+                )
+                rgb[fit.inlier_mask] = color
+            self._colored_pub.publish(
+                _create_xyzrgb_cloud(colored_header, xyz_valid, rgb),
+            )
+        if self._marker_pub is not None:
+            self._marker_pub.publish(
+                self._build_markers(marker_header, xyz_fit, fits)
+            )
 
+        elapsed_ms = (time.perf_counter() - t0) * 1000.0
         if fits:
             parts = []
             for index, fit in enumerate(fits):
@@ -204,24 +217,26 @@ class WaterlineRansacNode(Node):
                 )
             self.get_logger().info(
                 f'{"; ".join(parts)} candidates={int(candidate.sum())}/{len(xyz_valid)} '
-                f'radius={self._max_radius:.1f} m',
+                f'radius={self._max_radius:.1f} m time_ms={elapsed_ms:.1f}',
                 throttle_duration_sec=2.0,
             )
         else:
             self.get_logger().warning(
-                'No waterline plane this frame',
+                f'No waterline plane this frame time_ms={elapsed_ms:.1f}',
                 throttle_duration_sec=2.0,
             )
 
     def _publish_empty(self, cloud_header: Header, marker_header: Header) -> None:
         empty = np.zeros((0, 3), dtype=np.float64)
-        self._colored_pub.publish(
-            _create_xyzrgb_cloud(cloud_header, empty, np.zeros(0, dtype=np.uint32)),
-        )
         self._removed_pub.publish(_create_xyzi_cloud(cloud_header, empty, None))
-        self._marker_pub.publish(
-            self._build_markers(marker_header, empty, []),
-        )
+        if self._colored_pub is not None:
+            self._colored_pub.publish(
+                _create_xyzrgb_cloud(cloud_header, empty, np.zeros(0, dtype=np.uint32)),
+            )
+        if self._marker_pub is not None:
+            self._marker_pub.publish(
+                self._build_markers(marker_header, empty, []),
+            )
 
     def _lookup_transform_matrix(
         self,
