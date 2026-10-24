@@ -23,11 +23,17 @@ logger = logging.getLogger("teleop.radio_rx")
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Forward teleop serial frames to PWM daemon")
-    parser.add_argument("--port", default=os.environ.get("RADIO_SERIAL_PORT", "/dev/ttyUSB0"))
+    parser.add_argument(
+        "--port",
+        default=os.environ.get("RADIO_SERIAL_PORT"),
+        help="Serial device path (required; or set RADIO_SERIAL_PORT)",
+    )
     parser.add_argument("--baud", type=int, default=int(os.environ.get("RADIO_BAUD", "57600")))
     parser.add_argument("--daemon-host", default=os.environ.get("PWM_DAEMON_HOST", "127.0.0.1"))
     parser.add_argument("--daemon-port", type=int, default=int(os.environ.get("PWM_DAEMON_PORT", "5600")))
     args = parser.parse_args()
+    if not args.port:
+        raise SystemExit("RADIO_SERIAL_PORT (or --port) must be set to the radio by-id path")
 
     try:
         import serial

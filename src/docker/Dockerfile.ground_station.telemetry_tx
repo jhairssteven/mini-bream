@@ -1,4 +1,5 @@
-# Telemetry transmitter: Linux joystick → SiK radio serial (no ROS).
+# Telemetry transmitter: Linux joystick → SiK/RFD900+ serial (no ROS).
+# RADIO_SERIAL_PORT must be set at runtime (no default).
 FROM python:3.11-slim-bookworm
 
 WORKDIR /opt/teleop
@@ -8,7 +9,6 @@ RUN pip install --no-cache-dir pyserial
 COPY teleop/ /opt/teleop/
 
 ENV JOY_DEVICE=/dev/input/js0
-ENV RADIO_SERIAL_PORT=/dev/ttyUSB0
 ENV RADIO_BAUD=57600
 
 CMD ["python3", "/opt/teleop/joy_to_serial.py"]
