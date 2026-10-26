@@ -1,0 +1,64 @@
+path:
+  resample_step_m: 0.396
+  cruise_speed_mps: 0.3573567968140897
+  closed: true
+  smooth_dubins: true
+  monotonic_progress: false
+surge_pi:
+  kp: 7.692547681124979
+  ki: 0.597527875940991
+  k_ff: 30.0
+  x_min: -18.42748161383011
+  x_max: 18.42748161383011
+  i_limit: 6.0
+  dx_max: 21.929622666605788
+  u_lpf_tau_s: 0.44839867997225097
+  speed_feedback: body_u
+yaw_pd:
+  kp: 2.909422471011937
+  kd: 1.5716472624900266
+  n_max: 4.0
+speed:
+  angle_threshold_fast_rad: 0.21887007369900752
+  angle_threshold_slow_rad: 0.6522319465548687
+  min_speed_scale: 0.5324575585860691
+  u_d_floor_frac_of_cruise: 0.65
+ilos:
+  delta_m: 1.2
+  sigma: 0.18
+  e_i_limit: 3.4683526247295906
+  advance_eps_m: 0.15
+gs_mpc:
+  horizon: 16
+  dt: 0.15
+  period_s: 0.2
+  u_min: 0.15
+  u_max: 0.40681524968309973
+  r_max: 0.46206271985006747
+  du_max: 0.05
+  dr_max: 0.12
+  ref_ahead_points: 48
+  w_path: 54.263445091730944
+  w_u: 11.041104069648892
+  w_r: 3.0
+  w_du: 1.0
+  w_dr: 0.9232122131898687
+  w_obs: 80.0
+  boat_radius_m: 0.6
+  margin_m: 0.8
+  max_iter: 35
+tuning:
+  phase: global
+  method: lhs_then_local
+  target_rmse_m: 0.1
+  min_completion: 0.8
+  best_objective: 0.664007
+  validation_rmse: 0.601233
+  validation_completion: 0.8238461538461539
+  validation_valid: true
+  n_coarse: 6
+  n_local: 12
+  n_valid: 9
+  n_rejected: 9
+  timestamp: '2026-10-26T06:11:14.563717+00:00'
+  platform: blueboat_sim

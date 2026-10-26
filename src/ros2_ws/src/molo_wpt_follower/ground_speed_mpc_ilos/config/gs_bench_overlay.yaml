@@ -1,0 +1,13 @@
+# Bench run: real sensors, thrust to sink topics (no motors).
+platform:
+  name: real_boat_bench
+  profile: bench
+
+topics:
+  left_thrust: /molo_boat/thrust_left
+  right_thrust: /molo_boat/thrust_right
+
+experiment:
+  warmup_s: 8.0
+  evaluate_s: 30.0
+  skip_initial_s: 8.0

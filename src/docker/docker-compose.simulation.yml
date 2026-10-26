@@ -21,6 +21,9 @@ services:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - GZ_VERSION=garden
+      - SIM_WORLD=${SIM_WORLD:-open_water_harner}
+      - SIM_LAUNCH=${SIM_LAUNCH:-open_water.launch.py}
+      - SIM_HEADLESS=${SIM_HEADLESS:-False}
       - NVIDIA_DRIVER_CAPABILITIES=all
       - NVIDIA_VISIBLE_DEVICES=all
     volumes:

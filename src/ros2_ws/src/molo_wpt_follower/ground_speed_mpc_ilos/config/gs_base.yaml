@@ -1,0 +1,113 @@
+# Ground-speed kinematic MPC → ILOS → PI/PD → allocation (lemniscate mission).
+experiment_id: GS_MPC_ILOS
+
+platform:
+  name: template
+  profile: base
+
+frame_id: world
+control_rate_hz: 10.0
+
+control:
+  approach: gs_mpc_ilos
+
+waypoints:
+  relative_to_start: true
+  trajectory:
+    type: lemniscate
+    scale_m: 7.0
+    num_points: 64
+
+path:
+  resample_step_m: 0.396
+  cruise_speed_mps: 0.30
+  closed: true
+  smooth_dubins: true
+  monotonic_progress: false
+
+dubins:
+  turning_radius_m: 5.71
+  step_size_m: 1.25
+
+# Local ground-speed MPC (path generator — does not command thrusters)
+gs_mpc:
+  horizon: 12
+  dt: 0.15
+  period_s: 0.20
+  u_min: 0.15
+  u_max: 0.45
+  r_max: 0.45
+  du_max: 0.05
+  dr_max: 0.12
+  ref_ahead_points: 48
+  w_path: 50.0
+  w_u: 12.0          # keep U near cruise (avoid collapse to u_min)
+  w_r: 1.5
+  w_du: 2.0
+  w_dr: 1.0
+  w_obs: 80.0
+  boat_radius_m: 0.6
+  margin_m: 0.8
+  max_iter: 35
+
+# Local ILOS on MPC polyline (pipeline.tex §4)
+ilos:
+  delta_m: 1.8
+  sigma: 0.06
+  e_i_limit: 2.5
+  advance_eps_m: 0.15
+
+# Inner loops → body force / moment
+# k_ff must match plant X/U (~few N per m/s). Large FF (30–45) overdrove U_g
+# well above U_d because PI could not overcome open-loop thrust until ~2 m/s.
+surge_pi:
+  kp: 10.0
+  ki: 2.0
+  k_ff: 6.0
+  x_min: -25.0
+  x_max: 25.0
+  i_limit: 8.0
+  dx_max: 50.0
+  u_lpf_tau_s: 0.25
+  ff_overspeed_fade_mps: 0.12
+  speed_feedback: body_u
+
+yaw_pd:
+  kp: 2.5
+  kd: 1.2
+  n_max: 6.0
+
+allocation:
+  thruster_sep_m: 0.59
+  t_max: 40.0
+  t_min: -40.0
+  surge_priority: true   # never reverse a thruster against surge intent
+
+thruster_map:
+  t_max: 40.0
+  n_db: 0.02
+  c1: 40.0
+  c2: 0.0
+
+speed:
+  angle_threshold_fast_rad: 0.15
+  angle_threshold_slow_rad: 0.60
+  min_speed_scale: 0.40
+  u_d_floor_frac_of_cruise: 0.75
+
+topics:
+  ref_path: /molo_mpc/ref_path
+  pred_path: /molo_mpc/pred_path
+  traversed_path: /molo_mpc/traversed_path
+  vehicle_pose: /molo_mpc/vehicle_pose
+  cross_track_error: /molo_mpc/cross_track_error
+
+experiment:
+  warmup_s: 5.0
+  # ~37 m lemniscate × 80% ≈ 29 m; at ~0.3 m/s needs ≥100 s (not 60).
+  evaluate_s: 120.0
+  skip_initial_s: 5.0
+  target_rmse_m: 0.1
+  min_completion: 0.8
+  wait_for_gps_timeout_s: 30.0
+  wait_for_xte_timeout_s: 30.0

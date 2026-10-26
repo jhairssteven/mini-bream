@@ -227,11 +227,15 @@ class PathActivationManager:
         if self._trim_to_closest:
             idx0 = closest_index(samples, origin_xy[0], origin_xy[1])
             samples = samples[idx0:]
+            idx0 = 0  # trimmed path starts at the closest sample
         elif self._skip_rotate_to_closest:
             idx0 = 0
         else:
             idx0 = closest_index(samples, origin_xy[0], origin_xy[1])
             samples = rotate_path_to_index(samples, idx0)
+            # After rotation the closest sample is at index 0. Passing the
+            # pre-rotate index made followers start mid-path (XTE ~path radius).
+            idx0 = 0
         if len(samples) < 2:
             return
         self._pending = False
