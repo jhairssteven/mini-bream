@@ -74,7 +74,11 @@ def map_thrust(
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--joy-device", default=os.environ.get("JOY_DEVICE", "/dev/input/js0"))
-    parser.add_argument("--port", default=os.environ.get("RADIO_SERIAL_PORT", "/dev/ttyUSB0"))
+    parser.add_argument(
+        "--port",
+        default=os.environ.get("RADIO_SERIAL_PORT"),
+        help="Serial device path (required; or set RADIO_SERIAL_PORT)",
+    )
     parser.add_argument("--baud", type=int, default=int(os.environ.get("RADIO_BAUD", "57600")))
     parser.add_argument("--left-axis", type=int, default=int(os.environ.get("JOY_LEFT_AXIS", "1")))
     parser.add_argument("--right-axis", type=int, default=int(os.environ.get("JOY_RIGHT_AXIS", "4")))
@@ -104,6 +108,8 @@ def main() -> None:
     parser.add_argument("--rate", type=float, default=30.0)
     args = parser.parse_args()
 
+    if not args.port:
+        raise SystemExit("RADIO_SERIAL_PORT (or --port) must be set to the radio by-id path")
     if args.expo < 1.0:
         raise SystemExit("--expo must be >= 1.0")
     if not (0.0 < args.gain <= 1.0):

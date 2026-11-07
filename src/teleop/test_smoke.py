@@ -105,34 +105,46 @@ def test_daemon_mux_docker() -> None:
     print("OK daemon mux\n" + "\n".join(out.strip().splitlines()[-12:]))
 
 
+def _radio_by_id_candidates() -> list[Path]:
+    by_id = Path("/dev/serial/by-id")
+    if not by_id.is_dir():
+        return []
+    patterns = ("*FTDI*", "*FT231*", "*Silicon_Labs*", "*CP2102*", "*CP210x*")
+    found: list[Path] = []
+    for pat in patterns:
+        found.extend(by_id.glob(pat))
+    # Preserve order, drop duplicates
+    return list(dict.fromkeys(found))
+
+
 def test_radio_port_present() -> None:
     by_id = Path("/dev/serial/by-id")
     assert by_id.is_dir(), "missing /dev/serial/by-id"
-    ftdi = list(by_id.glob("*FTDI*")) + list(by_id.glob("*FT231*"))
-    assert ftdi, f"No FTDI/SiK device under {by_id}: {list(by_id.iterdir())}"
-    target = ftdi[0].resolve()
+    matches = _radio_by_id_candidates()
+    assert matches, (
+        f"No SiK (FTDI) or RFD900+ (CP2102) device under {by_id}: "
+        f"{list(by_id.iterdir())}"
+    )
+    target = matches[0].resolve()
     assert target.exists()
-    print(f"OK SiK candidate {ftdi[0]} -> {target}")
+    print(f"OK radio candidate {matches[0]} -> {target}")
 
 
 def test_radio_serial_open() -> None:
     import serial
 
-    port = os.environ.get(
-        "RADIO_SERIAL_PORT",
-        "/dev/serial/by-id/usb-FTDI_FT231X_USB_UART_D30GKEF6-if00-port0",
-    )
-    if not Path(port).exists():
-        # Fall back to first FTDI by-id
-        matches = list(Path("/dev/serial/by-id").glob("*FTDI*"))
-        assert matches, "no FTDI serial device"
+    port = os.environ.get("RADIO_SERIAL_PORT", "")
+    if not port or not Path(port).exists():
+        matches = _radio_by_id_candidates()
+        assert matches, "no SiK/RFD serial device"
         port = str(matches[0])
 
-    with serial.Serial(port, 57600, timeout=0.2) as ser:
-        # Write a disarm frame; expect no exception (SiK is a transparent UART)
+    baud = int(os.environ.get("RADIO_BAUD", "57600"))
+    with serial.Serial(port, baud, timeout=0.2) as ser:
+        # Write a disarm frame; expect no exception (transparent UART)
         ser.write(TeleopCommand(0.0, 0.0, arm=False, seq=1).encode_serial())
         _ = ser.read(64)
-    print(f"OK opened radio serial {port}")
+    print(f"OK opened radio serial {port} @ {baud}")
 
 
 def main() -> None:

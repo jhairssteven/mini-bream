@@ -17,7 +17,7 @@ ROS autonomy can run normally; radio teleop **overrides** it when armed.
 
 ### Ground station roles
 
-**`telemetry_tx`** does **not** use ROS. It reads the controller via `/dev/input/js0` and sends framed packets over the SiK radio. The container uses Docker’s default bridge network, so it is isolated from robot DDS. The only teleop link to the boat is the **serial telemetry radio**.
+**`telemetry_tx`** does **not** use ROS. It reads the controller via `/dev/input/js0` and sends framed packets over a **transparent UART telemetry radio** (Holybro SiK v3 **or** RFDesign RFD900+). The container uses Docker’s default bridge network, so it is isolated from robot DDS. The only teleop link to the boat is that serial radio.
 
 **`ground_station`** (separate compose file) is for **RViz2** on the ground PC (`192.168.0.103`). It joins the same Cyclone DDS domain as Pi and Jetson to visualize LiDAR, camera, GPS, etc. It does not send motor commands.
 
@@ -31,7 +31,7 @@ flowchart LR
         Xbox["Xbox / joystick"]
         JS["/dev/input/js0<br/>Linux joystick API"]
         TX["joy_to_serial"]
-        GRadio["SiK radio"]
+        GRadio["SiK or RFD900+"]
 
         Xbox --> JS --> TX
         TX -->|"Serial frames"| GRadio
@@ -40,7 +40,7 @@ flowchart LR
     GRadio <-->|"Telemetry radio link"| RRadio
 
     subgraph Robot
-        RRadio["SiK radio"]
+        RRadio["SiK or RFD900+"]
         RX["radio_rx"]
         ROS["ROS autonomy<br/>ThrustSourceSelector"]
         MC["motor_controller"]
@@ -86,9 +86,18 @@ DEVICE_CONFIG=rpi PWM_BACKEND_OVERRIDE=dry_run \
   docker compose -f docker-compose.frontseat.yml up -d pwm_daemon
 ```
 
-## Finding the SiK telemetry radio serial port
+## Telemetry radios (SiK and RFD900+)
 
-SiK Telemetry Radio v3 usually appears as an **FTDI FT231X** USB-UART (not as `ttyACM*` — those are often GPS).
+Software treats the modem as a **transparent UART**. Swap hardware by pointing `RADIO_SERIAL_PORT` at the right USB device (**required** — no default); keep `RADIO_BAUD` matched to the modem’s UART speed (default **57600**).
+
+| Modem | Typical USB-UART | `by-id` name contains |
+|-------|------------------|------------------------|
+| Holybro **SiK** Telemetry Radio v3 | FTDI **FT231X** | `FTDI_FT231X` |
+| RFDesign **RFD900+** (USB adapter) | Silicon Labs **CP2102** | `Silicon_Labs_CP2102` |
+
+Use a **matched pair** of the same modem type on GS and robot. Do not mix SiK with RFD900+ on one link.
+
+### Finding the serial port
 
 **1. List stable IDs (preferred):**
 
@@ -96,17 +105,27 @@ SiK Telemetry Radio v3 usually appears as an **FTDI FT231X** USB-UART (not as `t
 ls -l /dev/serial/by-id/
 ```
 
-Example on this robot:
+Examples:
 
 ```text
-usb-FTDI_FT231X_USB_UART_D30GKEF6-if00-port0 -> ../../ttyUSB0   ← SiK radio
-usb-u-blox_AG_-_..._u-blox_GNSS_receiver-if00 -> ../../ttyACM1 ← GPS
+# SiK (Holybro)
+usb-FTDI_FT231X_USB_UART_D30GKEF6-if00-port0 -> ../../ttyUSB0
+
+# RFD900+ (this lab pair — both ends may share serial "0001"; that is OK across hosts)
+usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0 -> ../../ttyUSB0
+
+# GPS — not the telemetry radio
+usb-u-blox_AG_-_..._u-blox_GNSS_receiver-if00 -> ../../ttyACM0
 ```
 
-Use the **by-id** path in compose so it survives reboot / USB reorder:
-
 ```bash
+# SiK example
 export RADIO_SERIAL_PORT=/dev/serial/by-id/usb-FTDI_FT231X_USB_UART_D30GKEF6-if00-port0
+
+# RFD900+ example
+export RADIO_SERIAL_PORT=/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0
+
+export RADIO_BAUD=57600
 ```
 
 **2. Confirm vendor/product:**
@@ -115,18 +134,53 @@ export RADIO_SERIAL_PORT=/dev/serial/by-id/usb-FTDI_FT231X_USB_UART_D30GKEF6-if0
 udevadm info -q property -n /dev/ttyUSB0 | grep -E 'ID_VENDOR|ID_MODEL|ID_SERIAL'
 ```
 
-SiK v3 typically shows `ID_VENDOR=FTDI` and `ID_MODEL=FT231X_USB_UART`.
+- SiK v3: `ID_VENDOR=FTDI`, `ID_MODEL=FT231X_USB_UART`
+- RFD900+: `ID_VENDOR=Silicon_Labs`, `ID_MODEL=CP2102_USB_to_UART_Bridge_Controller`
 
-**3. Unplug/replug test:**
+**3. Baud:** both families commonly use **57600** host UART (`RADIO_BAUD`). Some RFD units ship at **115200** (`ATS1=115`) — if open/link fails, check with AT commands below and set `RADIO_BAUD` to match, or set `ATS1=57` on the radio so it matches the compose default.
+
+GPS modules (`u-blox` → `ttyACM*`) are **not** the telemetry radio.
+
+### RFD900+ pairing / long-range settings
+
+Use `configure_rfd_modem.py` on **each** modem (stop `telemetry_tx` / `radio_rx` first so the port is free). Both ends of a pair must get the same air/netid/freq settings.
+
+**Defaults (lab teleop):** UART **57600**, air **64** kbps, NETID **25**, TX **20** dBm, MAVLINK **off**.
 
 ```bash
-dmesg -w
-# unplug radio, plug back — look for FTDI / ttyUSB
+cd <repo>/src/teleop
+PORT=/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0
+
+python3 configure_rfd_modem.py --port "$PORT" --show   # inspect
+python3 configure_rfd_modem.py --port "$PORT"          # apply defaults
+
+# Longer range example (run identical args on the other modem too)
+python3 configure_rfd_modem.py --port "$PORT" --air-speed 12 --tx-power 30
 ```
 
-**4. Baud:** SiK default is often **57600** (set `RADIO_BAUD` if you changed air/radio settings).
+Without the script, enter AT mode (`+++`), match both radios, then:
 
-GPS modules (`u-blox` → `ttyACM*`) are **not** the telemetry radio — leave those for the frontseat GPS launch files.
+```text
+ATS1=57          # UART 57600 (must match RADIO_BAUD)
+ATS2=64          # air rate; lower (e.g. 12) for more range; must match
+ATS3=25          # NETID — must match
+ATS4=20          # TX power dBm (up to 30 if legal); lab OK at 20
+ATS6=0           # MAVLINK framing OFF (required for our 9-byte frames)
+AT&W
+ATZ
+```
+
+Verified lab pair (GS Alienware + Pi `.101`): `SERIAL_SPEED=57`, `AIR_SPEED=64`, `NETID=25`, `MAVLINK=0`, `TXPOWER=20`, host baud **57600**. Transparent serial + teleop frames round-tripped successfully.
+
+Optional one-shot link check (GS → Pi → ACK) after both ports are open at 57600: write `GS->PI:HELLO\n` on one side and expect `PI->GS:ACK\n` on the other.
+
+**Power:** RFD at higher TX power can draw ~1 A peaks. USB power can work for bench tests; for field/long range prefer a solid local 5 V on the boat (and on GS if USB browns out). Antennas must be attached before transmitting.
+
+### Swapping SiK ↔ RFD900+
+
+1. Plug the chosen pair on GS and robot.  
+2. Export the matching `RADIO_SERIAL_PORT` on each host (and `RADIO_BAUD` if not 57600).  
+3. Restart `telemetry_tx` / `radio_rx` — no code changes.
 
 ## Serial protocol
 
@@ -147,7 +201,7 @@ UDP JSON to `127.0.0.1:5600` (host network on the robot):
 
 ## Controller setup — what to run (both machines)
 
-Plug in the SiK radio on **both** sides and the Xbox receiver on the ground PC first.
+Plug in the telemetry radio pair (SiK **or** RFD900+) on **both** sides and the Xbox receiver on the ground PC first.
 
 ### 0) Identify devices (each machine)
 
@@ -155,7 +209,7 @@ Plug in the SiK radio on **both** sides and the Xbox receiver on the ground PC f
 # Joystick (ground PC only)
 ls -l /dev/input/js*
 
-# SiK radio (both machines) — prefer by-id, see section above
+# Telemetry radio (both machines) — prefer by-id, see section above
 ls -l /dev/serial/by-id/
 ```
 
@@ -182,8 +236,11 @@ Current Xbox defaults (after mapping):
 cd <repo>/src/docker
 
 # Safe bring-up (logs thrust, does not drive ESCs)
+# SiK:   RADIO_SERIAL_PORT=/dev/serial/by-id/usb-FTDI_FT231X_USB_UART_<ROBOT_SERIAL>-if00-port0
+# RFD900+: RADIO_SERIAL_PORT=/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0
 DEVICE_CONFIG=rpi PWM_BACKEND_OVERRIDE=dry_run \
-RADIO_SERIAL_PORT=/dev/serial/by-id/usb-FTDI_FT231X_USB_UART_<ROBOT_SERIAL>-if00-port0 \
+RADIO_SERIAL_PORT=/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0 \
+RADIO_BAUD=57600 \
   docker compose -f docker-compose.frontseat.yml up -d --build pwm_daemon radio_rx
 
 # When ready for real motors, omit PWM_BACKEND_OVERRIDE (uses devices/rpi.json → pigpio hw PWM)
@@ -200,14 +257,16 @@ docker logs -f mini_bream_pwm_daemon
 docker logs -f mini_bream_radio_rx
 ```
 
-You want `radio_rx` to open the SiK port, and when the GS is armed, `pwm_daemon` should show `Active source → radio`.
+You want `radio_rx` to open the radio port, and when the GS is armed, `pwm_daemon` should show `Active source → radio`.
 
 ### 2) Ground PC — emergency teleop transmitter
 
 ```bash
 cd <repo>/src/docker
 
-RADIO_SERIAL_PORT=/dev/serial/by-id/usb-FTDI_FT231X_USB_UART_<GS_SERIAL>-if00-port0 \
+# Match the modem type on the Pi (SiK FTDI by-id or RFD CP2102 by-id)
+RADIO_SERIAL_PORT=/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0 \
+RADIO_BAUD=57600 \
 JOY_DEVICE=/dev/input/js0 \
   docker compose -f docker-compose.ground.telemetry.yaml up --build
 ```
@@ -228,7 +287,7 @@ Hold **button[5]** → log `Deadman ARMED`; release → `disarmed` / robot falls
 
 ### Order summary
 
-1. Power radios + Xbox receiver  
+1. Power radios (antennas on) + Xbox receiver  
 2. On **Pi**: `pwm_daemon` + `radio_rx` (`docker-compose.frontseat.yml`)  
 3. On **ground PC**: `telemetry_tx` (`docker-compose.ground.telemetry.yaml`)  
 4. Hold deadman (**button[5]**), move **axis[1]** / **axis[4]**, confirm Pi daemon logs  

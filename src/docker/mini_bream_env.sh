@@ -24,7 +24,7 @@
 #   ROS_DOMAIN_ID=0      Must match on all hosts (default 0)
 #   LIDAR_IFACE=eth0     Jetson LiDAR NIC (default eth0)
 #   GROUND_IFACE=wlp5s0
-#   RADIO_SERIAL_PORT=...  SiK radio by-id path
+#   RADIO_SERIAL_PORT=...  required for radio teleop (SiK FTDI or RFD900+ CP2102 by-id)
 #   PWM_BACKEND_OVERRIDE=dry_run
 #   SKIP_CLOCK_PREFLIGHT=1  Skip epoch clock check on start pi|jetson|autonomy
 
@@ -269,7 +269,7 @@ start_gs() {
   fi
 
   if [[ "${NO_TELEMETRY}" -eq 0 ]]; then
-    log "Starting telemetry_tx (joystick → SiK radio, detached)..."
+    log "Starting telemetry_tx (joystick → telemetry radio, detached)..."
     compose -f "${COMPOSE_TELEMETRY}" up -d $(build_flag) telemetry_tx
   else
     log "Skipping telemetry_tx (--no-telemetry)"

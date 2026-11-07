@@ -7,7 +7,7 @@ flowchart LR
     subgraph GS["Ground-station computer (.103)"]
         Xbox["Xbox controller<br/>/dev/input/js0"]
         Telemetry["telemetry_tx<br/>mini-bream:telemetry"]
-        GRadio["SiK telemetry radio<br/>serial USB"]
+        GRadio["SiK / RFD900+ radio<br/>serial USB"]
         Rviz["ground_station<br/>mini-bream:ground-station<br/>RViz2"]
 
         Xbox --> Telemetry
@@ -16,10 +16,10 @@ flowchart LR
         Rviz -.->|"ROS 2 DDS"| Jetson
     end
 
-    GRadio <-->|"9-byte serial commands<br/>over SiK radio"| RRadio
+    GRadio <-->|"9-byte serial commands<br/>over telemetry radio"| RRadio
 
     subgraph Pi["Raspberry Pi (.100)"]
-        RRadio["SiK telemetry radio<br/>serial USB"]
+        RRadio["SiK / RFD900+ radio<br/>serial USB"]
         RadioRx["radio_rx<br/>mini-bream:teleop"]
         Pwm["pwm_daemon<br/>mini-bream:teleop"]
         Frontseat["frontseat<br/>mini-bream:frontseat<br/>motors + RTK"]
@@ -30,6 +30,7 @@ flowchart LR
         Frontseat -->|"UDP ROS command"| Pwm
         Pwm -->|"pigpio hardware PWM"| Motors
     end
+
 
     subgraph Jetson["Jetson Orin Nano (.102)"]
         Perception["perception<br/>mini-bream:perception"]
@@ -43,7 +44,7 @@ flowchart LR
 
 ## Images and services
 
-- `Dockerfile.ground_station.telemetry_tx` builds `mini-bream:telemetry` (joystick → SiK radio, no ROS).
+- `Dockerfile.ground_station.telemetry_tx` builds `mini-bream:telemetry` (joystick → SiK/RFD900+ radio, no ROS).
 - `Dockerfile.ground_station` builds `mini-bream:ground-station` (RViz2 topic viewer).
 - `Dockerfile.teleop` builds `mini-bream:teleop` (`radio_rx`, `pwm_daemon` on the Pi).
 - `Dockerfile.frontseat` builds `mini-bream:frontseat` (Pi: motor control + RTK).

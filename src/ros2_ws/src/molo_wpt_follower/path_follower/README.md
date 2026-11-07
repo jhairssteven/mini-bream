@@ -35,7 +35,7 @@ rviz2 -d /workspace/docker/config/molo_autonomy.rviz --ros-args -p use_sim_time:
 ros2 launch mission_planner molo_autonomy.launch.py platform:=blueboat controller:=ilos use_sim_time:=false
 ```
 
-Requires LiDAR on `/rslidar_points` and odometry on `/molo_boat/estimated_odometry` (TF bridge in `config/blueboat/tf_bridge.json`).
+Requires LiDAR on `/rslidar_points` and odometry on `/odom` (TF bridge in `config/blueboat/tf_bridge.json`).
 
 ## Controller selection
 

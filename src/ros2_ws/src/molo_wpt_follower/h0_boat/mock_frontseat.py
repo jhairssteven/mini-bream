@@ -17,10 +17,12 @@ import rclpy
 import utm
 import yaml
 from geometry_msgs.msg import Quaternion, Vector3
+from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from rclpy.qos import QoSDurabilityPolicy, QoSProfile, QoSReliabilityPolicy
 from sensor_msgs.msg import Imu, NavSatFix
 from std_msgs.msg import Float32, Float64
+from tf_transformations import quaternion_from_euler
 
 PKG_DIR = Path(__file__).resolve().parent
 MOLO_DIR = PKG_DIR.parent
@@ -55,8 +57,10 @@ class MockFrontseatNode(Node):
         speed_mps: float,
         gps_topic: str,
         imu_topic: str,
+        odom_topic: str,
         thrust_topics: tuple[str, str],
         log_thrust: bool,
+        frame_id: str = "map",
     ):
         super().__init__("mock_frontseat")
         self._origin_utm = utm.from_latlon(origin_lat, origin_lon)
@@ -65,6 +69,7 @@ class MockFrontseatNode(Node):
         self._t_path = 0.0
         self._x = self._y = self._psi = 0.0
         self._log_thrust = log_thrust
+        self._frame_id = frame_id
 
         qos_sensor = QoSProfile(
             reliability=QoSReliabilityPolicy.BEST_EFFORT,
@@ -78,6 +83,7 @@ class MockFrontseatNode(Node):
         )
         self._gps_pub = self.create_publisher(NavSatFix, gps_topic, qos_gps)
         self._imu_pub = self.create_publisher(Imu, imu_topic, qos_sensor)
+        self._odom_pub = self.create_publisher(Odometry, odom_topic, qos_sensor)
 
         self.create_subscription(Float32, thrust_topics[0], self._left_cb, 10)
         self.create_subscription(Float32, thrust_topics[1], self._right_cb, 10)
@@ -87,7 +93,8 @@ class MockFrontseatNode(Node):
 
         self.create_timer(0.1, self._tick)
         self.get_logger().info(
-            f"mock_frontseat origin=({origin_lat:.6f}, {origin_lon:.6f}) scale={scale_m}m"
+            f"mock_frontseat origin=({origin_lat:.6f}, {origin_lon:.6f}) "
+            f"scale={scale_m}m odom={odom_topic}"
         )
 
     def _left_cb(self, msg: Float32) -> None:
@@ -133,6 +140,18 @@ class MockFrontseatNode(Node):
         imu.angular_velocity = Vector3(z=self._speed / max(self._scale_m, 1.0) * 0.15)
         self._imu_pub.publish(imu)
 
+        odom = Odometry()
+        odom.header.stamp = gps.header.stamp
+        odom.header.frame_id = self._frame_id
+        odom.child_frame_id = "base_link"
+        odom.pose.pose.position.x = self._x
+        odom.pose.pose.position.y = self._y
+        qx, qy, qz, qw = quaternion_from_euler(0.0, 0.0, self._psi)
+        odom.pose.pose.orientation = Quaternion(x=qx, y=qy, z=qz, w=qw)
+        odom.twist.twist.linear.x = self._speed
+        odom.twist.twist.angular.z = float(imu.angular_velocity.z)
+        self._odom_pub.publish(odom)
+
         if self._log_thrust and (abs(self._last_thrust[0]) > 1e-4 or abs(self._last_thrust[1]) > 1e-4):
             self.get_logger().info(
                 f"thrust L={self._last_thrust[0]:+.3f} R={self._last_thrust[1]:+.3f} "
@@ -150,6 +169,7 @@ def main() -> None:
     parser.add_argument("--speed-mps", type=float, default=0.14)
     parser.add_argument("--gps-topic", default="/wamv/sensors/gps/gps/fix")
     parser.add_argument("--imu-topic", default="/wamv/sensors/imu/imu/data")
+    parser.add_argument("--odom-topic", default="/mock/odom")
     parser.add_argument("--thrust-left", default="/molo_boat/thrust_left")
     parser.add_argument("--thrust-right", default="/molo_boat/thrust_right")
     parser.add_argument("--no-thrust-log", action="store_true")
@@ -161,8 +181,10 @@ def main() -> None:
     speed_mps = args.speed_mps
     gps_topic = args.gps_topic
     imu_topic = args.imu_topic
+    odom_topic = args.odom_topic
     thrust_left = args.thrust_left
     thrust_right = args.thrust_right
+    frame_id = "map"
 
     if args.config:
         with open(args.config, encoding="utf-8") as f:
@@ -176,8 +198,10 @@ def main() -> None:
         topics = cfg.get("topics", {})
         gps_topic = topics.get("gps", gps_topic)
         imu_topic = topics.get("imu", imu_topic)
+        odom_topic = topics.get("odometry", odom_topic)
         thrust_left = topics.get("left_thrust", thrust_left)
         thrust_right = topics.get("right_thrust", thrust_right)
+        frame_id = str(cfg.get("frame_id", frame_id))
     else:
         if origin_lat is None or origin_lon is None:
             cfg = build_h0_boat_config()
@@ -192,8 +216,10 @@ def main() -> None:
         speed_mps,
         gps_topic,
         imu_topic,
+        odom_topic,
         (thrust_left, thrust_right),
         log_thrust=not args.no_thrust_log,
+        frame_id=frame_id,
     )
     try:
         rclpy.spin(node)

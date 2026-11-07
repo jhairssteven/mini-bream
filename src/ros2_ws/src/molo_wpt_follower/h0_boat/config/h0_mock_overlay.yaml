@@ -9,12 +9,9 @@ platform:
 topics:
   gps: /mock/wamv/sensors/gps/gps/fix
   imu: /mock/wamv/sensors/imu/imu/data
+  odometry: /mock/odom
   left_thrust: /molo_boat/thrust_left
   right_thrust: /molo_boat/thrust_right
-
-boat_bridge:
-  gps_topic: /mock/wamv/sensors/gps/gps/fix
-  imu_topic: /mock/wamv/sensors/imu/imu/data
 
 experiment:
   warmup_s: 8.0

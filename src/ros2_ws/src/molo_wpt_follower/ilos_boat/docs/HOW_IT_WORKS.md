@@ -9,13 +9,10 @@ This package runs a **closed-loop lemniscate tracking experiment** using **ILOS 
 ```mermaid
 flowchart LR
     subgraph inputs [Sensors]
-        GPS[GPS]
-        IMU[IMU]
-        Odom[Odometry / GT]
+        Odom["/odom or GT odometry"]
     end
 
     subgraph stack [stack_runner.py]
-        VO[VelocityOdomNode]
         PT[PoseTrailViz]
         IL[IlosFollowerNode]
     end
@@ -26,11 +23,7 @@ flowchart LR
         MIX[Differential thrust mix]
     end
 
-    GPS --> IL
-    IMU --> IL
     Odom --> IL
-    GPS --> VO
-    IMU --> VO
     IL --> ILOS --> PID --> MIX
     MIX --> Thrust["/pwm/* or /blueboat/thrusters/*"]
     IL --> Viz["/molo_mpc/* topics"]

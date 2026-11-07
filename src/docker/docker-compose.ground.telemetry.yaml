@@ -1,15 +1,18 @@
 name: mini-bream-ground-telemetry
 
-# Emergency teleop transmitter: joystick (/dev/input/js*) → SiK telemetry radio.
-# No ROS. Uses Docker bridge network — isolated from robot DDS.
+# Emergency teleop transmitter: joystick (/dev/input/js*) → telemetry radio.
+# Supports Holybro SiK v3 (FTDI) or RFDesign RFD900+ (CP2102). No ROS.
+# Uses Docker bridge network — isolated from robot DDS.
 #
 #   docker compose -f docker-compose.ground.telemetry.yaml up --build
 #
-# Env overrides:
-#   RADIO_SERIAL_PORT=/dev/serial/by-id/usb-FTDI_FT231X_USB_UART_<SERIAL>-if00-port0
+# Required:
+#   RADIO_SERIAL_PORT=/dev/serial/by-id/usb-FTDI_FT231X_USB_UART_<SERIAL>-if00-port0   # SiK
+#   or RADIO_SERIAL_PORT=/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0  # RFD900+
+# Optional:
 #   RADIO_BAUD=57600
 #   JOY_DEVICE=/dev/input/js0
-# See ../teleop/README.md for identifying the SiK radio.
+# See ../teleop/README.md for identifying / pairing radios.
 
 services:
   telemetry_tx:
@@ -24,7 +27,7 @@ services:
     environment:
       - TZ=${TZ:-}
       - JOY_DEVICE=${JOY_DEVICE:-/dev/input/js0}
-      - RADIO_SERIAL_PORT=${RADIO_SERIAL_PORT:-/dev/ttyUSB0}
+      - RADIO_SERIAL_PORT=${RADIO_SERIAL_PORT:?Set RADIO_SERIAL_PORT to the radio by-id path}
       - RADIO_BAUD=${RADIO_BAUD:-57600}
     volumes:
       - ${LOCALTIME_PATH:-/etc/localtime}:/etc/localtime:ro
@@ -32,12 +35,12 @@ services:
       - /dev:/dev
     devices:
       - ${JOY_DEVICE:-/dev/input/js0}:${JOY_DEVICE:-/dev/input/js0}
-      - ${RADIO_SERIAL_PORT:-/dev/ttyUSB0}:${RADIO_SERIAL_PORT:-/dev/ttyUSB0}
-    # Xbox: axis[1]/left thrust, axis[4]=right thrust, button[5]=deadman
+      - ${RADIO_SERIAL_PORT:?Set RADIO_SERIAL_PORT to the radio by-id path}:${RADIO_SERIAL_PORT:?Set RADIO_SERIAL_PORT to the radio by-id path}
+    # Xbox: axis[1]=left thrust, axis[4]=right thrust, button[5]=deadman
     command: >
       python3 /opt/teleop/joy_to_serial.py
         --joy-device ${JOY_DEVICE:-/dev/input/js0}
-        --port ${RADIO_SERIAL_PORT:-/dev/ttyUSB0}
+        --port ${RADIO_SERIAL_PORT:?Set RADIO_SERIAL_PORT to the radio by-id path}
         --baud ${RADIO_BAUD:-57600}
         --left-axis ${JOY_LEFT_AXIS:-1}
         --right-axis ${JOY_RIGHT_AXIS:-4}

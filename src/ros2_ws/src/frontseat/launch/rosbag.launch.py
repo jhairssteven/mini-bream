@@ -40,8 +40,6 @@ CORE_TOPICS = [
     # TF
     '/tf',
     '/tf_static',
-    # Odometry (autonomy)
-    '/molo_boat/estimated_odometry',
 ]
 
 LIDAR_TOPICS = [

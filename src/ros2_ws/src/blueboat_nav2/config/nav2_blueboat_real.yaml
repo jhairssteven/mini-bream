@@ -1,4 +1,4 @@
-# Nav2 parameters for BlueBoat field operation (estimated odometry + LiDAR).
+# Nav2 parameters for BlueBoat field operation (gps_map_odom /odom + LiDAR).
 
 goal_path_planner:
   ros__parameters:
@@ -10,7 +10,7 @@ goal_path_planner:
 pointcloud_to_laserscan:
   ros__parameters:
     target_frame: blueboat/blueboat/base_link
-    min_height: 0.35
+    min_height: 0.0
     max_height: 2.5
     angle_min: -3.14159
     angle_max: 3.14159
@@ -34,7 +34,7 @@ planner_server:
       max_on_approach_iterations: 1000
       max_planning_time: 5.0
       motion_model_for_search: "DUBIN"
-      minimum_turning_radius: 3.0
+      minimum_turning_radius: 0.3
       angle_quantization_bins: 72
       analytic_expansion_ratio: 3.5
       analytic_expansion_max_length: 6.0
@@ -55,12 +55,13 @@ global_costmap:
       robot_base_frame: blueboat/blueboat/base_link
       use_sim_time: false
       rolling_window: true
-      width: 60
-      height: 60
+      width: 20
+      height: 20
       resolution: 0.25
       track_unknown_space: false
       transform_tolerance: 2.0
-      footprint: "[[0.65, 0.33], [0.65, -0.33], [-0.65, -0.33], [-0.65, 0.33]]"
+      # BlueBoat deployed hull (Blue Robotics): 1.20 m × 0.93 m.
+      footprint: "[[0.6, 0.465], [0.6, -0.465], [-0.6, -0.465], [-0.6, 0.465]]"
       plugins: ["obstacle_layer", "inflation_layer"]
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
@@ -85,7 +86,9 @@ global_costmap:
           obstacle_min_range: 0.8
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        inflation_radius: 0.75
+        # Circumscribed hull radius ≈ 0.76 m (√(0.6²+0.465²)); inflate ≥ that so
+        # soft costs cover the full footprint. +~0.25 m (~1 cell) GPS/control margin.
+        inflation_radius: 1.0
         cost_scaling_factor: 5.0
       always_send_full_costmap: true
 

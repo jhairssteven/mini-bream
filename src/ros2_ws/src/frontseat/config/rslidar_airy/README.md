@@ -83,7 +83,7 @@ docker exec mini_bream_perception bash -lc '
 
 For real-boat operation (`use_sim_time:=false`), `airy.yaml` sets `use_lidar_clock: false`.
 With `use_lidar_clock: true`, the Airy stamps point clouds with the sensor uptime clock while
-`molo_tf_bridge` and `/molo_boat/estimated_odometry` use host time. Nav2 then cannot transform
+`gps_map_odom` `/odom` and TF use host time. Nav2 then cannot transform
 `/scan` into `map` and logs `The /scan observation buffer has not been updated`.
 
 After changing this setting, restart the LiDAR tmux session in perception:

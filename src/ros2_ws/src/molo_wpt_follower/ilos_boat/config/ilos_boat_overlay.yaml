@@ -1,31 +1,19 @@
 # ILOS experiment overlay for real BlueBoat (frontseat).
+# Pose from frontseat gps_map_odom (/odom + map→base_link).
 platform:
   name: real_boat
   profile: real
   prerequisites: frontseat
 
 sim_enable: false
-
-feedback:
-  use_ground_truth_pose: false
-
-origin:
-  lat: null
-  lon: null
+frame_id: map
 
 topics:
   gps: /wamv/sensors/gps/gps/fix
   imu: /wamv/sensors/imu/imu/data
-  odometry: /molo_boat/estimated_odometry
+  odometry: /odom
   left_thrust: /pwm/left_thrust_cmd
   right_thrust: /pwm/right_thrust_cmd
-
-boat_bridge:
-  velocity_odom_enabled: true
-  gps_topic: /wamv/sensors/gps/gps/fix
-  imu_topic: /wamv/sensors/imu/imu/data
-  estimated_odom_topic: /molo_boat/estimated_odometry
-  velocity_window_s: 0.4
 
 viz:
   pose_topic: /molo_mpc/vehicle_pose
