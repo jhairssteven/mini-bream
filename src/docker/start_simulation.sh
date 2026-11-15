@@ -49,9 +49,13 @@ BB_PREFIX="$(ros2 pkg prefix blueboat_sim)"
 BB_SIM_SHARE="${BB_PREFIX}/share/blueboat_sim"
 export GZ_SIM_RESOURCE_PATH="${BB_PREFIX}/share:${BB_SIM_SHARE}/worlds:${BB_SIM_SHARE}/models:${VRX_GZ_SHARE}/models:${VRX_GZ_SHARE}/worlds:${GZ_SIM_RESOURCE_PATH:-}"
 
-WORLD="${SIM_WORLD:-lidar_obstacle_course_harner}"
+# Default: open water (no shore/dock/obstacle collisions that can trap the boat).
+# Override with SIM_WORLD / SIM_LAUNCH if needed (e.g. lidar_obstacle_course_harner).
+WORLD="${SIM_WORLD:-open_water_harner}"
+LAUNCH="${SIM_LAUNCH:-open_water.launch.py}"
 HEADLESS="${SIM_HEADLESS:-False}"
 
-exec ros2 launch blueboat_sim lidar_obstacle_course.launch.py \
+echo "[sim] launch=${LAUNCH} world=${WORLD} headless=${HEADLESS}"
+exec ros2 launch blueboat_sim "${LAUNCH}" \
   world:="${WORLD}" \
   headless:="${HEADLESS}"

@@ -1,0 +1,30 @@
+# GS-MPC+ILOS overlay for BlueBoat Gazebo simulation.
+platform:
+  name: blueboat_sim
+  profile: sim
+  prerequisites: blueboat_sim
+
+sim_enable: true
+use_sim_time: true
+frame_id: map
+
+topics:
+  gps: /blueboat/sensors/gps/gps/fix
+  imu: /blueboat/sensors/imu/imu/data
+  odometry: /blueboat/sensors/position/ground_truth_odometry
+  left_thrust: /blueboat/thrusters/left/thrust
+  right_thrust: /blueboat/thrusters/right/thrust
+
+viz:
+  pose_topic: /molo_mpc/vehicle_pose
+  recent_poses_topic: /molo_h0/recent_poses
+  frame_id: map
+  max_recent_poses: 40
+
+experiment:
+  warmup_s: 5.0
+  evaluate_s: 60.0
+  skip_initial_s: 5.0
+  target_rmse_m: 0.1
+  wait_for_gps_timeout_s: 30.0
+  wait_for_xte_timeout_s: 30.0

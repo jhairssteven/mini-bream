@@ -1,0 +1,29 @@
+# GS-MPC+ILOS overlay for real BlueBoat (frontseat).
+platform:
+  name: real_boat
+  profile: real
+  prerequisites: frontseat
+
+sim_enable: false
+frame_id: map
+
+topics:
+  gps: /wamv/sensors/gps/gps/fix
+  imu: /wamv/sensors/imu/imu/data
+  odometry: /odom
+  left_thrust: /pwm/left_thrust_cmd
+  right_thrust: /pwm/right_thrust_cmd
+
+viz:
+  pose_topic: /molo_mpc/vehicle_pose
+  recent_poses_topic: /molo_h0/recent_poses
+  frame_id: map
+  max_recent_poses: 40
+
+experiment:
+  warmup_s: 20.0
+  evaluate_s: 55.0
+  skip_initial_s: 20.0
+  target_rmse_m: 0.1
+  wait_for_gps_timeout_s: 60.0
+  wait_for_xte_timeout_s: 45.0

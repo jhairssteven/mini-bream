@@ -1,0 +1,46 @@
+# Hybrid: phase_global best_validation outer params + post-fix surge/yaw defaults.
+# Outer (from tune_staged_sim_20261026T044224Z/phase_global/best_validation):
+path:
+  cruise_speed_mps: 0.3573567968140897
+gs_mpc:
+  horizon: 16
+  u_min: 0.15
+  u_max: 0.40681524968309973
+  r_max: 0.46206271985006747
+  w_path: 54.263445091730944
+  w_u: 11.041104069648892
+  w_r: 3.0
+  w_du: 1.0
+  w_dr: 0.9232122131898687
+ilos:
+  delta_m: 1.2
+  sigma: 0.18
+  e_i_limit: 3.4683526247295906
+  advance_eps_m: 0.15
+speed:
+  angle_threshold_fast_rad: 0.21887007369900752
+  angle_threshold_slow_rad: 0.6522319465548687
+  min_speed_scale: 0.5324575585860691
+  u_d_floor_frac_of_cruise: 0.65
+# Inner loops (from 20261026T124332Z / gs_base after surge FF fix):
+surge_pi:
+  kp: 10.0
+  ki: 2.0
+  k_ff: 6.0
+  x_min: -25.0
+  x_max: 25.0
+  i_limit: 8.0
+  dx_max: 50.0
+  u_lpf_tau_s: 0.25
+  ff_overspeed_fade_mps: 0.12
+  speed_feedback: body_u
+yaw_pd:
+  kp: 2.5
+  kd: 1.2
+  n_max: 6.0
+experiment:
+  warmup_s: 5.0
+  evaluate_s: 60.0
+  skip_initial_s: 5.0
+  target_rmse_m: 0.1
+  min_completion: 0.8
