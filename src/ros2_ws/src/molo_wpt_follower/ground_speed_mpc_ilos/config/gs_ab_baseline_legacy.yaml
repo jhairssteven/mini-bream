@@ -1,0 +1,50 @@
+# A/B baseline: global-best numeric gains + legacy surge/allocator structure.
+# Same gains as phase_global/best_validation; old brake behavior for comparison.
+path:
+  cruise_speed_mps: 0.42
+surge_pi:
+  kp: 9.12366556080948
+  ki: 0.627335037522565
+  k_ff: 3.9239951746522888
+  x_min: -26.594172322273483
+  x_max: 26.594172322273483
+  i_limit: 8.0
+  dx_max: 70.0
+  u_lpf_tau_s: 0.26123851015508986
+  ff_overspeed_fade_mps: 0.12
+  brake_x_min: -26.594172322273483
+  brake_kp_scale: 1.0
+  speed_feedback: body_u
+yaw_pd:
+  kp: 2.788206406201538
+  kd: 0.9422452206546716
+  n_max: 6.296983454488361
+speed:
+  angle_threshold_fast_rad: 0.1903804008806302
+  angle_threshold_slow_rad: 0.5961870011063604
+  min_speed_scale: 0.35
+  u_d_floor_frac_of_cruise: 0.9
+ilos:
+  delta_m: 1.2664767660367902
+  sigma: 0.03840759590669617
+  e_i_limit: 2.907983708945807
+  advance_eps_m: 0.15
+gs_mpc:
+  horizon: 13
+  u_min: 0.15
+  u_max: 0.385
+  r_max: 0.45
+  w_path: 55.0
+  w_u: 13.0
+  w_r: 1.9
+  w_du: 2.5
+  w_dr: 1.5
+allocation:
+  surge_priority: true
+  surge_priority_x_min: 8.0
+experiment:
+  warmup_s: 5.0
+  evaluate_s: 120.0
+  skip_initial_s: 5.0
+  target_rmse_m: 0.1
+  min_completion: 0.8

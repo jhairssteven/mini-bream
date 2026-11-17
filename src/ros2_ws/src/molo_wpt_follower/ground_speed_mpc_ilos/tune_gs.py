@@ -67,18 +67,19 @@ PHASES = ("inner", "ilos", "mpc", "global")
 
 # (name, lo, hi, is_int) — tight boxes around known-stable defaults (avoid chatter).
 BOUND_INNER: List[Tuple[str, float, float, bool]] = [
-    # Floor high enough that 100 s evaluate can still hit 80% completion.
+    # Keep cruise near lemniscate-completable band for 100–120 s evaluate.
     ("cruise", 0.26, 0.42, False),
-    ("surge_kp", 6.0, 16.0, False),
-    ("surge_ki", 0.5, 4.0, False),
-    # Keep k_ff near plant gain; old 30–55 range made U_g ≫ U_d.
-    ("surge_kff", 2.0, 12.0, False),
-    ("surge_dx_max", 25.0, 70.0, False),
+    ("surge_kp", 20.0, 60.0, False),
+    ("surge_ki", 2.0, 12.0, False),
+    # Plant X/U ≈ 25+40U (~30–50 N·s/m over cruise band).
+    ("surge_kff", 28.0, 45.0, False),
+    ("surge_dx_max", 80.0, 200.0, False),
     ("surge_lpf", 0.15, 0.40, False),
-    ("surge_xmax", 15.0, 28.0, False),
-    ("yaw_kp", 1.2, 3.5, False),
-    ("yaw_kd", 0.6, 2.0, False),
-    ("yaw_nmax", 4.0, 9.0, False),
+    ("surge_xmax", 160.0, 200.0, False),
+    # Yaw must beat hydro nR≈80; keep priority_x_min high so cruise can reverse a thruster.
+    ("yaw_kp", 20.0, 60.0, False),
+    ("yaw_kd", 6.0, 20.0, False),
+    ("yaw_nmax", 30.0, 55.0, False),
     ("u_d_floor", 0.65, 0.90, False),
 ]
 BOUND_ILOS: List[Tuple[str, float, float, bool]] = [
@@ -96,22 +97,22 @@ BOUND_MPC: List[Tuple[str, float, float, bool]] = [
     ("w_r", 0.8, 3.0, False),
     ("w_du", 1.0, 4.0, False),
     ("w_dr", 0.5, 2.5, False),
-    ("u_max", 0.32, 0.45, False),
+    ("u_max", 0.32, 0.55, False),
     ("r_max", 0.35, 0.55, False),
 ]
 
-# Nominal seed = base yaml defaults (inside tight bounds).
+# Nominal seed = plant smoke seed (gs_plant_smoke_seed.yaml).
 SEED_INNER = {
-    "cruise": 0.32,
-    "surge_kp": 10.0,
-    "surge_ki": 2.0,
-    "surge_kff": 6.0,
-    "surge_dx_max": 50.0,
-    "surge_lpf": 0.25,
-    "surge_xmax": 25.0,
-    "yaw_kp": 2.5,
-    "yaw_kd": 1.2,
-    "yaw_nmax": 6.0,
+    "cruise": 0.30,
+    "surge_kp": 40.0,
+    "surge_ki": 6.0,
+    "surge_kff": 35.0,
+    "surge_dx_max": 150.0,
+    "surge_lpf": 0.30,
+    "surge_xmax": 200.0,
+    "yaw_kp": 35.0,
+    "yaw_kd": 12.0,
+    "yaw_nmax": 50.0,
     "u_d_floor": 0.75,
 }
 SEED_ILOS = {
@@ -129,7 +130,7 @@ SEED_MPC = {
     "w_r": 1.5,
     "w_du": 2.0,
     "w_dr": 1.0,
-    "u_max": 0.40,
+    "u_max": 0.45,
     "r_max": 0.45,
 }
 
@@ -238,9 +239,19 @@ def apply_params(cfg: dict, p: Dict[str, Any]) -> dict:
     if "surge_xmax" in p:
         surge["x_max"] = p["surge_xmax"]
         surge["x_min"] = -abs(p["surge_xmax"])
-    # Preserve post-fix FF fade even if an old overlay omitted it.
-    surge.setdefault("ff_overspeed_fade_mps", 0.12)
+    # Keep post-reverse-fix surge structure even if an overlay omitted keys.
+    surge.setdefault("ff_overspeed_fade_mps", 0.40)
+    surge.setdefault("brake_x_min", -10.0)
+    surge.setdefault("brake_kp_scale", 0.4)
     surge.setdefault("speed_feedback", "body_u")
+    alloc = c.setdefault("allocation", {})
+    alloc.setdefault("surge_priority", True)
+    alloc.setdefault("surge_priority_x_min", 40.0)
+    alloc.setdefault("t_max", 100.0)
+    alloc.setdefault("t_min", -100.0)
+    fmap = c.setdefault("thruster_map", {})
+    fmap.setdefault("t_max", 100.0)
+    fmap.setdefault("c1", 100.0)
 
     yaw = c.setdefault("yaw_pd", {})
     if "yaw_kp" in p:

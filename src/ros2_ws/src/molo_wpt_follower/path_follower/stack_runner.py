@@ -34,9 +34,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run a path follower with a pluggable controller")
     parser.add_argument(
         "--controller",
-        choices=["ilos", "h0", "mpc"],
+        choices=["ilos", "h0", "mpc", "gs", "gs_mpc_ilos"],
         default="ilos",
-        help="Controller backend (h0 and mpc both use MpcFollowerNode)",
+        help="Controller backend (h0/mpc → H0; gs/gs_mpc_ilos → GS-MPC→ILOS)",
     )
     parser.add_argument(
         "--platform",

@@ -1,4 +1,4 @@
-"""Full perception-planning-control stack: Nav2 planning + ILOS/H0 follower."""
+"""Full perception-planning-control stack: Nav2 planning + ILOS/H0/GS-MPC follower."""
 
 import sys
 from pathlib import Path
@@ -133,7 +133,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "controller",
                 default_value="ilos",
-                description="Path follower controller: ilos | h0 | mpc",
+                description="Path follower controller: ilos | h0 | mpc | gs | gs_mpc_ilos",
             ),
             DeclareLaunchArgument("enable_follower", default_value="true"),
             DeclareLaunchArgument("use_sim_time", default_value="true"),

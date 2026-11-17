@@ -46,7 +46,7 @@ class GroundSpeedMpcConfig:
     horizon: int = 12
     dt: float = 0.15
     u_min: float = 0.05
-    u_max: float = 0.45
+    u_max: float = 1.8
     r_max: float = 0.55
     du_max: float = 0.08
     dr_max: float = 0.20

@@ -7,6 +7,7 @@
 #   ./mini_bream_env.sh start gs              # telemetry_tx + RViz ground_station
 #   ./mini_bream_env.sh start gs --heading-compare  # RViz: raw vs LPF vs EKF heading arrows
 #   ./mini_bream_env.sh start gs --h0-boat --sim-viz  # same + use_sim_time (Gazebo sim)
+#   ./mini_bream_env.sh start gs --gs-mpc --sim-viz --no-telemetry  # GS-MPC paths + /plan
 #   ./mini_bream_env.sh stop pi               # remove Pi containers (compose down -v)
 #   ./mini_bream_env.sh stop jetson           # remove perception
 #   ./mini_bream_env.sh start autonomy       # Jetson/dev: H0 + ILOS + planning stack
@@ -84,6 +85,7 @@ DRY_RUN=0
 NO_TELEMETRY=0
 DETACH_FRONTSEAT=0
 H0_BOAT_RVIZ=0
+GS_MPC_RVIZ=0
 SIM_VIZ=0
 HEADING_COMPARE_RVIZ=0
 
@@ -174,9 +176,12 @@ detect_ground_dds_address() {
   fi
   local detected
   detected="$(ip -4 route get 192.168.0.100 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i=="src") print $(i+1)}' | head -1)"
-  if [[ -n "${detected}" ]]; then
+  # Default-route src (e.g. home Wi-Fi 192.168.1.103) is not the robot LAN.
+  if [[ "${detected}" == 192.168.0.* ]]; then
     export GROUND_DDS_ADDRESS="${detected}"
     log "GROUND_DDS_ADDRESS=${GROUND_DDS_ADDRESS} (auto-detected for robot LAN)"
+  elif [[ -n "${detected}" ]]; then
+    log "warning: route to robot LAN src=${detected} is not 192.168.0.0/24; leaving GROUND_DDS_ADDRESS unset"
   fi
 }
 
@@ -256,6 +261,11 @@ start_gs() {
   if [[ "${H0_BOAT_RVIZ}" -eq 1 ]]; then
     export RVIZ_CONFIG=/workspace/docker/config/h0_boat.rviz
     log "Using boat experiment RViz config (${RVIZ_CONFIG})"
+  fi
+
+  if [[ "${GS_MPC_RVIZ}" -eq 1 ]]; then
+    export RVIZ_CONFIG=/workspace/docker/config/gs_mpc.rviz
+    log "Using GS-MPC RViz config (${RVIZ_CONFIG})"
   fi
 
   if [[ "${HEADING_COMPARE_RVIZ}" -eq 1 ]]; then
@@ -350,6 +360,7 @@ while [[ $# -gt 0 ]]; do
     --no-telemetry) NO_TELEMETRY=1 ;;
     --detach-frontseat) DETACH_FRONTSEAT=1 ;;
     --h0-boat|--ilos-boat) H0_BOAT_RVIZ=1 ;;
+    --gs-mpc|--gs-mpc-ilos) GS_MPC_RVIZ=1 ;;
     --sim-viz) SIM_VIZ=1 ;;
     --heading-compare) HEADING_COMPARE_RVIZ=1 ;;
     -h|--help) usage 0 ;;

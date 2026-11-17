@@ -82,6 +82,19 @@ class PathFollowerConfigTests(unittest.TestCase):
         self.assertEqual(cfg["path"]["source"], "topic")
         self.assertEqual(cfg["path"]["reference_path_topic"], "/plan")
 
+    def test_build_gs_external_path(self):
+        sys.path.insert(0, str(MOLO_DIR / "path_follower"))
+        from config import build_path_follower_config  # noqa: WPS433
+
+        cfg = build_path_follower_config(controller="gs", platform="sim", use_external_path=True)
+        self.assertEqual(cfg["path"]["source"], "topic")
+        self.assertEqual(cfg["path"]["reference_path_topic"], "/plan")
+        self.assertEqual(cfg["control"]["approach"], "gs_mpc_ilos")
+        self.assertFalse(cfg["path"]["closed"])
+        # Tuned overlay gains should be present when gs_tuned_overlay.yaml exists.
+        self.assertIn("gs_mpc", cfg)
+        self.assertIn("surge_pi", cfg)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -2,7 +2,7 @@
 
 Implements `pipeline.tex` with the same experiment harness as `h0_boat` / `ilos_boat`.
 
-**Cascade:** fixed mission path (lemniscate, …) → local **ground-speed kinematic MPC** (polyline + `U_MPC`) → **ILOS** (`ψ_d`, `U_d`) → surge **PI** / yaw **PD** → thruster allocation → `f^{-1}` → PWM/thrust.
+**Cascade:** fixed mission path (lemniscate, …) → local **ground-speed kinematic MPC** (polyline + `U_MPC`) → **ILOS** (`ψ_d`, `U_d`) → surge **PI** / yaw **PD** → thruster allocation → sim: force **[N]** to Gazebo / real: `f^{-1}` → normalized PWM.
 
 Unlike H0 (`baseline_ilos_velocity`), MPC here is a **path generator**, not a hydro thrust allocator. Unlike `ilos_boat`, a short-horizon GS-MPC sits above ILOS. RRT★ from the TeX notes is replaced by the same parametric trajectories as the other packages.
 

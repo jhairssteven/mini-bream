@@ -18,6 +18,8 @@ CONTROLLERS: Dict[str, str] = {
     "ilos": "ilos_boat",
     "h0": "h0_boat",
     "mpc": "h0_boat",
+    "gs": "ground_speed_mpc_ilos",
+    "gs_mpc_ilos": "ground_speed_mpc_ilos",
 }
 
 
@@ -54,6 +56,13 @@ def build_path_follower_config(
         from ilos_boat.config import build_ilos_boat_config
 
         cfg = build_ilos_boat_config(platform, origin_latlon=origin_latlon)
+    elif key in ("gs", "gs_mpc_ilos"):
+        from ground_speed_mpc_ilos.config import build_gs_boat_config
+
+        # Always include gs_tuned_overlay.yaml when present (last sim/real tune).
+        cfg = build_gs_boat_config(
+            platform, origin_latlon=origin_latlon, include_tuned=True
+        )
     else:
         from h0_boat.config import build_h0_boat_config
 

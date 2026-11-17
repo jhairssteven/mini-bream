@@ -22,22 +22,34 @@ speed:
   angle_threshold_slow_rad: 0.6522319465548687
   min_speed_scale: 0.5324575585860691
   u_d_floor_frac_of_cruise: 0.65
-# Inner loops (from 20261026T124332Z / gs_base after surge FF fix):
+# Inner loops: plant-matched T_max=100 N / X_max=200 N (interim gains).
 surge_pi:
-  kp: 10.0
-  ki: 2.0
-  k_ff: 6.0
-  x_min: -25.0
-  x_max: 25.0
-  i_limit: 8.0
-  dx_max: 50.0
+  kp: 40.0
+  ki: 8.0
+  k_ff: 35.0
+  x_min: -200.0
+  x_max: 200.0
+  i_limit: 60.0
+  dx_max: 200.0
   u_lpf_tau_s: 0.25
-  ff_overspeed_fade_mps: 0.12
+  ff_overspeed_fade_mps: 0.40
+  brake_x_min: -10.0
+  brake_kp_scale: 0.4
   speed_feedback: body_u
 yaw_pd:
-  kp: 2.5
-  kd: 1.2
-  n_max: 6.0
+  kp: 35.0
+  kd: 12.0
+  n_max: 50.0
+allocation:
+  t_max: 100.0
+  t_min: -100.0
+  surge_priority: true
+  surge_priority_x_min: 40.0
+thruster_map:
+  t_max: 100.0
+  c1: 100.0
+  n_db: 0.02
+  c2: 0.0
 experiment:
   warmup_s: 5.0
   evaluate_s: 60.0

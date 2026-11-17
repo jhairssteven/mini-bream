@@ -43,8 +43,9 @@ echo "[autonomy] workspace built (blueboat_nav2, mission_planner)"
 echo "[autonomy] ready — launch experiments with:"
 echo "  docker exec -it mini_bream_autonomy bash"
 echo "  ros2 launch mission_planner molo_autonomy.launch.py platform:=blueboat_sim controller:=ilos"
+echo "  ros2 launch mission_planner molo_autonomy.launch.py platform:=blueboat_sim controller:=gs"
 echo "  ros2 launch mission_planner molo_autonomy.launch.py platform:=blueboat controller:=ilos use_sim_time:=false"
-echo "  rviz2 -d /workspace/docker/config/molo_autonomy.rviz --ros-args -p use_sim_time:=true"
+echo "  rviz2 -d /workspace/docker/config/gs_mpc.rviz --ros-args -p use_sim_time:=true"
 echo "[autonomy] ROS_DOMAIN_ID=${ROS_DOMAIN_ID} CYCLONEDDS_URI=${CYCLONEDDS_URI:-<unset>}"
 
 exec tail -f /dev/null

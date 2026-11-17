@@ -8,7 +8,7 @@ Thin integration layer that connects **any path provider** (Nav2, rosbag replay,
 | --- | --- |
 | Input topic | `/plan` (`nav_msgs/Path`) from Nav2 |
 | Frame | `map` |
-| Controllers | `ilos`, `h0` / `mpc` |
+| Controllers | `ilos`, `h0` / `mpc`, `gs` / `gs_mpc_ilos` |
 
 Enable with `path.source: topic` in YAML (see `config/path_topic_overlay.yaml`). Controllers still run standalone with their existing experiment scripts when `path.source` is omitted.
 
@@ -43,6 +43,7 @@ Requires LiDAR on `/rslidar_points` and odometry on `/odom` (TF bridge in `confi
 | --- | --- | --- |
 | `ilos` | `ilos_boat/ilos_follower.py` | `ilos_boat/run_real_boat.sh` |
 | `h0` / `mpc` | `mpc/mpc.py` via `h0_boat/stack_runner.py` | `h0_boat/run_real_boat.sh` |
+| `gs` / `gs_mpc_ilos` | `ground_speed_mpc_ilos/gs_mpc_ilos_follower.py` (+ tuned overlay) | `ground_speed_mpc_ilos/run_real_boat.sh` |
 
 Use `--internal-path` to keep the built-in YAML trajectory (lemniscate, etc.) for controller tuning without a planner.
 
