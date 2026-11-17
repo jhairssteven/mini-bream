@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Controller Results Viewer</title>
+<script src="/vendor/plotly-2.35.2.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #1a2332;
+    --border: #2d3a4d;
+    --text: #e7ecf3;
+    --muted: #8b9bb4;
+    --accent: #3d9cf0;
+    --ok: #34d399;
+    --bad: #f87171;
+    --warn: #fbbf24;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+  header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem 1rem;
+    align-items: center;
+    padding: 0.65rem 1rem;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  header h1 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+    margin-right: 0.5rem;
+  }
+  label { font-size: 0.8rem; color: var(--muted); display: flex; flex-direction: column; gap: 0.2rem; }
+  select, button, input[type="range"], input[type="number"], input[type="search"], input[type="text"] {
+    background: #0d1520;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.35rem 0.55rem;
+    font: inherit;
+  }
+  button {
+    cursor: pointer;
+    background: var(--accent);
+    border-color: transparent;
+    color: #061018;
+    font-weight: 600;
+  }
+  button.secondary { background: #243044; color: var(--text); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  .meta {
+    font-size: 0.8rem;
+    color: var(--muted);
+    flex: 1 1 12rem;
+  }
+  .meta strong { color: var(--text); }
+  .pass { color: var(--ok); }
+  .fail { color: var(--bad); }
+  .shell {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(240px, 320px) 1fr;
+  }
+  aside.tree-pane {
+    border-right: 1px solid var(--border);
+    background: #121a24;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .tree-toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.55rem 0.65rem;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .tree-toolbar .row {
+    display: flex;
+    gap: 0.35rem;
+    align-items: center;
+  }
+  .tree-toolbar input[type="search"] { flex: 1; min-width: 0; }
+  .tree-scroll {
+    overflow: auto;
+    flex: 1;
+    padding: 0.35rem 0.25rem 1rem;
+    font-size: 0.8rem;
+  }
+  .tree ul {
+    list-style: none;
+    margin: 0;
+    padding: 0 0 0 0.85rem;
+  }
+  .tree > ul { padding-left: 0.25rem; }
+  .tree li { margin: 0; }
+  .tree .node {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.18rem 0.35rem;
+    border-radius: 5px;
+    cursor: default;
+    user-select: none;
+    line-height: 1.25;
+  }
+  .tree .node:hover { background: #1c2838; }
+  .tree .node.folder { color: var(--muted); font-weight: 600; cursor: pointer; }
+  .tree .node.leaf {
+    color: var(--text);
+    cursor: pointer;
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 0.75rem;
+  }
+  .tree .node.leaf.selected {
+    background: #1e3a5f;
+    color: #dbeafe;
+    outline: 1px solid var(--accent);
+  }
+  .tree .twist {
+    width: 1rem;
+    flex-shrink: 0;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.65rem;
+  }
+  .tree .badge {
+    margin-left: auto;
+    font-size: 0.65rem;
+    color: var(--muted);
+    font-weight: 500;
+    font-family: inherit;
+  }
+  .tree .badge.ok { color: var(--ok); }
+  .tree .badge.bad { color: var(--bad); }
+  .tree .hidden { display: none; }
+  .content {
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .selected-path {
+    padding: 0.4rem 0.85rem;
+    font-size: 0.75rem;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    word-break: break-all;
+  }
+  .selected-path strong { color: var(--text); font-weight: 600; }
+  main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    padding: 0.75rem;
+  }
+  @media (max-width: 1100px) {
+    .shell { grid-template-columns: 1fr; }
+    aside.tree-pane { max-height: 40vh; border-right: none; border-bottom: 1px solid var(--border); }
+    main { grid-template-columns: 1fr; }
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+  .card.wide { grid-column: 1 / -1; }
+  .card.dragging { opacity: 0.45; }
+  .card.drag-over {
+    outline: 2px dashed var(--accent);
+    outline-offset: -2px;
+  }
+  .card-head {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.4rem 0.5rem;
+    border-bottom: 1px solid transparent;
+    cursor: grab;
+    user-select: none;
+  }
+  .card-head:active { cursor: grabbing; }
+  .card:not(.collapsed) .card-head { border-bottom-color: var(--border); }
+  .card-head .grip {
+    color: var(--muted);
+    font-size: 0.75rem;
+    letter-spacing: -0.05em;
+    padding: 0 0.15rem;
+  }
+  .card-head h2 {
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--muted);
+    flex: 1;
+    min-width: 0;
+  }
+  .card-head .icon-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--muted);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .card-head .icon-btn:hover {
+    background: #243044;
+    color: var(--text);
+    border-color: var(--border);
+  }
+  .card-body { padding: 0.2rem 0.4rem 0.4rem; }
+  .card.collapsed { min-height: 0; }
+  .card.collapsed .card-body { display: none; }
+  .plot { width: 100%; height: 300px; }
+  .plot.tall { height: 360px; }
+  .hint {
+    padding: 0.5rem 1rem 0.75rem;
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+  .replay-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: end;
+  }
+  .replay-bar label { min-width: 7rem; }
+  status-dot {
+    display: inline-block;
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    background: var(--warn);
+    margin-right: 0.35rem;
+  }
+  status-dot.ok { background: var(--ok); }
+  status-dot.err { background: var(--bad); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Results viewer</h1>
+  <label>Controller
+    <select id="controllerFilter">
+      <option value="">all</option>
+      <option value="ground_speed_mpc_ilos">ground_speed_mpc_ilos</option>
+      <option value="ilos_boat">ilos_boat</option>
+      <option value="h0_boat">h0_boat</option>
+      <option value="mpc">mpc</option>
+    </select>
+  </label>
+  <button type="button" id="btnReload" class="secondary" title="Refresh run list">↻</button>
+  <div class="replay-bar">
+    <button type="button" id="btnPlay">Replay</button>
+    <button type="button" id="btnPause" class="secondary" disabled>Pause</button>
+    <button type="button" id="btnReset" class="secondary">Show all</button>
+    <label>Speed
+      <input type="number" id="replaySpeed" value="1" min="0.25" max="50" step="0.25" style="width:4.5rem" />
+    </label>
+    <label>Progress
+      <input type="range" id="replaySlider" min="0" max="1000" value="1000" style="width:12rem" />
+    </label>
+  </div>
+  <div class="meta" id="metaLine"><status-dot id="statusDot"></status-dot>Start <code>python3 serve_results_viewer.py</code> then pick a run.</div>
+</header>
+<div class="shell">
+  <aside class="tree-pane">
+    <div class="tree-toolbar">
+      <div class="row">
+        <input type="search" id="treeFilter" placeholder="Filter tree…" />
+        <button type="button" id="btnExpand" class="secondary" title="Expand all">⊞</button>
+        <button type="button" id="btnCollapse" class="secondary" title="Collapse all">⊟</button>
+      </div>
+    </div>
+    <div class="tree-scroll">
+      <div class="tree" id="runTree">loading…</div>
+    </div>
+  </aside>
+  <div class="content">
+    <div class="selected-path" id="selectedPath">No run selected</div>
+    <p class="hint">
+      Click a leaf in the tree. Drag panel headers (⋮⋮) to reorder; ▾/▸ collapses a panel (layout saved in the browser).
+      Legend click toggles series; hover for values. Optional file load:
+      <input type="file" id="fileLog" accept=".csv" />
+      <input type="file" id="fileRef" accept=".csv" />
+      <input type="file" id="fileMeta" accept=".json" />
+    </p>
+    <main id="plotGrid">
+      <!-- Default order matches offline plots.png: 2×3 then thrusters -->
+      <div class="card" data-panel="traj" draggable="true">
+        <div class="card-head"><span class="grip" title="Drag to reorder">⋮⋮</span><h2>Trajectory (world)</h2><button type="button" class="icon-btn collapse-btn" title="Collapse/expand">▾</button></div>
+        <div class="card-body"><div class="plot" id="plotTraj"></div></div>
+      </div>
+      <div class="card" data-panel="xte" draggable="true">
+        <div class="card-head"><span class="grip" title="Drag to reorder">⋮⋮</span><h2>Cross-track error</h2><button type="button" class="icon-btn collapse-btn" title="Collapse/expand">▾</button></div>
+        <div class="card-body"><div class="plot" id="plotXte"></div></div>
+      </div>
+      <div class="card" data-panel="surge" draggable="true">
+        <div class="card-head"><span class="grip" title="Drag to reorder">⋮⋮</span><h2>Inner surge: command vs measured</h2><button type="button" class="icon-btn collapse-btn" title="Collapse/expand">▾</button></div>
+        <div class="card-body"><div class="plot" id="plotSurge"></div></div>
+      </div>
+      <div class="card" data-panel="surgeErr" draggable="true">
+        <div class="card-head"><span class="grip" title="Drag to reorder">⋮⋮</span><h2>Inner surge: error + force X</h2><button type="button" class="icon-btn collapse-btn" title="Collapse/expand">▾</button></div>
+        <div class="card-body"><div class="plot" id="plotSurgeErr"></div></div>
+      </div>
+      <div class="card" data-panel="yaw" draggable="true">
+        <div class="card-head"><span class="grip" title="Drag to reorder">⋮⋮</span><h2>Inner yaw: command vs measured</h2><button type="button" class="icon-btn collapse-btn" title="Collapse/expand">▾</button></div>
+        <div class="card-body"><div class="plot" id="plotYaw"></div></div>
+      </div>
+      <div class="card" data-panel="yawErr" draggable="true">
+        <div class="card-head"><span class="grip" title="Drag to reorder">⋮⋮</span><h2>Inner yaw: error + moment N</h2><button type="button" class="icon-btn collapse-btn" title="Collapse/expand">▾</button></div>
+        <div class="card-body"><div class="plot" id="plotYawErr"></div></div>
+      </div>
+      <div class="card wide" data-panel="thrust" draggable="true">
+        <div class="card-head"><span class="grip" title="Drag to reorder">⋮⋮</span><h2>Thrusters</h2><button type="button" class="icon-btn collapse-btn" title="Collapse/expand">▾</button></div>
+        <div class="card-body"><div class="plot" id="plotThrust"></div></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+(() => {
+  const LAYOUT_BASE = {
+    paper_bgcolor: "#1a2332",
+    plot_bgcolor: "#121a24",
+    font: { color: "#e7ecf3", size: 11 },
+    margin: { t: 28, r: 50, b: 40, l: 50 },
+    legend: { orientation: "h", y: 1.12, font: { size: 10 } },
+    hovermode: "x unified",
+    xaxis: { gridcolor: "#243044", zerolinecolor: "#2d3a4d" },
+    yaxis: { gridcolor: "#243044", zerolinecolor: "#2d3a4d" },
+  };
+  const CFG = { responsive: true, displayModeBar: true, displaylogo: false };
+
+  const el = (id) => document.getElementById(id);
+  const state = {
+    runs: [],
+    runsByPath: {},
+    selectedPath: "",
+    collapsed: new Set(),
+    log: null,
+    ref: null,
+    meta: {},
+    nShow: 0,
+    playing: false,
+    raf: null,
+    lastTs: 0,
+    playT: 0,
+  };
+
+  /** Build nested tree from run_dir paths; drop redundant `/results` segment for clarity. */
+  function treeParts(runDir) {
+    const parts = String(runDir).split("/").filter(Boolean);
+    if (parts.length >= 2 && parts[1] === "results") {
+      return [parts[0], ...parts.slice(2)];
+    }
+    return parts;
+  }
+
+  function buildTree(runs) {
+    const root = { name: "", children: new Map(), run: null, count: 0 };
+    for (const r of runs) {
+      let node = root;
+      const parts = treeParts(r.run_dir);
+      for (let i = 0; i < parts.length; i++) {
+        const name = parts[i];
+        if (!node.children.has(name)) {
+          node.children.set(name, { name, children: new Map(), run: null, count: 0 });
+        }
+        node = node.children.get(name);
+        node.count += 1;
+        if (i === parts.length - 1) node.run = r;
+      }
+    }
+    return root;
+  }
+
+  function sortChildNames(map) {
+    return [...map.keys()].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
+  }
+
+  function folderKey(pathParts) {
+    return pathParts.join("/");
+  }
+
+  function renderTree() {
+    const host = el("runTree");
+    const q = (el("treeFilter").value || "").trim().toLowerCase();
+    if (!state.runs.length) {
+      host.textContent = "no runs found";
+      return;
+    }
+    const root = buildTree(state.runs);
+
+    function matchesQuery(node) {
+      if (!q) return true;
+      if (node.run && String(node.run.run_dir).toLowerCase().includes(q)) return true;
+      if (node.name.toLowerCase().includes(q)) return true;
+      for (const ch of node.children.values()) {
+        if (matchesQuery(ch)) return true;
+      }
+      return false;
+    }
+
+    function renderNode(node, pathParts, ul) {
+      const names = sortChildNames(node.children);
+      for (const name of names) {
+        const child = node.children.get(name);
+        if (!matchesQuery(child)) continue;
+        const parts = pathParts.concat(name);
+        const key = folderKey(parts);
+        const li = document.createElement("li");
+        const isLeaf = !!child.run && child.children.size === 0;
+        const isBranch = child.children.size > 0;
+
+        function appendLeaf(r, label) {
+          const row = document.createElement("div");
+          row.className = "node leaf" + (state.selectedPath === r.run_dir ? " selected" : "");
+          row.dataset.path = r.run_dir;
+          let badge = "";
+          if (r.rmse != null) {
+            const ok = r.pass === true || r.valid === true;
+            badge = `<span class="badge ${ok ? "ok" : "bad"}">RMSE ${Number(r.rmse).toFixed(3)}</span>`;
+          }
+          row.innerHTML = `<span class="twist">•</span><span>${escapeHtml(label)}</span>${badge}`;
+          row.onclick = (ev) => {
+            ev.stopPropagation();
+            selectRun(r.run_dir);
+          };
+          return row;
+        }
+
+        if (isBranch) {
+          const collapsed = q ? false : state.collapsed.has(key);
+          const row = document.createElement("div");
+          row.className = "node folder";
+          row.innerHTML = `<span class="twist">${collapsed ? "▸" : "▾"}</span><span>${escapeHtml(name)}</span><span class="badge">${child.count}</span>`;
+          row.onclick = (ev) => {
+            ev.stopPropagation();
+            if (state.collapsed.has(key)) state.collapsed.delete(key);
+            else state.collapsed.add(key);
+            renderTree();
+          };
+          li.appendChild(row);
+          // Rare: this directory itself also has a log.csv
+          if (child.run) li.appendChild(appendLeaf(child.run, name + " (this dir)"));
+          const childUl = document.createElement("ul");
+          if (collapsed) childUl.classList.add("hidden");
+          renderNode(child, parts, childUl);
+          li.appendChild(childUl);
+        } else if (isLeaf || child.run) {
+          li.appendChild(appendLeaf(child.run, name));
+        }
+        ul.appendChild(li);
+      }
+    }
+
+    const top = document.createElement("ul");
+    renderNode(root, [], top);
+    host.innerHTML = "";
+    host.appendChild(top);
+  }
+
+  function applyDefaultCollapse(root) {
+    // Expand controllers; collapse deeper folders (tune phases, hybrid groups, etc.)
+    function walk(node, depth, parts) {
+      for (const [name, child] of node.children) {
+        const p = parts.concat(name);
+        if (child.children.size && depth >= 1) {
+          state.collapsed.add(folderKey(p));
+        }
+        walk(child, depth + 1, p);
+      }
+    }
+    walk(root, 0, []);
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function expandToSelected() {
+    if (!state.selectedPath) return;
+    const parts = treeParts(state.selectedPath);
+    for (let i = 1; i <= parts.length; i++) {
+      state.collapsed.delete(folderKey(parts.slice(0, i)));
+    }
+  }
+
+  function setExpandAll(expand) {
+    if (expand) {
+      state.collapsed.clear();
+    } else {
+      const root = buildTree(state.runs);
+      function walk(node, parts) {
+        for (const [name, child] of node.children) {
+          const p = parts.concat(name);
+          if (child.children.size) state.collapsed.add(folderKey(p));
+          walk(child, p);
+        }
+      }
+      walk(root, []);
+    }
+    renderTree();
+  }
+
+  function selectRun(path) {
+    if (!path) return;
+    state.selectedPath = path;
+    expandToSelected();
+    renderTree();
+    const label = el("selectedPath");
+    label.innerHTML = `Selected: <strong>${escapeHtml(path)}</strong>`;
+    loadSelectedRun(path);
+  }
+
+  function setStatus(ok, msg) {
+    const line = el("metaLine");
+    let d = el("statusDot");
+    if (!d) {
+      line.innerHTML = `<status-dot id="statusDot"></status-dot><span id="metaText"></span>`;
+      d = el("statusDot");
+    }
+    d.className = ok === true ? "ok" : ok === false ? "err" : "";
+    let text = el("metaText");
+    if (!text) {
+      text = document.createElement("span");
+      text.id = "metaText";
+      line.appendChild(text);
+    }
+    text.innerHTML = msg;
+  }
+
+  function parseCsv(text) {
+    const lines = String(text || "").replace(/^\uFEFF/, "").trim().split(/\r?\n/).filter(Boolean);
+    if (lines.length < 2) return null;
+    const headers = lines[0].split(",").map((h) => h.trim());
+    const cols = {};
+    headers.forEach((h) => { cols[h] = []; });
+    for (let i = 1; i < lines.length; i++) {
+      const parts = lines[i].split(",");
+      headers.forEach((h, j) => {
+        const v = (parts[j] == null) ? "" : String(parts[j]).trim();
+        if (h === "approach") {
+          cols[h].push(v);
+          return;
+        }
+        const n = Number(v);
+        cols[h].push(Number.isFinite(n) ? n : NaN);
+      });
+    }
+    return cols;
+  }
+
+  function parseRef(text) {
+    const lines = text.trim().split(/\r?\n/).filter(Boolean);
+    if (!lines.length) return null;
+    let start = 0;
+    if (/[a-zA-Z]/.test(lines[0])) start = 1;
+    const x = [], y = [];
+    for (let i = start; i < lines.length; i++) {
+      const p = lines[i].split(",");
+      const xi = Number(p[0]), yi = Number(p[1]);
+      if (Number.isFinite(xi) && Number.isFinite(yi)) { x.push(xi); y.push(yi); }
+    }
+    return x.length ? { x, y } : null;
+  }
+
+  function angdiff(a, b) {
+    let d = a - b;
+    // JS % can be negative; normalize to (-pi, pi]
+    d = ((d + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+    return d;
+  }
+
+  function unwrap(arr) {
+    if (!arr || !arr.length) return [];
+    const out = [arr[0]];
+    for (let i = 1; i < arr.length; i++) {
+      let d = arr[i] - arr[i - 1];
+      while (d > Math.PI) d -= 2 * Math.PI;
+      while (d < -Math.PI) d += 2 * Math.PI;
+      out.push(out[i - 1] + d);
+    }
+    return out;
+  }
+
+  function sliceCols(cols, n) {
+    if (!cols) return null;
+    const out = {};
+    for (const k of Object.keys(cols)) out[k] = cols[k].slice(0, n);
+    return out;
+  }
+
+  function has(cols, k) {
+    return cols && Array.isArray(cols[k]) && cols[k].length > 0 && typeof cols[k][0] === "number";
+  }
+
+  function rmse(arr) {
+    if (!arr.length) return NaN;
+    let s = 0;
+    for (const v of arr) s += v * v;
+    return Math.sqrt(s / arr.length);
+  }
+
+  function layout(extra = {}) {
+    const out = Object.assign({}, LAYOUT_BASE, extra, {
+      xaxis: Object.assign({}, LAYOUT_BASE.xaxis, extra.xaxis || {}),
+      yaxis: Object.assign({}, LAYOUT_BASE.yaxis, extra.yaxis || {}),
+    });
+    if (extra.yaxis2) {
+      out.yaxis2 = Object.assign(
+        { overlaying: "y", side: "right", gridcolor: "#243044", showgrid: false },
+        extra.yaxis2
+      );
+    }
+    return out;
+  }
+
+  function emptyPlot(id, msg) {
+    if (typeof Plotly === "undefined") return;
+    Plotly.react(id, [], layout({
+      annotations: [{ text: msg || "no data", xref: "paper", yref: "paper", x: 0.5, y: 0.5, showarrow: false, font: { color: "#8b9bb4" } }],
+      xaxis: { visible: false },
+      yaxis: { visible: false },
+    }), CFG);
+  }
+
+  function drawAll() {
+    if (typeof Plotly === "undefined") {
+      setStatus(false, "Plotly failed to load. Hard-refresh the page (Ctrl+Shift+R). Local path: /vendor/plotly-2.35.2.min.js");
+      return;
+    }
+    try {
+      _drawAll();
+    } catch (e) {
+      console.error(e);
+      setStatus(false, "Plot error: " + (e && e.message ? e.message : e));
+    }
+  }
+
+  function _drawAll() {
+    const full = state.log;
+    if (!full || !has(full, "t")) {
+      ["plotTraj","plotXte","plotThrust","plotSurge","plotSurgeErr","plotYaw","plotYawErr"].forEach((id) => emptyPlot(id));
+      setStatus(false, "No usable log columns (need numeric <code>t</code>).");
+      return;
+    }
+    const nAll = full.t.length;
+    const n = Math.max(1, Math.min(state.nShow || nAll, nAll));
+    const d = sliceCols(full, n);
+    const t = d.t;
+    const target = Number(state.meta.target_rmse_m) || 0.1;
+
+    // Trajectory
+    {
+      const traces = [];
+      if (state.ref) {
+        traces.push({
+          x: state.ref.x, y: state.ref.y, mode: "lines", name: "reference",
+          line: { color: "#34d399", width: 2 },
+        });
+      }
+      traces.push({
+        x: d.x, y: d.y, mode: "lines", name: "traversed",
+        line: { color: "#3d9cf0", width: 1.5 },
+        customdata: t,
+        hovertemplate: "x=%{x:.3f}<br>y=%{y:.3f}<br>t=%{customdata:.2f}s<extra>traversed</extra>",
+      });
+      if (d.x.length) {
+        traces.push({
+          x: [d.x[0]], y: [d.y[0]], mode: "markers", name: "start",
+          marker: { color: "#fbbf24", size: 9 },
+        });
+        traces.push({
+          x: [d.x[d.x.length - 1]], y: [d.y[d.y.length - 1]], mode: "markers", name: "now",
+          marker: { color: "#f87171", size: 8, symbol: "x" },
+        });
+      }
+      Plotly.react("plotTraj", traces, layout({
+        // constrain:'domain' avoids Plotly axis-anchor errors on first paint
+        xaxis: { title: "x [m]", scaleanchor: "y", scaleratio: 1, constrain: "domain" },
+        yaxis: { title: "y [m]", constrain: "domain" },
+        hovermode: "closest",
+      }), CFG);
+    }
+
+    // XTE
+    if (has(d, "xte")) {
+      const abs = d.xte.map(Math.abs);
+      Plotly.react("plotXte", [
+        { x: t, y: abs, name: "|XTE|", line: { color: "#f87171", width: 1.2 } },
+        { x: [t[0], t[t.length - 1]], y: [target, target], name: `target ${target} m`,
+          line: { color: "#e7ecf3", width: 1, dash: "dash" }, mode: "lines" },
+      ], layout({ xaxis: { title: "t [s]" }, yaxis: { title: "|XTE| [m]" } }), CFG);
+    } else emptyPlot("plotXte", "no xte");
+
+    // Thrusters
+    if (has(d, "thrust_l_N") || has(d, "thrust_r_N")) {
+      const tr = [];
+      if (has(d, "thrust_l_N")) tr.push({ x: t, y: d.thrust_l_N, name: "left", line: { width: 1.2 } });
+      if (has(d, "thrust_r_N")) tr.push({ x: t, y: d.thrust_r_N, name: "right", line: { width: 1.2 } });
+      Plotly.react("plotThrust", tr, layout({ xaxis: { title: "t [s]" }, yaxis: { title: "thrust cmd" } }), CFG);
+    } else emptyPlot("plotThrust", "no thrust columns");
+
+    // Surge
+    {
+      const tr = [];
+      if (has(d, "u_cmd")) tr.push({ x: t, y: d.u_cmd, name: "U_d (ILOS)", line: { dash: "dash", width: 1.4 } });
+      if (has(d, "u_mpc")) tr.push({ x: t, y: d.u_mpc, name: "U_MPC", line: { dash: "dot", width: 1.3 } });
+      if (has(d, "u_g")) tr.push({ x: t, y: d.u_g, name: "U_g measured", line: { width: 1.2 } });
+      else if (has(d, "u")) tr.push({ x: t, y: d.u, name: "u body", line: { width: 1.2 } });
+      if (has(d, "u_mpc_ref")) tr.push({ x: t, y: d.u_mpc_ref, name: "u_mpc_ref", line: { width: 1.1 } });
+      if (tr.length) Plotly.react("plotSurge", tr, layout({ xaxis: { title: "t [s]" }, yaxis: { title: "m/s" } }), CFG);
+      else emptyPlot("plotSurge", "no surge columns");
+    }
+
+    // Surge error + X
+    {
+      const tr = [];
+      const layoutExtra = { xaxis: { title: "t [s]" }, yaxis: { title: "speed err [m/s]" } };
+      if (has(d, "u_cmd") && has(d, "u_g")) {
+        const eu = d.u_cmd.map((v, i) => v - d.u_g[i]);
+        tr.push({ x: t, y: eu, name: "e_u = U_d−U_g", line: { color: "#3d9cf0", width: 1.2 } });
+      }
+      if (has(d, "X")) {
+        tr.push({ x: t, y: d.X, name: "X [N]", yaxis: "y2", line: { color: "#f87171", width: 1.1 } });
+        layoutExtra.yaxis2 = { title: "X [N]", color: "#f87171" };
+      }
+      if (tr.length) Plotly.react("plotSurgeErr", tr, layout(layoutExtra), CFG);
+      else emptyPlot("plotSurgeErr", "no surge error / X");
+    }
+
+    // Yaw
+    {
+      const tr = [];
+      if (has(d, "psi_d") && has(d, "psi")) {
+        const psiU = unwrap(d.psi);
+        const psidU = unwrap(d.psi_d);
+        const off = psiU[0] - psidU[0];
+        tr.push({
+          x: t, y: psidU.map((v) => (v + off) * 180 / Math.PI),
+          name: "ψ_d", line: { dash: "dash", width: 1.4 },
+        });
+        tr.push({
+          x: t, y: psiU.map((v) => v * 180 / Math.PI),
+          name: "ψ", line: { width: 1.2 },
+        });
+      } else if (has(d, "psi")) {
+        tr.push({ x: t, y: d.psi.map((v) => v * 180 / Math.PI), name: "ψ [deg]", line: { width: 1.2 } });
+      }
+      if (has(d, "r")) {
+        tr.push({ x: t, y: d.r, name: "r [rad/s]", yaxis: "y2", line: { dash: "dot", width: 1, color: "#34d399" } });
+      }
+      const lay = { xaxis: { title: "t [s]" }, yaxis: { title: "heading [deg]" } };
+      if (has(d, "r")) lay.yaxis2 = { title: "r [rad/s]", color: "#34d399" };
+      if (tr.length) Plotly.react("plotYaw", tr, layout(lay), CFG);
+      else emptyPlot("plotYaw", "no yaw columns");
+    }
+
+    // Yaw error + N
+    {
+      const tr = [];
+      const lay = { xaxis: { title: "t [s]" }, yaxis: { title: "heading err [deg]" } };
+      if (has(d, "psi_d") && has(d, "psi")) {
+        const ep = d.psi_d.map((v, i) => angdiff(v, d.psi[i]) * 180 / Math.PI);
+        tr.push({ x: t, y: ep, name: "e_ψ [deg]", line: { color: "#3d9cf0", width: 1.2 } });
+      }
+      if (has(d, "N")) {
+        tr.push({ x: t, y: d.N, name: "N [N·m]", yaxis: "y2", line: { color: "#f87171", width: 1.1 } });
+        lay.yaxis2 = { title: "N [N·m]", color: "#f87171" };
+      }
+      if (has(d, "r_ref")) tr.push({ x: t, y: d.r_ref, name: "r_ref", line: { dash: "dot", width: 1 } });
+      if (tr.length) Plotly.react("plotYawErr", tr, layout(lay), CFG);
+      else emptyPlot("plotYawErr", "no yaw error / N");
+    }
+
+    updateMeta(n, nAll);
+    el("replaySlider").max = String(Math.max(1, nAll - 1));
+    if (!state.playing) el("replaySlider").value = String(n - 1);
+  }
+
+  function updateMeta(n, nAll) {
+    const m = state.meta || {};
+    const d = sliceCols(state.log, n);
+    let bits = [];
+    if (m.hypothesis_id || m.approach) bits.push(`<strong>${m.hypothesis_id || m.approach}</strong>`);
+    if (m.rmse != null) {
+      const ok = m.pass === true || (m.valid === true && Number(m.rmse) <= (Number(m.target_rmse_m) || 0.1));
+      bits.push(`RMSE=<strong class="${ok ? "pass" : "fail"}">${Number(m.rmse).toFixed(4)} m</strong>`);
+    }
+    if (m.completion != null) bits.push(`completion=${(100 * Number(m.completion)).toFixed(1)}%`);
+    if (has(d, "u_cmd") && has(d, "u_g")) {
+      const eu = d.u_cmd.map((v, i) => v - d.u_g[i]);
+      bits.push(`surge RMSE=${rmse(eu).toFixed(3)} m/s`);
+    }
+    if (has(d, "psi_d") && has(d, "psi")) {
+      const ep = d.psi_d.map((v, i) => angdiff(v, d.psi[i]));
+      bits.push(`yaw RMSE=${(rmse(ep) * 180 / Math.PI).toFixed(2)}°`);
+    }
+    bits.push(`samples ${n}/${nAll}`);
+    if (has(d, "t")) bits.push(`t=${d.t[d.t.length - 1].toFixed(1)} s`);
+    setStatus(true, bits.join(" · "));
+  }
+
+  async function loadRunList() {
+    const ctrl = el("controllerFilter").value;
+    const q = ctrl ? `?controller=${encodeURIComponent(ctrl)}` : "";
+    el("runTree").textContent = "loading…";
+    try {
+      const res = await fetch("/api/runs" + q);
+      if (!res.ok) throw new Error("API " + res.status);
+      const data = await res.json();
+      state.runs = data.runs || [];
+      state.runsByPath = {};
+      for (const r of state.runs) state.runsByPath[r.run_dir] = r;
+      state.collapsed = new Set();
+      if (!state.runs.length) {
+        el("runTree").textContent = "no runs found";
+        setStatus(false, "No log.csv under controller results/");
+        return;
+      }
+      // Keep selection if still present; else pick first leaf
+      if (!state.runsByPath[state.selectedPath]) {
+        state.selectedPath = state.runs[0].run_dir;
+      }
+      applyDefaultCollapse(buildTree(state.runs));
+      expandToSelected();
+      renderTree();
+      el("selectedPath").innerHTML = `Selected: <strong>${escapeHtml(state.selectedPath)}</strong>`;
+      setStatus(true, `${state.runs.length} runs indexed — click a leaf in the tree`);
+      await loadSelectedRun(state.selectedPath);
+    } catch (e) {
+      el("runTree").textContent = "(server offline — use file inputs)";
+      setStatus(null, `Server offline (${e.message}). Open via <code>python3 serve_results_viewer.py</code> or load CSV files.`);
+    }
+  }
+
+  async function loadSelectedRun(path) {
+    path = path || state.selectedPath;
+    if (!path) return;
+    stopPlay();
+    state.selectedPath = path;
+    el("selectedPath").innerHTML = `Selected: <strong>${escapeHtml(path)}</strong>`;
+    setStatus(null, `Loading <code>${escapeHtml(path)}</code>…`);
+    try {
+      const info = await (await fetch("/api/run?path=" + encodeURIComponent(path))).json();
+      if (info.error) throw new Error(info.error);
+      const logRes = await fetch(info.urls.log);
+      if (!logRes.ok) throw new Error(`log.csv HTTP ${logRes.status}`);
+      const logText = await logRes.text();
+      state.log = parseCsv(logText);
+      if (!state.log || !has(state.log, "t")) {
+        throw new Error("failed to parse log.csv (missing numeric t)");
+      }
+      state.ref = null;
+      if (info.files.ref_path) {
+        const refRes = await fetch(info.urls.ref_path);
+        if (refRes.ok) state.ref = parseRef(await refRes.text());
+      }
+      state.meta = info.meta || {};
+      state.nShow = state.log.t.length;
+      state.playT = state.log.t[state.nShow - 1];
+      el("replaySlider").max = String(Math.max(1, state.nShow - 1));
+      el("replaySlider").value = String(state.nShow - 1);
+      drawAll();
+    } catch (e) {
+      console.error(e);
+      setStatus(false, "Failed to load run: " + (e && e.message ? e.message : e));
+    }
+  }
+
+  function stopPlay() {
+    state.playing = false;
+    if (state.raf) cancelAnimationFrame(state.raf);
+    state.raf = null;
+    el("btnPlay").disabled = false;
+    el("btnPause").disabled = true;
+  }
+
+  function tick(now) {
+    if (!state.playing || !state.log) return;
+    const dt = (now - state.lastTs) / 1000;
+    state.lastTs = now;
+    const speed = Number(el("replaySpeed").value) || 1;
+    state.playT += dt * speed;
+    const times = state.log.t;
+    const tMax = times[times.length - 1];
+    if (state.playT >= tMax) {
+      state.playT = tMax;
+      state.nShow = times.length;
+      drawAll();
+      stopPlay();
+      return;
+    }
+    // binary search index
+    let lo = 0, hi = times.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (times[mid] <= state.playT) lo = mid;
+      else hi = mid - 1;
+    }
+    state.nShow = lo + 1;
+    el("replaySlider").value = String(lo);
+    drawAll();
+    state.raf = requestAnimationFrame(tick);
+  }
+
+  el("btnPlay").onclick = () => {
+    if (!state.log) return;
+    if (state.nShow >= state.log.t.length) {
+      state.nShow = 1;
+      state.playT = state.log.t[0];
+    } else {
+      state.playT = state.log.t[Math.max(0, state.nShow - 1)];
+    }
+    state.playing = true;
+    state.lastTs = performance.now();
+    el("btnPlay").disabled = true;
+    el("btnPause").disabled = false;
+    state.raf = requestAnimationFrame(tick);
+  };
+  el("btnPause").onclick = () => stopPlay();
+  el("btnReset").onclick = () => {
+    stopPlay();
+    if (!state.log) return;
+    state.nShow = state.log.t.length;
+    state.playT = state.log.t[state.nShow - 1];
+    drawAll();
+  };
+  el("replaySlider").oninput = () => {
+    stopPlay();
+    if (!state.log) return;
+    state.nShow = Number(el("replaySlider").value) + 1;
+    state.playT = state.log.t[state.nShow - 1];
+    drawAll();
+  };
+
+  el("controllerFilter").onchange = () => loadRunList();
+  el("btnReload").onclick = () => loadRunList();
+  el("treeFilter").oninput = () => renderTree();
+  el("btnExpand").onclick = () => setExpandAll(true);
+  el("btnCollapse").onclick = () => setExpandAll(false);
+
+  async function readFile(input) {
+    const f = input.files && input.files[0];
+    if (!f) return null;
+    return await f.text();
+  }
+  el("fileLog").onchange = async () => {
+    const text = await readFile(el("fileLog"));
+    if (!text) return;
+    stopPlay();
+    state.log = parseCsv(text);
+    state.meta = state.meta || {};
+    state.nShow = state.log.t.length;
+    drawAll();
+  };
+  el("fileRef").onchange = async () => {
+    const text = await readFile(el("fileRef"));
+    if (!text) return;
+    state.ref = parseRef(text);
+    drawAll();
+  };
+  el("fileMeta").onchange = async () => {
+    const text = await readFile(el("fileMeta"));
+    if (!text) return;
+    try { state.meta = JSON.parse(text); } catch { state.meta = {}; }
+    drawAll();
+  };
+
+  // --- Panel drag + collapse (persisted) ---
+  // v2: match offline plots.png (2×3) then thrusters; resets stale v1 layouts
+  const PANEL_STORE = "moloResultsViewer.panels.v2";
+  const DEFAULT_PANEL_ORDER = ["traj", "xte", "surge", "surgeErr", "yaw", "yawErr", "thrust"];
+
+  function loadPanelPrefs() {
+    try {
+      return JSON.parse(localStorage.getItem(PANEL_STORE) || "{}") || {};
+    } catch {
+      return {};
+    }
+  }
+
+  function savePanelPrefs(prefs) {
+    try { localStorage.setItem(PANEL_STORE, JSON.stringify(prefs)); } catch { /* ignore */ }
+  }
+
+  function panelMap() {
+    const map = {};
+    el("plotGrid").querySelectorAll(".card[data-panel]").forEach((c) => {
+      map[c.dataset.panel] = c;
+    });
+    return map;
+  }
+
+  function applyPanelPrefs() {
+    const prefs = loadPanelPrefs();
+    const grid = el("plotGrid");
+    const map = panelMap();
+    const order = Array.isArray(prefs.order) && prefs.order.length
+      ? prefs.order.filter((id) => map[id]).concat(DEFAULT_PANEL_ORDER.filter((id) => map[id] && !(prefs.order || []).includes(id)))
+      : DEFAULT_PANEL_ORDER.filter((id) => map[id]);
+    order.forEach((id) => grid.appendChild(map[id]));
+    const collapsed = prefs.collapsed || {};
+    order.forEach((id) => {
+      const card = map[id];
+      const isCol = !!collapsed[id];
+      card.classList.toggle("collapsed", isCol);
+      const btn = card.querySelector(".collapse-btn");
+      if (btn) btn.textContent = isCol ? "▸" : "▾";
+    });
+  }
+
+  function currentPanelOrder() {
+    return [...el("plotGrid").querySelectorAll(".card[data-panel]")].map((c) => c.dataset.panel);
+  }
+
+  function currentCollapsed() {
+    const out = {};
+    el("plotGrid").querySelectorAll(".card[data-panel]").forEach((c) => {
+      out[c.dataset.panel] = c.classList.contains("collapsed");
+    });
+    return out;
+  }
+
+  function persistPanels() {
+    savePanelPrefs({ order: currentPanelOrder(), collapsed: currentCollapsed() });
+  }
+
+  function resizeVisiblePlots() {
+    if (typeof Plotly === "undefined") return;
+    requestAnimationFrame(() => {
+      el("plotGrid").querySelectorAll(".card:not(.collapsed) .plot").forEach((div) => {
+        try { Plotly.Plots.resize(div); } catch { /* not plotted yet */ }
+      });
+    });
+  }
+
+  function setupPanelInteractions() {
+    const grid = el("plotGrid");
+    let dragCard = null;
+
+    grid.querySelectorAll(".card[data-panel]").forEach((card) => {
+      card.addEventListener("dragstart", (e) => {
+        // Don't start drag from collapse button
+        if (e.target.closest && e.target.closest(".collapse-btn")) {
+          e.preventDefault();
+          return;
+        }
+        dragCard = card;
+        card.classList.add("dragging");
+        try {
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("text/plain", card.dataset.panel);
+        } catch { /* ignore */ }
+      });
+      card.addEventListener("dragend", () => {
+        card.classList.remove("dragging");
+        grid.querySelectorAll(".card.drag-over").forEach((c) => c.classList.remove("drag-over"));
+        dragCard = null;
+        persistPanels();
+        resizeVisiblePlots();
+      });
+      card.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        if (!dragCard || dragCard === card) return;
+        card.classList.add("drag-over");
+        try { e.dataTransfer.dropEffect = "move"; } catch { /* ignore */ }
+      });
+      card.addEventListener("dragleave", () => card.classList.remove("drag-over"));
+      card.addEventListener("drop", (e) => {
+        e.preventDefault();
+        card.classList.remove("drag-over");
+        if (!dragCard || dragCard === card) return;
+        const cards = [...grid.querySelectorAll(".card[data-panel]")];
+        const from = cards.indexOf(dragCard);
+        const to = cards.indexOf(card);
+        if (from < 0 || to < 0) return;
+        if (from < to) grid.insertBefore(dragCard, card.nextSibling);
+        else grid.insertBefore(dragCard, card);
+        persistPanels();
+        resizeVisiblePlots();
+      });
+
+      const btn = card.querySelector(".collapse-btn");
+      if (btn) {
+        btn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          card.classList.toggle("collapsed");
+          btn.textContent = card.classList.contains("collapsed") ? "▸" : "▾";
+          persistPanels();
+          resizeVisiblePlots();
+        });
+        // Prevent HTML5 drag starting when pressing the button
+        btn.addEventListener("mousedown", (e) => e.stopPropagation());
+      }
+    });
+  }
+
+  // Ensure metaText node exists for setStatus
+  el("metaLine").innerHTML = `<status-dot id="statusDot"></status-dot><span id="metaText">Start <code>python3 serve_results_viewer.py</code> then pick a run.</span>`;
+
+  applyPanelPrefs();
+  setupPanelInteractions();
+
+  if (typeof Plotly === "undefined") {
+    setStatus(false, "Plotly not loaded — check /vendor/plotly-2.35.2.min.js (restart the server after pull).");
+  } else {
+    loadRunList();
+  }
+})();
+</script>
+</body>
+</html>
