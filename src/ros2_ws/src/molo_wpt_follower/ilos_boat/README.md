@@ -168,7 +168,8 @@ cd /workspace/ros2_ws/src/molo_wpt_follower/ilos_boat
 Refine around a prior result:
 
 ```bash
-./run_real_boat.sh --platform sim --tune --refine results/tune_sim_20260727/tune_result.json
+./run_real_boat.sh --platform sim --tune --seed-from results/tune_sim_20260727/
+./run_real_boat.sh --platform sim --tune --refine results/tune_sim_20260727/tune_result.json  # alias
 ```
 
 ---

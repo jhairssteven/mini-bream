@@ -48,6 +48,7 @@ Options:
   --bench        Shorthand for --platform bench
   --tune         Staged LHS→local constrained tuning (inner → ILOS → MPC → global)
   --install      With --tune: write best params to config/gs_tuned_overlay.yaml
+  --seed-from P  With --tune: warm-start from prior tune dir / summary / overlay
   --quick        With --tune: fewer evals; else shortened evaluate window
   --smoke        Short warmup/evaluate window
   --dry-run      Write config + ref_path only (skips ROS graph checks)
@@ -158,6 +159,10 @@ while [[ $# -gt 0 ]]; do
     --bench) PLATFORM="bench" ;;
     --tune) TUNE=1 ;;
     --install) INSTALL_TUNED=1 ;;
+    --seed-from|--refine)
+      shift
+      TUNE_ARGS+=(--seed-from "${1:?missing value for --seed-from}")
+      ;;
     --quick) TUNE_ARGS+=(--quick); SMOKE=1 ;;
     --smoke) SMOKE=1 ;;
     --dry-run) DRY_RUN=1 ;;

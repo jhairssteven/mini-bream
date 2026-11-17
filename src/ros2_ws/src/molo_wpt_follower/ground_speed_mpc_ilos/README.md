@@ -132,7 +132,18 @@ cd /workspace/ros2_ws/src/molo_wpt_follower/ground_speed_mpc_ilos
 
 # first time on a new boat: fewer trials
 ./run_real_boat.sh --platform real --tune --install --quick
+
+# warm-start from a previous sim (or field) tune
+./run_real_boat.sh --platform real --tune --install \
+  --seed-from results/tune_staged_sim_<timestamp>/
+# or from the installed overlay:
+./run_real_boat.sh --platform real --tune --install \
+  --seed-from config/gs_tuned_overlay.yaml
 ```
+
+`--seed-from` accepts a prior tune directory, `staged_summary.json`,
+`tune_result.json`, or a tuned overlay YAML. Coarse trial 0 of each phase
+uses that seed (missing keys fall back to plant smoke defaults).
 
 4. Artifacts: `/workspace/field_tests/ground_speed_mpc_ilos/tune_staged_real_<timestamp>/`  
 5. With `--install`, best params land in `config/gs_tuned_overlay.yaml`.

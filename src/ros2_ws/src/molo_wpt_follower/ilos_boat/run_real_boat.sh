@@ -48,6 +48,8 @@ Options:
   --bench        Shorthand for --platform bench
   --tune         Run Bayesian optimization (tune_ilos.py) instead of a single experiment
   --install      With --tune: write best params to config/ilos_tuned_overlay.yaml
+  --seed-from P  With --tune: warm-start/refine from prior tune dir / result / overlay
+  --refine P     Alias for --seed-from
   --quick        With --tune: 8 BO calls; otherwise shortened evaluate window
   --smoke        Short warmup/evaluate window (experiment only)
   --dry-run      Write config + ref_path only (skips ROS graph checks)
@@ -158,6 +160,10 @@ while [[ $# -gt 0 ]]; do
     --bench) PLATFORM="bench" ;;
     --tune) TUNE=1 ;;
     --install) INSTALL_TUNED=1 ;;
+    --seed-from|--refine)
+      shift
+      TUNE_ARGS+=(--seed-from "${1:?missing value for --seed-from}")
+      ;;
     --quick) TUNE_ARGS+=(--quick) ;;
     --smoke) SMOKE=1 ;;
     --dry-run) DRY_RUN=1 ;;

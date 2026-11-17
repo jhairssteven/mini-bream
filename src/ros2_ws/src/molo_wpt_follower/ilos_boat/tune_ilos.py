@@ -26,7 +26,7 @@ MOLO_DIR = PKG_DIR.parent
 MPC_DIR = MOLO_DIR / "mpc"
 EXP_DIR = MPC_DIR / "experiments"
 
-for path in (str(PKG_DIR), str(MPC_DIR), str(EXP_DIR)):
+for path in (str(PKG_DIR), str(MOLO_DIR), str(MPC_DIR), str(EXP_DIR)):
     if path not in sys.path:
         sys.path.insert(0, path)
 
@@ -38,6 +38,7 @@ from config import (  # noqa: E402
 )
 from reference_path import apply_reference_path, reference_path_block  # noqa: E402
 from trial_runner import bash_cmd, kill_stack, run_boat_trial  # noqa: E402
+from tune_seed import load_seed_params  # noqa: E402
 
 OPEN_WATER_LAUNCH = (
     "/workspace/ros2_ws/install/blueboat_sim/share/blueboat_sim/launch/open_water.launch.py"
@@ -81,8 +82,15 @@ def build_ilos_search_space():
     ]
 
 
+def _space_midpoints(space) -> Dict[str, Any]:
+    return {dim.name: 0.5 * (float(dim.low) + float(dim.high)) for dim in space}
+
+
 def build_ilos_refine_space(center: Dict[str, Any], fraction: float = 0.35):
     from skopt.space import Real
+
+    filled = _space_midpoints(build_ilos_search_space())
+    filled.update({k: v for k, v in center.items() if not str(k).startswith("_")})
 
     names = [
         "cruise", "ilos_min", "ilos_max", "ilos_conv", "pid_kp", "pid_kd",
@@ -91,7 +99,7 @@ def build_ilos_refine_space(center: Dict[str, Any], fraction: float = 0.35):
     ]
     space = []
     for name in names:
-        val = center[name]
+        val = filled[name]
         if name in ("ilos_min", "ilos_max"):
             lo = max(0.2, float(val) * (1.0 - fraction))
             hi = float(val) * (1.0 + fraction) + 0.1
@@ -241,13 +249,13 @@ def run_tuning(
     val_timing = VALIDATION_TIMING.get(platform, VALIDATION_TIMING["sim"])
 
     cfg_base = base_config(platform, overlay_path=overlay_path)
-    if refine_from is not None and refine_from.is_file():
-        with open(refine_from, encoding="utf-8") as f:
-            prev = json.load(f)
-        center = prev.get("best_params", {})
+    if refine_from is not None:
+        center = load_seed_params(refine_from, "ilos")
+        artifact = center.pop("_seed_artifact", str(refine_from))
         space = build_ilos_refine_space(center)
         print(
-            f"Refining around prior best (rmse={float(prev.get('validation_rmse', float('nan'))):.4f} m)",
+            f"Warm-start / refine from prior: {artifact}\n"
+            f"  seed keys: {sorted(center.keys())}",
             flush=True,
         )
     else:
@@ -397,7 +405,19 @@ def main() -> None:
     parser.add_argument("--launch", default=OPEN_WATER_LAUNCH)
     parser.add_argument("--no-restart", action="store_true")
     parser.add_argument("--install", action="store_true")
-    parser.add_argument("--refine", default=None, help="Path to tune_result.json")
+    parser.add_argument(
+        "--refine",
+        default=None,
+        help="Alias for --seed-from (local refinement around prior best)",
+    )
+    parser.add_argument(
+        "--seed-from",
+        default=None,
+        help=(
+            "Warm-start / refine from a previous tune: directory, tune_result.json, "
+            "ilos_tuned_overlay.yaml, or best_config.yaml"
+        ),
+    )
     parser.add_argument("--overlay", default=None, help="Optional extra YAML overlay")
     args = parser.parse_args()
 
@@ -409,6 +429,7 @@ def main() -> None:
         else PKG_DIR / "results" / f"tune_{args.platform}_{stamp}"
     )
     out_dir.mkdir(parents=True, exist_ok=True)
+    seed_path = args.seed_from or args.refine
 
     run_tuning(
         platform=args.platform,
@@ -417,7 +438,7 @@ def main() -> None:
         launch=args.launch,
         restart_sim=not args.no_restart,
         install_overlay=args.install,
-        refine_from=Path(args.refine) if args.refine else None,
+        refine_from=Path(seed_path) if seed_path else None,
         overlay_path=args.overlay,
     )
 
