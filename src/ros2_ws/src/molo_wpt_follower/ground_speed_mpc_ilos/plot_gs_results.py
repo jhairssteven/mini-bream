@@ -277,11 +277,11 @@ def plot_run(run_dir: Path, rmse: float, target: float = 0.1) -> Path:
     # Also thrusters-only small companion in overview folder
     if "thrust_l_N" in d:
         fig2, ax = plt.subplots(figsize=(10, 3.2))
-        ax.plot(d["t"], d["thrust_l_N"], label="left cmd (norm×1000)")
-        ax.plot(d["t"], d["thrust_r_N"], label="right cmd (norm×1000)")
+        ax.plot(d["t"], d["thrust_l_N"], label="left [N]")
+        ax.plot(d["t"], d["thrust_r_N"], label="right [N]")
         ax.set_xlabel("t [s]")
-        ax.set_ylabel("thrust cmd")
-        ax.set_title("Thruster commands")
+        ax.set_ylabel("thrust [N]")
+        ax.set_title("Thruster commands (allocated force)")
         ax.legend(fontsize=8)
         ax.grid(True, alpha=0.3)
         fig2.tight_layout()

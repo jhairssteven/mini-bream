@@ -98,18 +98,25 @@ class SurgePI:
     Large k_ff (e.g. 40) makes open-loop FF dominate: PI cannot brake until
     U_meas ≫ U_d (empirically U_g stayed ~0.75 m/s vs U_d ~0.25 with X>0).
     FF is faded under overspeed so feedback can actually decelerate.
+
+    When u_d > 0 (forward cruise), brake force is clamped to brake_x_min so the
+    loop can slow gently without driving the hull through zero into reverse.
     """
 
-    kp: float = 10.0
-    ki: float = 2.0
-    k_ff: float = 6.0  # X_ff ≈ k_ff * U_d  (N per m/s) — keep ≪ kp/0.15
-    x_min: float = -25.0
-    x_max: float = 25.0
-    i_limit: float = 8.0
-    dx_max: float = 50.0  # N/s slew limit
+    kp: float = 40.0
+    ki: float = 8.0
+    k_ff: float = 35.0  # X_ff ≈ k_ff * U_d; plant X/U ≈ 25+40U (~35 near cruise)
+    x_min: float = -200.0
+    x_max: float = 200.0
+    i_limit: float = 60.0
+    dx_max: float = 200.0  # N/s slew (~1 s to full X_max)
     u_lpf_tau_s: float = 0.25
-    # Fade FF to 0 once overspeed reaches this (m/s)
-    ff_overspeed_fade_mps: float = 0.12
+    # Fade FF to 0 once overspeed reaches this (m/s); wider = softer brake onset
+    ff_overspeed_fade_mps: float = 0.40
+    # Floor on X while commanding forward speed (N). 0 = coast-only; <0 = light brake.
+    brake_x_min: float = -10.0
+    # Scale kp when err < 0 (overspeed) so accel and brake are asymmetric.
+    brake_kp_scale: float = 0.4
     integral: float = 0.0
     _u_filt: float = 0.0
     _x_prev: float = 0.0
@@ -134,13 +141,21 @@ class SurgePI:
         err = u_d - self._u_filt
         self.integral = float(np.clip(self.integral + err * dt, -self.i_limit, self.i_limit))
 
-        # Fade feedforward when faster than commanded so PI can brake.
+        # Fade feedforward when faster than commanded so PI can decelerate.
         overspeed = max(0.0, self._u_filt - u_d)
         fade = max(self.ff_overspeed_fade_mps, 1e-3)
         ff_scale = float(np.clip(1.0 - overspeed / fade, 0.0, 1.0))
 
-        x_raw = self.k_ff * u_d * ff_scale + self.kp * err + self.ki * self.integral
-        x_sat = float(np.clip(x_raw, self.x_min, self.x_max))
+        kp_eff = self.kp
+        if err < 0.0:
+            kp_eff *= float(np.clip(self.brake_kp_scale, 0.0, 1.0))
+
+        x_raw = self.k_ff * u_d * ff_scale + kp_eff * err + self.ki * self.integral
+        x_lo, x_hi = self.x_min, self.x_max
+        # Forward command: do not allow hard reverse thrust (avoids U crossing 0).
+        if u_d > 0.05:
+            x_lo = max(x_lo, float(self.brake_x_min))
+        x_sat = float(np.clip(x_raw, x_lo, x_hi))
         if abs(x_raw - x_sat) > 1e-9:
             self.integral *= 0.95
 
@@ -153,9 +168,9 @@ class SurgePI:
 
 @dataclass
 class YawPD:
-    kp: float = 2.5
-    kd: float = 1.2
-    n_max: float = 6.0
+    kp: float = 35.0
+    kd: float = 12.0
+    n_max: float = 50.0
 
     def step(self, psi_d: float, psi: float, r: float) -> float:
         e = _angdiff(psi_d, psi)
@@ -167,9 +182,9 @@ class YawPD:
 class ThrusterMap:
     """Grey-box T = f(n); inverse via Newton / clamp. Linear default for sim."""
 
-    t_max: float = 40.0
+    t_max: float = 100.0
     n_db: float = 0.02
-    c1: float = 40.0
+    c1: float = 100.0
     c2: float = 0.0
 
     def forward(self, n: float) -> float:
@@ -194,6 +209,30 @@ class ThrusterMap:
         return float(np.clip(n, -1.0, 1.0))
 
 
+def platform_thrust_commands(
+    left_n: float,
+    right_n: float,
+    fmap: ThrusterMap,
+    *,
+    sim_enable: bool,
+) -> Tuple[float, float, float, float]:
+    """Map allocated thruster forces to platform topic commands.
+
+    Returns ``(cmd_left, cmd_right, force_left_N, force_right_N)``.
+
+    - **sim (Gazebo):** publish force in Newtons (``gz-sim`` Thruster
+      ``max_thrust_cmd`` units). Do **not** apply ``n*1000`` or the PWM
+      deadband bump — that quantized small PI forces into ±20 N bang-bang.
+    - **real:** publish normalized ``[-1, 1]`` via ``fmap.inverse`` for
+      ``motor_controller`` / ``/pwm/*_thrust_cmd``.
+    """
+    fl = float(np.clip(left_n, -fmap.t_max, fmap.t_max))
+    fr = float(np.clip(right_n, -fmap.t_max, fmap.t_max))
+    if sim_enable:
+        return fl, fr, fl, fr
+    return fmap.inverse(fl), fmap.inverse(fr), fl, fr
+
+
 @dataclass
 class Allocator:
     """Dual-thruster allocation with surge priority.
@@ -207,12 +246,12 @@ class Allocator:
     """
 
     thruster_sep_m: float = 0.59
-    t_min: float = -40.0
-    t_max: float = 40.0
+    t_min: float = -100.0
+    t_max: float = 100.0
     surge_priority: bool = True
     # Only enforce no-reverse when |X| is large enough; below this, allow
     # full yaw (otherwise path following starves at low surge).
-    surge_priority_x_min: float = 8.0
+    surge_priority_x_min: float = 40.0
 
     def allocate(self, x_force: float, n_moment: float) -> Tuple[float, float]:
         b = max(self.thruster_sep_m, 1e-3)

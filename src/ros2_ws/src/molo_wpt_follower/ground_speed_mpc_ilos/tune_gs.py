@@ -33,7 +33,7 @@ MOLO_DIR = PKG_DIR.parent
 MPC_DIR = MOLO_DIR / "mpc"
 EXP_DIR = MPC_DIR / "experiments"
 
-for path in (str(PKG_DIR), str(MPC_DIR), str(EXP_DIR)):
+for path in (str(PKG_DIR), str(MOLO_DIR), str(MPC_DIR), str(EXP_DIR)):
     if path not in sys.path:
         sys.path.insert(0, path)
 
@@ -45,6 +45,7 @@ from config import (  # noqa: E402
 )
 from plot_gs_results import plot_run  # noqa: E402
 from trial_runner import kill_stack, run_boat_trial  # noqa: E402
+from tune_seed import load_seed_params  # noqa: E402
 
 TARGET_RMSE_M = 0.1
 MIN_COMPLETION = 0.80
@@ -67,18 +68,19 @@ PHASES = ("inner", "ilos", "mpc", "global")
 
 # (name, lo, hi, is_int) — tight boxes around known-stable defaults (avoid chatter).
 BOUND_INNER: List[Tuple[str, float, float, bool]] = [
-    # Floor high enough that 100 s evaluate can still hit 80% completion.
+    # Keep cruise near lemniscate-completable band for 100–120 s evaluate.
     ("cruise", 0.26, 0.42, False),
-    ("surge_kp", 6.0, 16.0, False),
-    ("surge_ki", 0.5, 4.0, False),
-    # Keep k_ff near plant gain; old 30–55 range made U_g ≫ U_d.
-    ("surge_kff", 2.0, 12.0, False),
-    ("surge_dx_max", 25.0, 70.0, False),
+    ("surge_kp", 20.0, 60.0, False),
+    ("surge_ki", 2.0, 12.0, False),
+    # Plant X/U ≈ 25+40U (~30–50 N·s/m over cruise band).
+    ("surge_kff", 28.0, 45.0, False),
+    ("surge_dx_max", 80.0, 200.0, False),
     ("surge_lpf", 0.15, 0.40, False),
-    ("surge_xmax", 15.0, 28.0, False),
-    ("yaw_kp", 1.2, 3.5, False),
-    ("yaw_kd", 0.6, 2.0, False),
-    ("yaw_nmax", 4.0, 9.0, False),
+    ("surge_xmax", 160.0, 200.0, False),
+    # Yaw must beat hydro nR≈80; keep priority_x_min high so cruise can reverse a thruster.
+    ("yaw_kp", 20.0, 60.0, False),
+    ("yaw_kd", 6.0, 20.0, False),
+    ("yaw_nmax", 30.0, 55.0, False),
     ("u_d_floor", 0.65, 0.90, False),
 ]
 BOUND_ILOS: List[Tuple[str, float, float, bool]] = [
@@ -96,22 +98,22 @@ BOUND_MPC: List[Tuple[str, float, float, bool]] = [
     ("w_r", 0.8, 3.0, False),
     ("w_du", 1.0, 4.0, False),
     ("w_dr", 0.5, 2.5, False),
-    ("u_max", 0.32, 0.45, False),
+    ("u_max", 0.32, 0.55, False),
     ("r_max", 0.35, 0.55, False),
 ]
 
-# Nominal seed = base yaml defaults (inside tight bounds).
+# Nominal seed = plant smoke seed (gs_plant_smoke_seed.yaml).
 SEED_INNER = {
-    "cruise": 0.32,
-    "surge_kp": 10.0,
-    "surge_ki": 2.0,
-    "surge_kff": 6.0,
-    "surge_dx_max": 50.0,
-    "surge_lpf": 0.25,
-    "surge_xmax": 25.0,
-    "yaw_kp": 2.5,
-    "yaw_kd": 1.2,
-    "yaw_nmax": 6.0,
+    "cruise": 0.30,
+    "surge_kp": 40.0,
+    "surge_ki": 6.0,
+    "surge_kff": 35.0,
+    "surge_dx_max": 150.0,
+    "surge_lpf": 0.30,
+    "surge_xmax": 200.0,
+    "yaw_kp": 35.0,
+    "yaw_kd": 12.0,
+    "yaw_nmax": 50.0,
     "u_d_floor": 0.75,
 }
 SEED_ILOS = {
@@ -129,7 +131,7 @@ SEED_MPC = {
     "w_r": 1.5,
     "w_du": 2.0,
     "w_dr": 1.0,
-    "u_max": 0.40,
+    "u_max": 0.45,
     "r_max": 0.45,
 }
 
@@ -238,9 +240,19 @@ def apply_params(cfg: dict, p: Dict[str, Any]) -> dict:
     if "surge_xmax" in p:
         surge["x_max"] = p["surge_xmax"]
         surge["x_min"] = -abs(p["surge_xmax"])
-    # Preserve post-fix FF fade even if an old overlay omitted it.
-    surge.setdefault("ff_overspeed_fade_mps", 0.12)
+    # Keep post-reverse-fix surge structure even if an overlay omitted keys.
+    surge.setdefault("ff_overspeed_fade_mps", 0.40)
+    surge.setdefault("brake_x_min", -10.0)
+    surge.setdefault("brake_kp_scale", 0.4)
     surge.setdefault("speed_feedback", "body_u")
+    alloc = c.setdefault("allocation", {})
+    alloc.setdefault("surge_priority", True)
+    alloc.setdefault("surge_priority_x_min", 40.0)
+    alloc.setdefault("t_max", 100.0)
+    alloc.setdefault("t_min", -100.0)
+    fmap = c.setdefault("thruster_map", {})
+    fmap.setdefault("t_max", 100.0)
+    fmap.setdefault("c1", 100.0)
 
     yaw = c.setdefault("yaw_pd", {})
     if "yaw_kp" in p:
@@ -561,7 +573,14 @@ def run_phase(
         include_tuned=False,
         extra_overlays=frozen_overlays,
     )
-    seed_p = clip_params(bounds, seed_params or seed_for(phase))
+    # Merge prior seed on top of phase defaults so partial prior tunes still
+    # fill missing keys from SEED_* instead of bound midpoints.
+    merged_seed = seed_for(phase)
+    if seed_params:
+        merged_seed.update(
+            {k: v for k, v in seed_params.items() if not str(k).startswith("_") and v is not None}
+        )
+    seed_p = clip_params(bounds, merged_seed)
     rng = np.random.default_rng(42 + abs(hash(phase)) % 1000)
 
     print(
@@ -571,6 +590,7 @@ def run_phase(
         f"  output: {phase_dir}\n"
         f"  constraint: completion≥{MIN_COMPLETION:.0%}  target RMSE={TARGET_RMSE_M} m\n"
         f"  method: LHS coarse → local trust-region (tight bounds)\n"
+        f"  seed keys: {sorted(seed_p.keys())}\n"
         f"{'='*60}",
         flush=True,
     )
@@ -704,8 +724,19 @@ def run_staged(
     n_coarse_global: int,
     n_local_global: int,
     install_overlay: bool,
+    seed_from: Optional[Path] = None,
 ) -> Dict[str, Any]:
     out_dir.mkdir(parents=True, exist_ok=True)
+    prior_seed: Dict[str, Any] = {}
+    if seed_from is not None:
+        prior_seed = load_seed_params(seed_from, "gs")
+        artifact = prior_seed.pop("_seed_artifact", str(seed_from))
+        print(
+            f"Warm-starting GS staged tune from prior: {artifact}\n"
+            f"  seed keys: {sorted(prior_seed.keys())}",
+            flush=True,
+        )
+
     summary: Dict[str, Any] = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "platform": platform,
@@ -713,6 +744,7 @@ def run_staged(
         "target_rmse_m": TARGET_RMSE_M,
         "min_completion": MIN_COMPLETION,
         "sim_world": "open_water_harner",
+        "seed_from": str(seed_from) if seed_from else None,
         "phases": {},
     }
 
@@ -725,6 +757,7 @@ def run_staged(
         frozen_overlays=[],
         bounds_builder=bounds_inner,
         overlay_keys=INNER_KEYS,
+        seed_params=prior_seed or None,
     )
     summary["phases"]["inner"] = r1
     frozen: List[Path] = []
@@ -740,6 +773,7 @@ def run_staged(
         frozen_overlays=list(frozen),
         bounds_builder=bounds_ilos,
         overlay_keys=ILOS_KEYS,
+        seed_params=prior_seed or None,
     )
     summary["phases"]["ilos"] = r2
     if r2.get("overlay"):
@@ -754,10 +788,11 @@ def run_staged(
         frozen_overlays=list(frozen),
         bounds_builder=bounds_mpc,
         overlay_keys=MPC_KEYS,
+        seed_params=prior_seed or None,
     )
     summary["phases"]["mpc"] = r3
 
-    seed = {}
+    seed = dict(prior_seed)
     seed.update(r1.get("best_params") or {})
     seed.update(r2.get("best_params") or {})
     seed.update(r3.get("best_params") or {})
@@ -849,6 +884,14 @@ def main() -> None:
         choices=PHASES + ("staged",),
         default="staged",
     )
+    parser.add_argument(
+        "--seed-from",
+        default=None,
+        help=(
+            "Warm-start from a previous tune: directory, staged_summary.json, "
+            "tune_result.json, or gs_tuned_overlay.yaml / global_overlay.yaml"
+        ),
+    )
     args = parser.parse_args()
 
     if args.quick:
@@ -865,6 +908,7 @@ def main() -> None:
         if args.out
         else PKG_DIR / "results" / f"tune_lhs_local_{args.platform}_{stamp}"
     )
+    seed_from = Path(args.seed_from) if args.seed_from else None
 
     if args.phase == "staged":
         run_staged(
@@ -875,6 +919,7 @@ def main() -> None:
             n_coarse_global=n_cg,
             n_local_global=n_lg,
             install_overlay=args.install,
+            seed_from=seed_from,
         )
         return
 
@@ -896,6 +941,11 @@ def main() -> None:
             if cand.is_file():
                 frozen_list.append(cand)
 
+    prior = load_seed_params(seed_from, "gs") if seed_from else None
+    if prior:
+        prior.pop("_seed_artifact", None)
+        print(f"Warm-starting phase={args.phase} from {seed_from}", flush=True)
+
     n_c = n_cg if args.phase == "global" else n_cs
     n_l = n_lg if args.phase == "global" else n_ls
     run_phase(
@@ -907,6 +957,7 @@ def main() -> None:
         frozen_overlays=frozen_list,
         bounds_builder=b_builder,
         overlay_keys=keys,
+        seed_params=prior,
     )
 
 

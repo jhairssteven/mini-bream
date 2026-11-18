@@ -1,0 +1,18 @@
+waypoints:
+  relative_to_start: true
+  trajectory:
+    type: sine          # also accepts: sine_path
+    length_m: 40.0
+    amplitude_m: 5.0
+    waves: 2.0
+    num_points: 64
+  
+  #trajectory:
+  #  type: line
+  #  length_m: 35.0
+  #  num_points: 2
+
+path:
+  closed: false
+  monotonic_progress: true
+  # cruise_speed_mps: 0.34   # optional

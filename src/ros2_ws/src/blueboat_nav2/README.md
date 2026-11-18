@@ -2,7 +2,7 @@
 
 Nav2-based local planning for BlueBoat: LiDAR → costmap → Smac hybrid (Dubins) planner → `/plan`.
 
-Low-level control is **not** handled by Nav2. The ILOS or H0 follower in `molo_wpt_follower` subscribes to `/plan`.
+Low-level control is **not** handled by Nav2. The ILOS, H0, or GS-MPC follower in `molo_wpt_follower` subscribes to `/plan`.
 
 ## Stack
 
@@ -15,7 +15,7 @@ Low-level control is **not** handled by Nav2. The ILOS or H0 follower in `molo_w
   → SmacPlannerHybrid (Dubins, footprint 1.20×0.93 m)
   → goal_path_planner (RViz /goal_pose → ComputePathToPose)
   → /plan
-  → ILOS / H0 follower
+  → ILOS / H0 / GS-MPC follower
 ```
 
 ## Launch
@@ -26,6 +26,7 @@ ros2 launch blueboat_nav2 nav2_planning.launch.py platform:=blueboat_sim
 
 # Full autonomy (TF bridge + Nav2 + follower)
 ros2 launch mission_planner molo_autonomy.launch.py platform:=blueboat_sim controller:=ilos
+ros2 launch mission_planner molo_autonomy.launch.py platform:=blueboat_sim controller:=gs
 ```
 
 | Platform | `platform` arg | Base link frame | Odom |

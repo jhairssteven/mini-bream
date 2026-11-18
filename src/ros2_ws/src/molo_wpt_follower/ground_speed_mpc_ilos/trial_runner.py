@@ -332,35 +332,75 @@ def path_completion_from_log(
         return 0.0
 
 
+def reverse_frac_from_log(log_path: Path, skip_initial_s: float = 5.0) -> float:
+    """Fraction of samples with body surge u < 0 after skip window."""
+    if not log_path.is_file():
+        return 0.0
+    try:
+        with open(log_path, encoding="utf-8") as f:
+            header = next(f).strip().split(",")
+            if "u" not in header or "t" not in header:
+                return 0.0
+            ti, ui = header.index("t"), header.index("u")
+            n = 0
+            n_rev = 0
+            for line in f:
+                parts = line.strip().split(",")
+                if len(parts) <= max(ti, ui):
+                    continue
+                try:
+                    t = float(parts[ti])
+                    u = float(parts[ui])
+                except ValueError:
+                    continue
+                if t < float(skip_initial_s):
+                    continue
+                n += 1
+                if u < 0.0:
+                    n_rev += 1
+            return float(n_rev) / float(n) if n else 0.0
+    except Exception:
+        return 0.0
+
+
 def score_trial_from_artifacts(
     run_dir: Path,
     skip_initial_s: float,
     min_completion: float = 0.8,
     target_rmse_m: float = 0.1,
+    reverse_penalty_w: float = 2.0,
 ) -> dict:
-    """Compute RMSE + completion; mark valid if completion>=min and rmse finite."""
+    """Compute RMSE + completion; mark valid if completion>=min and rmse finite.
+
+    Objective for valid trials: rmse + reverse_penalty_w * frac(u<0) so tuning
+    does not reward forward/back chatter that leaves XTE looking acceptable.
+    """
     log_path = run_dir / "log.csv"
     ref_path = run_dir / "ref_path.csv"
     rmse = rmse_from_log(log_path, skip_initial_s)
     if rmse is None:
         rmse = float("inf")
     completion = path_completion_from_log(log_path, ref_path, skip_initial_s)
+    reverse_frac = reverse_frac_from_log(log_path, skip_initial_s)
     valid = math.isfinite(rmse) and completion >= float(min_completion)
     # BO objective: invalid trials heavily penalized
     if not valid:
         objective = 10.0 + (rmse if math.isfinite(rmse) else 50.0) + 5.0 * max(
             0.0, float(min_completion) - completion
         )
+        objective += float(reverse_penalty_w) * reverse_frac
     else:
-        objective = float(rmse)
+        objective = float(rmse) + float(reverse_penalty_w) * reverse_frac
     return {
         "rmse": float(rmse),
         "completion": float(completion),
+        "reverse_frac": float(reverse_frac),
         "valid": bool(valid),
         "objective": float(objective),
         "pass_target": bool(valid and rmse < float(target_rmse_m)),
         "min_completion": float(min_completion),
         "target_rmse_m": float(target_rmse_m),
+        "reverse_penalty_w": float(reverse_penalty_w),
     }
 
 

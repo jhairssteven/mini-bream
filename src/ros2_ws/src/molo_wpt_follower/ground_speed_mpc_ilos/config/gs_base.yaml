@@ -35,7 +35,7 @@ gs_mpc:
   dt: 0.15
   period_s: 0.20
   u_min: 0.15
-  u_max: 0.45
+  u_max: 1.8
   r_max: 0.45
   du_max: 0.05
   dr_max: 0.12
@@ -58,35 +58,46 @@ ilos:
   advance_eps_m: 0.15
 
 # Inner loops → body force / moment
-# k_ff must match plant X/U (~few N per m/s). Large FF (30–45) overdrove U_g
-# well above U_d because PI could not overcome open-loop thrust until ~2 m/s.
+# Plant (BlueBoat / Gazebo T200): ~100 N/thruster, hydro X≈25U+40U².
+# Full surge X_max=2*T_max=200 N → U_ss≈1.95 m/s (matches open-loop 100+100 N).
+# k_ff ≈ X/U = 25+40U (~35 N·s/m near 0.3 m/s cruise).
 surge_pi:
-  kp: 10.0
-  ki: 2.0
-  k_ff: 6.0
-  x_min: -25.0
-  x_max: 25.0
-  i_limit: 8.0
-  dx_max: 50.0
+  kp: 40.0
+  ki: 8.0
+  k_ff: 35.0
+  x_min: -200.0
+  x_max: 200.0
+  i_limit: 60.0
+  dx_max: 200.0                # ~1 s to full surge; scale with x_max
   u_lpf_tau_s: 0.25
-  ff_overspeed_fade_mps: 0.12
+  ff_overspeed_fade_mps: 0.40  # wider fade → gentler brake onset
+  brake_x_min: -10.0           # light brake floor while U_d>0 (avoid slam reverse)
+  brake_kp_scale: 0.4          # weaker P when overspeed
   speed_feedback: body_u
 
 yaw_pd:
-  kp: 2.5
-  kd: 1.2
-  n_max: 6.0
+  # Plant yaw damping ≈80 N·m·s/rad → need large N for useful r (r≈N/80).
+  # Pair with surge_priority_x_min≥40 so cruise can use reverse thruster for yaw.
+  kp: 35.0
+  kd: 12.0
+  n_max: 50.0                  # soft; diamond max ≈ B*T_max ≈ 59 N·m
+
 
 allocation:
   thruster_sep_m: 0.59
-  t_max: 40.0
-  t_min: -40.0
+  t_max: 100.0                 # Gazebo / T200 max_thrust_cmd
+  t_min: -100.0
   surge_priority: true   # never reverse a thruster against surge intent
+  # Arm only under hard surge. Cruise X≈8–12 N; a low threshold (1.5–5)
+  # zeros one thruster via |N|≤B/2|X| and kills heading tracking.
+  surge_priority_x_min: 40.0
 
+# Sim publishes allocated Newtons directly to Gazebo. Real boat uses f^{-1}
+# (n_db / c1) → normalized [-1,1] for motor_controller. c1=T_max so |n|=1 ↔ 100 N.
 thruster_map:
-  t_max: 40.0
+  t_max: 100.0
   n_db: 0.02
-  c1: 40.0
+  c1: 100.0
   c2: 0.0
 
 speed:

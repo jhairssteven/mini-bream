@@ -50,6 +50,7 @@ from inner_control import (  # noqa: E402
     ThrusterMap,
     YawPD,
     angdiff,
+    platform_thrust_commands,
     speed_scale_from_heading,
 )
 from mpc import build_mission_path  # noqa: E402
@@ -108,29 +109,32 @@ class GsMpcIlosFollowerNode(Node):
 
         surge_cfg = config.get("surge_pi", {})
         self._surge = SurgePI(
-            kp=float(surge_cfg.get("kp", 10.0)),
-            ki=float(surge_cfg.get("ki", 2.0)),
-            k_ff=float(surge_cfg.get("k_ff", 6.0)),
-            x_min=float(surge_cfg.get("x_min", -25.0)),
-            x_max=float(surge_cfg.get("x_max", 25.0)),
-            i_limit=float(surge_cfg.get("i_limit", 8.0)),
-            dx_max=float(surge_cfg.get("dx_max", 50.0)),
+            kp=float(surge_cfg.get("kp", 40.0)),
+            ki=float(surge_cfg.get("ki", 8.0)),
+            k_ff=float(surge_cfg.get("k_ff", 35.0)),
+            x_min=float(surge_cfg.get("x_min", -200.0)),
+            x_max=float(surge_cfg.get("x_max", 200.0)),
+            i_limit=float(surge_cfg.get("i_limit", 60.0)),
+            dx_max=float(surge_cfg.get("dx_max", 200.0)),
             u_lpf_tau_s=float(surge_cfg.get("u_lpf_tau_s", 0.25)),
-            ff_overspeed_fade_mps=float(surge_cfg.get("ff_overspeed_fade_mps", 0.12)),
+            ff_overspeed_fade_mps=float(surge_cfg.get("ff_overspeed_fade_mps", 0.40)),
+            brake_x_min=float(surge_cfg.get("brake_x_min", -10.0)),
+            brake_kp_scale=float(surge_cfg.get("brake_kp_scale", 0.4)),
         )
         yaw_cfg = config.get("yaw_pd", {})
         self._yaw = YawPD(
-            kp=float(yaw_cfg.get("kp", 2.5)),
-            kd=float(yaw_cfg.get("kd", 1.2)),
-            n_max=float(yaw_cfg.get("n_max", 6.0)),
+            kp=float(yaw_cfg.get("kp", 35.0)),
+            kd=float(yaw_cfg.get("kd", 12.0)),
+            n_max=float(yaw_cfg.get("n_max", 50.0)),
         )
         alloc_cfg = config.get("allocation", {})
-        t_max = float(alloc_cfg.get("t_max", 40.0))
+        t_max = float(alloc_cfg.get("t_max", 100.0))
         self._alloc = Allocator(
             thruster_sep_m=float(alloc_cfg.get("thruster_sep_m", 0.59)),
             t_min=float(alloc_cfg.get("t_min", -t_max)),
             t_max=t_max,
             surge_priority=bool(alloc_cfg.get("surge_priority", True)),
+            surge_priority_x_min=float(alloc_cfg.get("surge_priority_x_min", 40.0)),
         )
         speed_cfg = config.get("speed", {})
         self._angle_fast = float(speed_cfg.get("angle_threshold_fast_rad", 0.15))
@@ -146,7 +150,6 @@ class GsMpcIlosFollowerNode(Node):
             c2=float(fmap.get("c2", 0.0)),
         )
 
-        self._sim_scale = 1000.0 if self.sim_enable else 1.0
         self._u_min = float(self._mpc.cfg.u_min)
         self._u_max = float(self._mpc.cfg.u_max)
         # Signed surge feedback (body-x). Unsigned |U_g| loses direction and
@@ -312,16 +315,15 @@ class GsMpcIlosFollowerNode(Node):
             self.viz.publish_pred(states)
         # else keep last P_loc / U_MPC
 
-    def _publish_thrust(self, left_n: float, right_n: float) -> None:
-        # Normalized command via f^{-1}, then sim scale
-        n_l = self._fmap.inverse(left_n)
-        n_r = self._fmap.inverse(right_n)
-        tl = float(np.clip(n_l, -1.0, 1.0) * self._sim_scale)
-        tr = float(np.clip(n_r, -1.0, 1.0) * self._sim_scale)
+    def _publish_thrust(self, left_n: float, right_n: float) -> Tuple[float, float]:
+        """Publish thruster cmds; return allocated forces [N] for logging."""
+        cmd_l, cmd_r, force_l, force_r = platform_thrust_commands(
+            left_n, right_n, self._fmap, sim_enable=self.sim_enable
+        )
         t = Float64 if self.sim_enable else Float32
-        self._left_pub.publish(t(data=tl))
-        self._right_pub.publish(t(data=tr))
-        return n_l, n_r
+        self._left_pub.publish(t(data=float(cmd_l)))
+        self._right_pub.publish(t(data=float(cmd_r)))
+        return force_l, force_r
 
     def _control_loop(self) -> None:
         if self._x is None or self._psi is None or not self._path_ready:
@@ -375,7 +377,7 @@ class GsMpcIlosFollowerNode(Node):
         x_force = self._surge.step(u_d, u_g_meas, self._dt)
         n_moment = self._yaw.step(psi_d, self._psi, self._r)
         t_l, t_r = self._alloc.allocate(x_force, n_moment)
-        n_l, n_r = self._publish_thrust(t_l, t_r)
+        force_l, force_r = self._publish_thrust(t_l, t_r)
 
         # XTE vs global path (scoring / evaluate_mpc): always use geometric
         # closest sample. Monotonic index is only for optional progress logs.
@@ -398,7 +400,7 @@ class GsMpcIlosFollowerNode(Node):
                 f"{t:.4f},{self._x:.5f},{self._y:.5f},{self._psi:.5f},"
                 f"{self._u:.4f},{self._v:.4f},{self._r:.4f},{xte_global:.5f},"
                 f"{u_d:.4f},0.0000,0.0000,{kappa:.5f},{app},"
-                f"{n_l * self._sim_scale:.2f},{n_r * self._sim_scale:.2f},"
+                f"{force_l:.2f},{force_r:.2f},"
                 f"{u_g_meas:.4f},{self._u_mpc:.4f},{psi_d:.5f},{x_force:.3f},{n_moment:.3f}\n"
             )
             self._log_file.flush()

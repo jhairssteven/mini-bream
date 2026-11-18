@@ -32,7 +32,7 @@ MOLO_DIR = PKG_DIR.parent
 MPC_DIR = MOLO_DIR / "mpc"
 EXP_DIR = MPC_DIR / "experiments"
 
-for path in (str(PKG_DIR), str(MPC_DIR), str(EXP_DIR)):
+for path in (str(PKG_DIR), str(MOLO_DIR), str(MPC_DIR), str(EXP_DIR)):
     if path not in sys.path:
         sys.path.insert(0, path)
 
@@ -45,6 +45,7 @@ from config import (  # noqa: E402
 )
 from reference_path import apply_reference_path, reference_path_block  # noqa: E402
 from trial_runner import bash_cmd, kill_stack, run_boat_trial  # noqa: E402
+from tune_seed import load_seed_params  # noqa: E402
 
 OPEN_WATER_LAUNCH = (
     "/workspace/ros2_ws/install/blueboat_sim/share/blueboat_sim/launch/open_water.launch.py"
@@ -68,38 +69,6 @@ VALIDATION_TIMING = {
 }
 
 
-def build_h0_refine_space(center: Dict[str, Any], fraction: float = 0.35):
-    """Local search space around a known good parameter set."""
-    from skopt.space import Integer, Real
-
-    def band(val, lo_scale, hi_scale, int_val=False):
-        if int_val:
-            v = int(val)
-            return Integer(max(1, int(v * lo_scale)), max(v + 1, int(v * hi_scale)), name="")
-        return Real(val * lo_scale, val * hi_scale, name="")
-
-    names = [
-        "cruise", "ilos_min", "ilos_max", "ilos_conv", "pid_kp", "pid_kd",
-        "max_yaw_r", "lateral_v", "horizon", "Q_u", "Q_v", "Q_r", "R_in", "Q_term",
-    ]
-    space = []
-    for name in names:
-        val = center[name]
-        if name == "horizon":
-            space.append(Integer(max(8, int(val) - 4), int(val) + 4, name=name))
-        elif name in ("ilos_min", "ilos_max"):
-            lo = max(0.2, float(val) * (1.0 - fraction))
-            hi = float(val) * (1.0 + fraction) + 0.1
-            space.append(Real(lo, hi, name=name))
-        elif name == "R_in":
-            space.append(Real(max(0.003, float(val) * 0.5), float(val) * 2.0, name=name))
-        else:
-            lo = max(1e-3, float(val) * (1.0 - fraction))
-            hi = float(val) * (1.0 + fraction)
-            space.append(Real(lo, hi, name=name))
-    return space
-
-
 def build_h0_search_space():
     """Focused search space for baseline_ilos_velocity (14 parameters)."""
     from skopt.space import Integer, Real
@@ -120,6 +89,44 @@ def build_h0_search_space():
         Real(0.005, 0.06, name="R_in"),
         Real(3.0, 14.0, name="Q_term"),
     ]
+
+
+def _space_midpoints(space) -> Dict[str, Any]:
+    out: Dict[str, Any] = {}
+    for dim in space:
+        lo, hi = dim.low, dim.high
+        mid = 0.5 * (float(lo) + float(hi))
+        out[dim.name] = int(round(mid)) if dim.name == "horizon" else float(mid)
+    return out
+
+
+def build_h0_refine_space(center: Dict[str, Any], fraction: float = 0.35):
+    """Local search space around a known good parameter set."""
+    from skopt.space import Integer, Real
+
+    filled = _space_midpoints(build_h0_search_space())
+    filled.update({k: v for k, v in center.items() if not str(k).startswith("_")})
+
+    names = [
+        "cruise", "ilos_min", "ilos_max", "ilos_conv", "pid_kp", "pid_kd",
+        "max_yaw_r", "lateral_v", "horizon", "Q_u", "Q_v", "Q_r", "R_in", "Q_term",
+    ]
+    space = []
+    for name in names:
+        val = filled[name]
+        if name == "horizon":
+            space.append(Integer(max(8, int(val) - 4), int(val) + 4, name=name))
+        elif name in ("ilos_min", "ilos_max"):
+            lo = max(0.2, float(val) * (1.0 - fraction))
+            hi = float(val) * (1.0 + fraction) + 0.1
+            space.append(Real(lo, hi, name=name))
+        elif name == "R_in":
+            space.append(Real(max(0.003, float(val) * 0.5), float(val) * 2.0, name=name))
+        else:
+            lo = max(1e-3, float(val) * (1.0 - fraction))
+            hi = float(val) * (1.0 + fraction)
+            space.append(Real(lo, hi, name=name))
+    return space
 
 
 def vector_to_dict(space, x) -> Dict[str, Any]:
@@ -249,13 +256,13 @@ def run_tuning(
     val_timing = VALIDATION_TIMING.get(platform, VALIDATION_TIMING["sim"])
 
     cfg_base = base_config(platform, overlay_path=overlay_path)
-    if refine_from is not None and refine_from.is_file():
-        with open(refine_from, encoding="utf-8") as f:
-            prev = json.load(f)
-        center = prev.get("best_params", {})
+    if refine_from is not None:
+        center = load_seed_params(refine_from, "h0")
+        artifact = center.pop("_seed_artifact", str(refine_from))
         space = build_h0_refine_space(center)
         print(
-            f"Refining around prior best (rmse={float(prev.get('validation_rmse', float('nan'))):.4f} m)",
+            f"Warm-start / refine from prior: {artifact}\n"
+            f"  seed keys: {sorted(center.keys())}",
             flush=True,
         )
     else:
@@ -412,7 +419,15 @@ def main() -> None:
     parser.add_argument(
         "--refine",
         default=None,
-        help="Path to tune_result.json for local refinement around prior best",
+        help="Alias for --seed-from (local refinement around prior best)",
+    )
+    parser.add_argument(
+        "--seed-from",
+        default=None,
+        help=(
+            "Warm-start / refine from a previous tune: directory, tune_result.json, "
+            "h0_tuned_overlay.yaml, or best_config.yaml"
+        ),
     )
     parser.add_argument("--overlay", default=None, help="Optional extra YAML overlay")
     args = parser.parse_args()
@@ -425,6 +440,7 @@ def main() -> None:
         else PKG_DIR / "results" / f"tune_{args.platform}_{stamp}"
     )
     out_dir.mkdir(parents=True, exist_ok=True)
+    seed_path = args.seed_from or args.refine
 
     run_tuning(
         platform=args.platform,
@@ -433,7 +449,7 @@ def main() -> None:
         launch=args.launch,
         restart_sim=not args.no_restart,
         install_overlay=args.install,
-        refine_from=Path(args.refine) if args.refine else None,
+        refine_from=Path(seed_path) if seed_path else None,
         overlay_path=args.overlay,
     )
 

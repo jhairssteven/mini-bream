@@ -1,49 +1,51 @@
 path:
   resample_step_m: 0.396
-  cruise_speed_mps: 0.42
+  cruise_speed_mps: 0.26
   closed: true
   smooth_dubins: true
   monotonic_progress: false
 surge_pi:
-  kp: 9.12366556080948
-  ki: 0.627335037522565
-  k_ff: 3.9239951746522888
-  x_min: -26.594172322273483
-  x_max: 26.594172322273483
-  i_limit: 8.0
-  dx_max: 70.0
-  u_lpf_tau_s: 0.26123851015508986
-  ff_overspeed_fade_mps: 0.12
+  kp: 44.915166710755
+  ki: 12.0
+  k_ff: 28.0
+  x_min: -166.18402734694638
+  x_max: 166.18402734694638
+  i_limit: 60.0
+  dx_max: 80.0
+  u_lpf_tau_s: 0.35309831210471193
+  ff_overspeed_fade_mps: 0.4
+  brake_x_min: -10.0
+  brake_kp_scale: 0.4
   speed_feedback: body_u
 yaw_pd:
-  kp: 2.788206406201538
-  kd: 0.9422452206546716
-  n_max: 6.296983454488361
+  kp: 55.53155678318494
+  kd: 8.964645367002035
+  n_max: 37.48886072395484
 speed:
-  angle_threshold_fast_rad: 0.1903804008806302
-  angle_threshold_slow_rad: 0.5961870011063604
-  min_speed_scale: 0.35
-  u_d_floor_frac_of_cruise: 0.9
+  angle_threshold_fast_rad: 0.16020939093359396
+  angle_threshold_slow_rad: 0.7870868346245155
+  min_speed_scale: 0.49091900071349737
+  u_d_floor_frac_of_cruise: 0.7998021446557715
 ilos:
-  delta_m: 1.2664767660367902
-  sigma: 0.03840759590669617
-  e_i_limit: 2.907983708945807
+  delta_m: 1.2554932321772332
+  sigma: 0.18
+  e_i_limit: 2.171127177713049
   advance_eps_m: 0.15
 gs_mpc:
-  horizon: 13
+  horizon: 10
   dt: 0.15
   period_s: 0.2
   u_min: 0.15
-  u_max: 0.385
-  r_max: 0.45
+  u_max: 0.516274073134147
+  r_max: 0.35
   du_max: 0.05
   dr_max: 0.12
   ref_ahead_points: 48
-  w_path: 55.0
-  w_u: 13.0
-  w_r: 1.9
-  w_du: 2.5
-  w_dr: 1.5
+  w_path: 30.0
+  w_u: 6.0
+  w_r: 2.4095299113214494
+  w_du: 3.977653575180977
+  w_dr: 2.1475518448757493
   w_obs: 80.0
   boat_radius_m: 0.6
   margin_m: 0.8
@@ -53,13 +55,13 @@ tuning:
   method: lhs_then_local
   target_rmse_m: 0.1
   min_completion: 0.8
-  best_objective: 1000.0
-  validation_rmse: 0.279733
-  validation_completion: 0.9853846153846154
+  best_objective: 0.122147
+  validation_rmse: 0.122326
+  validation_completion: 0.9538461538461539
   validation_valid: true
-  n_coarse: 6
-  n_local: 12
-  n_valid: 0
-  n_rejected: 6
-  timestamp: '2026-10-26T15:51:44.589492+00:00'
+  n_coarse: 3
+  n_local: 6
+  n_valid: 8
+  n_rejected: 1
+  timestamp: '2026-11-02T04:09:43.511712+00:00'
   platform: blueboat_sim

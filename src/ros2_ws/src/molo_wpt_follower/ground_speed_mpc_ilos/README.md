@@ -2,7 +2,7 @@
 
 Implements `pipeline.tex` with the same experiment harness as `h0_boat` / `ilos_boat`.
 
-**Cascade:** fixed mission path (lemniscate, …) → local **ground-speed kinematic MPC** (polyline + `U_MPC`) → **ILOS** (`ψ_d`, `U_d`) → surge **PI** / yaw **PD** → thruster allocation → `f^{-1}` → PWM/thrust.
+**Cascade:** fixed mission path (lemniscate, …) → local **ground-speed kinematic MPC** (polyline + `U_MPC`) → **ILOS** (`ψ_d`, `U_d`) → surge **PI** / yaw **PD** → thruster allocation → sim: force **[N]** to Gazebo / real: `f^{-1}` → normalized PWM.
 
 Unlike H0 (`baseline_ilos_velocity`), MPC here is a **path generator**, not a hydro thrust allocator. Unlike `ilos_boat`, a short-horizon GS-MPC sits above ILOS. RRT★ from the TeX notes is replaced by the same parametric trajectories as the other packages.
 
@@ -132,7 +132,18 @@ cd /workspace/ros2_ws/src/molo_wpt_follower/ground_speed_mpc_ilos
 
 # first time on a new boat: fewer trials
 ./run_real_boat.sh --platform real --tune --install --quick
+
+# warm-start from a previous sim (or field) tune
+./run_real_boat.sh --platform real --tune --install \
+  --seed-from results/tune_staged_sim_<timestamp>/
+# or from the installed overlay:
+./run_real_boat.sh --platform real --tune --install \
+  --seed-from config/gs_tuned_overlay.yaml
 ```
+
+`--seed-from` accepts a prior tune directory, `staged_summary.json`,
+`tune_result.json`, or a tuned overlay YAML. Coarse trial 0 of each phase
+uses that seed (missing keys fall back to plant smoke defaults).
 
 4. Artifacts: `/workspace/field_tests/ground_speed_mpc_ilos/tune_staged_real_<timestamp>/`  
 5. With `--install`, best params land in `config/gs_tuned_overlay.yaml`.

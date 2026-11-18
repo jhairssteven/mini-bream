@@ -72,6 +72,7 @@ Retune H0 for the BlueBoat platform using scikit-optimize (`gp_minimize`, EI acq
 cd /workspace/ros2_ws/src/molo_wpt_follower/h0_boat
 ./run_real_boat.sh --platform sim --tune --install    # 28 BO trials → config/h0_tuned_overlay.yaml
 ./run_real_boat.sh --platform sim --tune --quick      # 8 trials (smoke test)
+./run_real_boat.sh --platform sim --tune --seed-from results/tune_sim_<ts>/   # refine around prior
 ```
 
 **Field fine-tuning:**
