@@ -145,7 +145,7 @@ GPS modules (`u-blox` → `ttyACM*`) are **not** the telemetry radio.
 
 Use `configure_rfd_modem.py` on **each** modem (stop `telemetry_tx` / `radio_rx` first so the port is free). Both ends of a pair must get the same air/netid/freq settings.
 
-**Defaults (lab teleop):** UART **57600**, air **64** kbps, NETID **25**, TX **20** dBm, MAVLINK **off**.
+**Defaults (lab teleop):** UART **57600**, air **64** kbps, NETID **25**, TX **20** dBm, MAVLINK **off**, OPPRESEND **off**. Both ends must match (including `S7`); older SiK **1.9** boards often ship with `OPPRESEND=1` while **1.13** uses `0` — that mismatch breaks pairing.
 
 ```bash
 cd <repo>/src/teleop

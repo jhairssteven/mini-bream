@@ -15,8 +15,9 @@ Examples:
   # Longer range: lower air rate + higher power (if legal); match both ends
   python3 configure_rfd_modem.py --port ... --air-speed 12 --tx-power 30
 
-Defaults: UART 57600, air 64 kbps, NETID 25, TX 20 dBm, MAVLINK off.
+Defaults: UART 57600, air 64 kbps, NETID 25, TX 20 dBm, MAVLINK off, OPPRESEND off.
 Stop radio_rx / telemetry_tx first so the serial port is free.
+Both ends must match (including S7 OPPRESEND); a SiK 1.9 ↔ 1.13 pair is OK if params match.
 """
 
 from __future__ import annotations
@@ -59,6 +60,7 @@ class ModemSettings:
     tx_power: int = 20
     mavlink: int = 0
     ecc: int = 0
+    oppresend: int = 0  # must match pair (older SiK 1.9 defaults to 1)
     min_freq: int = 915000
     max_freq: int = 928000
     num_channels: int = 50
@@ -71,6 +73,7 @@ class ModemSettings:
             f"ATS4={self.tx_power}",
             f"ATS5={self.ecc}",
             f"ATS6={self.mavlink}",
+            f"ATS7={self.oppresend}",
             f"ATS8={self.min_freq}",
             f"ATS9={self.max_freq}",
             f"ATS10={self.num_channels}",
@@ -231,6 +234,7 @@ def build_settings(args: argparse.Namespace) -> ModemSettings:
         tx_power=args.tx_power,
         mavlink=args.mavlink,
         ecc=args.ecc,
+        oppresend=args.oppresend,
         min_freq=args.min_freq,
         max_freq=args.max_freq,
         num_channels=args.num_channels,
@@ -263,6 +267,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--tx-power", type=int, default=20, help="S4 TX power dBm (0–30)")
     parser.add_argument("--mavlink", type=int, default=0, choices=(0, 1, 2), help="S6; use 0 for teleop")
     parser.add_argument("--ecc", type=int, default=0, choices=(0, 1), help="S5 ECC")
+    parser.add_argument(
+        "--oppresend",
+        type=int,
+        default=0,
+        choices=(0, 1),
+        help="S7 opportunistic resend; must match pair (lab default 0)",
+    )
     parser.add_argument("--min-freq", type=int, default=915000)
     parser.add_argument("--max-freq", type=int, default=928000)
     parser.add_argument("--num-channels", type=int, default=50)
