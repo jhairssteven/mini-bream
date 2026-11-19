@@ -103,7 +103,7 @@ def save_ref_path(cfg: dict, path: Path, origin_xy: tuple[float, float] = (0.0, 
 def wait_for_xte(timeout_s: float = 25.0) -> bool:
     cmd = (
         f"{ros_env()} && timeout {timeout_s} bash -c "
-        "'until ros2 topic echo /molo_mpc/cross_track_error --once 2>/dev/null | grep -q data; do sleep 0.5; done'"
+        "'until ros2 topic echo /molo_mpc/cross_track_error --qos-reliability best_effort --once 2>/dev/null | grep -q data; do sleep 0.5; done'"
     )
     return subprocess.run([*BASH.split(), cmd], capture_output=True).returncode == 0
 

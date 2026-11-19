@@ -76,7 +76,7 @@ Visualization Manager:
         Depth: 50
         Durability Policy: Volatile
         History Policy: Keep Last
-        Reliability Policy: Reliable
+        Reliability Policy: Best Effort
         Value: /baseline/heading/marker/raw
       Value: true
     - Class: rviz_default_plugins/Marker
@@ -88,7 +88,7 @@ Visualization Manager:
         Depth: 50
         Durability Policy: Volatile
         History Policy: Keep Last
-        Reliability Policy: Reliable
+        Reliability Policy: Best Effort
         Value: /baseline/heading/marker/lfp
       Value: true
     - Class: rviz_default_plugins/Marker
@@ -100,7 +100,7 @@ Visualization Manager:
         Depth: 50
         Durability Policy: Volatile
         History Policy: Keep Last
-        Reliability Policy: Reliable
+        Reliability Policy: Best Effort
         Value: /baseline/heading/marker/ekf
       Value: true
     - Class: rviz_default_plugins/Marker
@@ -112,7 +112,7 @@ Visualization Manager:
         Depth: 5
         Durability Policy: Volatile
         History Policy: Keep Last
-        Reliability Policy: Reliable
+        Reliability Policy: Best Effort
         Value: /gps/center/recent_path
       Value: true
     - Class: rviz_default_plugins/Axes

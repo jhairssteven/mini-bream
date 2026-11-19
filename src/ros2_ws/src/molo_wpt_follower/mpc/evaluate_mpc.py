@@ -10,14 +10,21 @@ import time
 
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import QoSDurabilityPolicy, QoSProfile, QoSReliabilityPolicy
 from std_msgs.msg import Float32
+
+_VIZ_QOS = QoSProfile(
+    reliability=QoSReliabilityPolicy.BEST_EFFORT,
+    durability=QoSDurabilityPolicy.VOLATILE,
+    depth=10,
+)
 
 
 class MpcEvaluator(Node):
     def __init__(self, duration: float, skip_initial: float = 0.0):
         super().__init__("mpc_evaluator")
         self.samples: list[float] = []
-        self.create_subscription(Float32, "/molo_mpc/cross_track_error", self._cb, 10)
+        self.create_subscription(Float32, "/molo_mpc/cross_track_error", self._cb, _VIZ_QOS)
         self._t0 = time.monotonic()
         self._duration = duration
         self._skip_until = self._t0 + skip_initial

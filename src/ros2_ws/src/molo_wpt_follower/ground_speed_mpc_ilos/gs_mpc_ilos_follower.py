@@ -13,6 +13,7 @@ import json
 import math
 import os
 import sys
+import threading
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -20,6 +21,8 @@ import numpy as np
 import rclpy
 import yaml
 from nav_msgs.msg import Odometry
+from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
+from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import QoSDurabilityPolicy, QoSProfile, QoSReliabilityPolicy
 from std_msgs.msg import Float32, Float64
@@ -174,26 +177,28 @@ class GsMpcIlosFollowerNode(Node):
             durability=QoSDurabilityPolicy.VOLATILE,
             depth=1,
         )
-        qos_c = QoSProfile(
-            reliability=QoSReliabilityPolicy.RELIABLE,
-            durability=QoSDurabilityPolicy.VOLATILE,
-            depth=5,
-        )
-
         odom_topic = topics.get("odometry", "/odom")
         self.create_subscription(Odometry, odom_topic, self._odom_cb, qos_s)
 
         thrust_t = Float64 if self.sim_enable else Float32
         self._left_pub = self.create_publisher(
-            thrust_t, topics.get("left_thrust", "/wamv/thrusters/left/thrust"), qos_c
+            thrust_t, topics.get("left_thrust", "/wamv/thrusters/left/thrust"), qos_s
         )
         self._right_pub = self.create_publisher(
-            thrust_t, topics.get("right_thrust", "/wamv/thrusters/right/thrust"), qos_c
+            thrust_t, topics.get("right_thrust", "/wamv/thrusters/right/thrust"), qos_s
         )
 
         traj_cfg = config.get("trajectory", {})
         self.viz = MpcVisualizer(self, self.frame_id, topics)
         self._traj_step = float(traj_cfg.get("min_distance_m", 0.25))
+        self._viz_lock = threading.Lock()
+        self._viz_snap: Optional[Tuple[float, float, float, float]] = None
+        self._viz_pred = None
+        self._viz_display: Optional[List] = None
+        self._viz_ref_stamp = None
+        self._viz_ref_dirty = False
+        self._viz_ref_mono = 0.0
+        self._viz_group = MutuallyExclusiveCallbackGroup()
 
         self._x = self._y = self._psi = None
         self._u = self._v = self._r = 0.0
@@ -221,6 +226,9 @@ class GsMpcIlosFollowerNode(Node):
         self._rate = float(config.get("control_rate_hz", 10.0))
         self._dt = 1.0 / self._rate
         self.create_timer(self._dt, self._control_loop)
+        # Paths and pose markers go out on another thread so a stalled subscriber
+        # cannot delay the next thrust command.
+        self.create_timer(0.1, self._publish_viz, callback_group=self._viz_group)
         self.get_logger().info(
             f"molo_gs_mpc_ilos ready (GS-MPC→ILOS→PI/PD, pose from {odom_topic})"
         )
@@ -269,7 +277,10 @@ class GsMpcIlosFollowerNode(Node):
             self._ilos.reset()
             self._mpc.reset()
         stamp = self._path_activation._last_path_stamp
-        self.viz.publish_ref(display_samples, stamp=stamp)
+        with self._viz_lock:
+            self._viz_display = display_samples
+            self._viz_ref_stamp = stamp
+            self._viz_ref_dirty = True
         action = "updated" if soft else "loaded"
         self.get_logger().info(
             f"GS-MPC path {action} ({len(self._path)} samples, closed={self._path_closed})"
@@ -312,7 +323,8 @@ class GsMpcIlosFollowerNode(Node):
             self._u_mpc = float(np.clip(sol.u_mpc, self._u_min, self._u_max))
             self._ilos.set_path(self._p_loc, soft=True, pose_xy=(self._x, self._y))
             states = np.column_stack([sol.path_xy, sol.path_psi])
-            self.viz.publish_pred(states)
+            with self._viz_lock:
+                self._viz_pred = states
         # else keep last P_loc / U_MPC
 
     def _publish_thrust(self, left_n: float, right_n: float) -> Tuple[float, float]:
@@ -405,15 +417,29 @@ class GsMpcIlosFollowerNode(Node):
             )
             self._log_file.flush()
 
-        self.viz.publish_pose(self._x, self._y, self._psi)
-        self.viz.publish_xte(xte_global)
-        if self._path_ready and self._path:
-            stamp = self._path_activation._last_path_stamp
-            display = getattr(self._path_activation, "_viz_samples", None)
-            if display is None:
-                display = self._path
+        with self._viz_lock:
+            self._viz_snap = (self._x, self._y, self._psi, xte_global)
+
+    def _publish_viz(self) -> None:
+        with self._viz_lock:
+            snap = self._viz_snap
+            pred = self._viz_pred
+            self._viz_pred = None
+            display = self._viz_display
+            stamp = self._viz_ref_stamp
+            dirty = self._viz_ref_dirty
+            self._viz_ref_dirty = False
+        if snap is not None:
+            x, y, psi, xte = snap
+            self.viz.publish_pose(x, y, psi)
+            self.viz.publish_xte(xte)
+            self.viz.publish_traversed(x, y, psi, self._traj_step)
+        if pred is not None:
+            self.viz.publish_pred(pred)
+        now = self.get_clock().now().nanoseconds * 1e-9
+        if display and (dirty or now - self._viz_ref_mono >= 1.0):
             self.viz.publish_ref(display, stamp=stamp)
-        self.viz.publish_traversed(self._x, self._y, self._psi, self._traj_step)
+            self._viz_ref_mono = now
 
 
 def main() -> None:
@@ -427,11 +453,14 @@ def main() -> None:
     config = load_config(args.config)
     rclpy.init()
     node = GsMpcIlosFollowerNode(config)
+    executor = MultiThreadedExecutor(num_threads=2)
+    executor.add_node(node)
     try:
-        rclpy.spin(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     finally:
+        executor.shutdown()
         if node._log_file:
             node._log_file.close()
         node.destroy_node()

@@ -111,21 +111,15 @@ class IlosFollowerNode(Node):
             durability=QoSDurabilityPolicy.VOLATILE,
             depth=1,
         )
-        qos_c = QoSProfile(
-            reliability=QoSReliabilityPolicy.RELIABLE,
-            durability=QoSDurabilityPolicy.VOLATILE,
-            depth=5,
-        )
-
         odom_topic = topics.get("odometry", "/odom")
         self.create_subscription(Odometry, odom_topic, self._odom_cb, qos_s)
 
         thrust_t = Float64 if self.sim_enable else Float32
         self._left_pub = self.create_publisher(
-            thrust_t, topics.get("left_thrust", "/wamv/thrusters/left/thrust"), qos_c
+            thrust_t, topics.get("left_thrust", "/wamv/thrusters/left/thrust"), qos_s
         )
         self._right_pub = self.create_publisher(
-            thrust_t, topics.get("right_thrust", "/wamv/thrusters/right/thrust"), qos_c
+            thrust_t, topics.get("right_thrust", "/wamv/thrusters/right/thrust"), qos_s
         )
 
         traj_cfg = config.get("trajectory", {})

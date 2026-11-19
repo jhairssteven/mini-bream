@@ -7,10 +7,18 @@ from typing import Sequence
 
 from geometry_msgs.msg import PoseStamped, Quaternion
 from nav_msgs.msg import Path
+from rclpy.qos import QoSDurabilityPolicy, QoSProfile, QoSReliabilityPolicy
 from std_msgs.msg import Float32, Header
 from visualization_msgs.msg import Marker
 
 from path_reference import PathSample
+
+# Best-effort: a slow RViz or bag subscriber must not block the control loop.
+_VIZ_QOS = QoSProfile(
+    reliability=QoSReliabilityPolicy.BEST_EFFORT,
+    durability=QoSDurabilityPolicy.VOLATILE,
+    depth=10,
+)
 
 
 def _yaw_q(yaw: float) -> Quaternion:
@@ -25,18 +33,18 @@ class MpcVisualizer:
         self.node = node
         self.frame_id = frame_id
         t = topics
-        self.ref_pub = node.create_publisher(Path, t.get("ref_path", "/molo_mpc/ref_path"), 10)
-        self.pred_pub = node.create_publisher(Path, t.get("pred_path", "/molo_mpc/pred_path"), 10)
+        self.ref_pub = node.create_publisher(Path, t.get("ref_path", "/molo_mpc/ref_path"), _VIZ_QOS)
+        self.pred_pub = node.create_publisher(Path, t.get("pred_path", "/molo_mpc/pred_path"), _VIZ_QOS)
         self.pose_pub = node.create_publisher(
-            PoseStamped, t.get("vehicle_pose", "/molo_mpc/vehicle_pose"), 10
+            PoseStamped, t.get("vehicle_pose", "/molo_mpc/vehicle_pose"), _VIZ_QOS
         )
         self.xte_pub = node.create_publisher(
-            Float32, t.get("cross_track_error", "/molo_mpc/cross_track_error"), 10
+            Float32, t.get("cross_track_error", "/molo_mpc/cross_track_error"), _VIZ_QOS
         )
         self._traj = Path()
         self._traj.header.frame_id = frame_id
         self.trav_pub = node.create_publisher(
-            Path, t.get("traversed_path", "/molo_mpc/traversed_path"), 10
+            Path, t.get("traversed_path", "/molo_mpc/traversed_path"), _VIZ_QOS
         )
 
     def _hdr(self, stamp=None) -> Header:
