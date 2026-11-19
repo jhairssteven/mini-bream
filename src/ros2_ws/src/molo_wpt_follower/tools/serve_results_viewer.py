@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Local HTTP server for tools/results_viewer.html — browse controller run CSVs.
+"""HTTP server for tools/results_viewer.html — browse controller run CSVs.
 
-Usage (host or autonomy container):
+Usage:
 
   cd .../molo_wpt_follower/tools
   python3 serve_results_viewer.py
-  # open http://127.0.0.1:8766/
+  # http://127.0.0.1:8766/  or  http://<host-ip>:8766/
 
 Scans sibling controller packages' results/ trees for directories that contain
 log.csv (gs / ilos / h0 / mpc experiments).
@@ -209,15 +209,14 @@ class Handler(BaseHTTPRequestHandler):
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Serve interactive controller results viewer")
-    ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8766)
     args = ap.parse_args()
 
     if not VIEWER_HTML.is_file():
         raise SystemExit(f"missing {VIEWER_HTML}")
 
-    httpd = ThreadingHTTPServer((args.host, args.port), Handler)
-    print(f"Results viewer: http://{args.host}:{args.port}/")
+    httpd = ThreadingHTTPServer(("0.0.0.0", args.port), Handler)
+    print(f"Results viewer: http://0.0.0.0:{args.port}/  (also http://127.0.0.1:{args.port}/)")
     print(f"Scanning under: {MOLO_DIR}")
     try:
         httpd.serve_forever()
