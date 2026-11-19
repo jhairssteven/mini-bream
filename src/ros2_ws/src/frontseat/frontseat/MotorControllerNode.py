@@ -11,7 +11,7 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float32
 
-from frontseat.qos_profiles import reliable_volatile_qos
+from frontseat.qos_profiles import best_effort_volatile_qos
 
 # Mounted at /opt/teleop in the prod container
 import sys
@@ -34,10 +34,10 @@ class MotorControllerNode(Node):
         self.get_logger().info(f"PWM daemon at udp://{host}:{port} (pass-through ±1)")
 
         self.create_subscription(
-            Float32, "/pwm/right_thrust_cmd", self.__right_thrust_cbk, reliable_volatile_qos
+            Float32, "/pwm/right_thrust_cmd", self.__right_thrust_cbk, best_effort_volatile_qos
         )
         self.create_subscription(
-            Float32, "/pwm/left_thrust_cmd", self.__left_thrust_cbk, reliable_volatile_qos
+            Float32, "/pwm/left_thrust_cmd", self.__left_thrust_cbk, best_effort_volatile_qos
         )
         # Keep daemon fed even if only one side updates
         self.create_timer(0.05, self.__publish_to_daemon)

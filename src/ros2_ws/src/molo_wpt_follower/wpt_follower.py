@@ -59,14 +59,9 @@ class WptFollowerNode(Node):
             durability=QoSDurabilityPolicy.VOLATILE,
             depth=1,
         )
-        qos_cmd = QoSProfile(
-            reliability=QoSReliabilityPolicy.RELIABLE,
-            durability=QoSDurabilityPolicy.VOLATILE,
-            depth=5,
-        )
 
         self.create_subscription(
-            NavSatFix, topics.get("gps", "/wamv/sensors/gps/gps/fix"), self._gps_cb, qos_cmd
+            NavSatFix, topics.get("gps", "/wamv/sensors/gps/gps/fix"), self._gps_cb, qos_sensor
         )
         self.create_subscription(
             Imu, topics.get("imu", "/wamv/sensors/imu/imu/data"), self._imu_cb, qos_sensor
@@ -88,10 +83,10 @@ class WptFollowerNode(Node):
         scale = 1000.0 if self.sim_enable else 1.0
         self._thrust_scale = scale
         self._left_pub = self.create_publisher(
-            thrust_type, topics.get("left_thrust", "/wamv/thrusters/left/thrust"), qos_cmd
+            thrust_type, topics.get("left_thrust", "/wamv/thrusters/left/thrust"), qos_sensor
         )
         self._right_pub = self.create_publisher(
-            thrust_type, topics.get("right_thrust", "/wamv/thrusters/right/thrust"), qos_cmd
+            thrust_type, topics.get("right_thrust", "/wamv/thrusters/right/thrust"), qos_sensor
         )
 
         self._marker_pub = self.create_publisher(MarkerArray, "/molo_wpt/waypoint_markers", 10)

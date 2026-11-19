@@ -11,8 +11,15 @@ from typing import Deque, Tuple
 import rclpy
 from geometry_msgs.msg import PoseStamped
 from rclpy.node import Node
+from rclpy.qos import QoSDurabilityPolicy, QoSProfile, QoSReliabilityPolicy
 from std_msgs.msg import ColorRGBA, Header
 from visualization_msgs.msg import Marker, MarkerArray
+
+_VIZ_QOS = QoSProfile(
+    reliability=QoSReliabilityPolicy.BEST_EFFORT,
+    durability=QoSDurabilityPolicy.VOLATILE,
+    depth=10,
+)
 
 
 class PoseTrailViz(Node):
@@ -30,8 +37,8 @@ class PoseTrailViz(Node):
         self._marker_scale = marker_scale
         self._poses: Deque[Tuple[float, float, float]] = deque(maxlen=self._max_poses)
 
-        self.create_subscription(PoseStamped, pose_topic, self._pose_cb, 10)
-        self._pub = self.create_publisher(MarkerArray, marker_topic, 10)
+        self.create_subscription(PoseStamped, pose_topic, self._pose_cb, _VIZ_QOS)
+        self._pub = self.create_publisher(MarkerArray, marker_topic, _VIZ_QOS)
         self.create_timer(0.2, self._publish)
 
     def _pose_cb(self, msg: PoseStamped) -> None:

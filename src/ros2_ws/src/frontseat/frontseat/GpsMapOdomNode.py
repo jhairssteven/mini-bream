@@ -4,11 +4,14 @@
 from __future__ import annotations
 
 import math
+import threading
 from collections import deque
 
 import rclpy
 from geometry_msgs.msg import Point, TransformStamped
 from nav_msgs.msg import Odometry
+from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
+from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from sensor_msgs.msg import Imu, NavSatFix
 from std_msgs.msg import ColorRGBA
@@ -60,16 +63,31 @@ class GpsMapOdomNode(Node):
         self._v = 0.0
         self._r = 0.0
         self._recent_points: deque[tuple[float, float]] = deque(maxlen=self._recent_path_max)
+        self._state_lock = threading.Lock()
 
         self._tf_broadcaster = TransformBroadcaster(self)
         self._odom_pub = self.create_publisher(
             Odometry, self.get_parameter('odom_topic').value, best_effort_volatile_qos
         )
-        self._recent_path_pub = self.create_publisher(Marker, recent_path_topic, 10)
+        self._recent_path_pub = self.create_publisher(
+            Marker, recent_path_topic, best_effort_volatile_qos
+        )
 
-        self.create_subscription(NavSatFix, gps_topic, self._gps_cb, best_effort_volatile_qos)
-        self.create_subscription(Imu, heading_topic, self._heading_cb, best_effort_volatile_qos)
-        self.create_timer(0.1, self._republish_cb)
+        # Odom stays on the sensor thread. The recent-path marker and /tf are
+        # published from another thread so a slow reliable TF subscriber cannot
+        # freeze the pose that the controller uses.
+        self._sensor_group = MutuallyExclusiveCallbackGroup()
+        self._viz_group = MutuallyExclusiveCallbackGroup()
+        self.create_subscription(
+            NavSatFix, gps_topic, self._gps_cb, best_effort_volatile_qos,
+            callback_group=self._sensor_group,
+        )
+        self.create_subscription(
+            Imu, heading_topic, self._heading_cb, best_effort_volatile_qos,
+            callback_group=self._sensor_group,
+        )
+        self.create_timer(0.1, self._publish_odom, callback_group=self._sensor_group)
+        self.create_timer(0.1, self._publish_viz, callback_group=self._viz_group)
 
         z_mode = 'flattened (2D)' if self._flatten_z else 'GPS altitude'
         self.get_logger().info(
@@ -100,31 +118,32 @@ class GpsMapOdomNode(Node):
         assert self._origin_lon is not None
         assert self._origin_alt is not None
 
-        self._last_position_enu = latlon_to_local_enu(
-            msg.latitude,
-            msg.longitude,
-            msg.altitude,
-            self._origin_lat,
-            self._origin_lon,
-            self._origin_alt,
-        )
-        east, north, _ = self._last_position_enu
-        self._recent_points.append((east, north))
-        self._update_twist(east, north)
-        self._publish()
+        with self._state_lock:
+            self._last_position_enu = latlon_to_local_enu(
+                msg.latitude,
+                msg.longitude,
+                msg.altitude,
+                self._origin_lat,
+                self._origin_lon,
+                self._origin_alt,
+            )
+            east, north, _ = self._last_position_enu
+            self._recent_points.append((east, north))
+            self._update_twist(east, north)
+        self._publish_odom()
 
     def _heading_cb(self, msg: Imu) -> None:
         if msg.orientation_covariance[8] < 0.0:
             return
-        self._last_yaw_rad = yaw_from_quaternion(
-            msg.orientation.x,
-            msg.orientation.y,
-            msg.orientation.z,
-            msg.orientation.w,
-        )
-        if msg.angular_velocity.z != 0.0:
-            self._r = float(msg.angular_velocity.z)
-        self._publish()
+        with self._state_lock:
+            self._last_yaw_rad = yaw_from_quaternion(
+                msg.orientation.x,
+                msg.orientation.y,
+                msg.orientation.z,
+                msg.orientation.w,
+            )
+            if msg.angular_velocity.z != 0.0:
+                self._r = float(msg.angular_velocity.z)
 
     def _update_twist(self, east: float, north: float) -> None:
         t = self._now_sec()
@@ -148,40 +167,54 @@ class GpsMapOdomNode(Node):
         self._prev_yaw = yaw
         self._prev_t = t
 
-    def _republish_cb(self) -> None:
-        self._publish()
+    def _snapshot(self) -> dict | None:
+        with self._state_lock:
+            if self._last_position_enu is None:
+                return None
+            east, north, up = self._last_position_enu
+            return {
+                'east': east,
+                'north': north,
+                'up': 0.0 if self._flatten_z else up,
+                'yaw': self._last_yaw_rad if self._last_yaw_rad is not None else 0.0,
+                'u': self._u,
+                'v': self._v,
+                'r': self._r,
+                'points': list(self._recent_points),
+            }
 
-    def _publish(self) -> None:
-        if self._last_position_enu is None:
+    def _publish_odom(self) -> None:
+        state = self._snapshot()
+        if state is None:
             return
 
         stamp = self.get_clock().now().to_msg()
-        east, north, up = self._last_position_enu
-        if self._flatten_z:
-            up = 0.0
-
-        yaw_rad = self._last_yaw_rad if self._last_yaw_rad is not None else 0.0
-        quat = yaw_to_quaternion(yaw_rad)
-
-        self._publish_recent_path(stamp)
-
+        quat = yaw_to_quaternion(state['yaw'])
         odom = Odometry()
         odom.header.stamp = stamp
         odom.header.frame_id = self._map_frame
         odom.child_frame_id = self._base_frame
-        odom.pose.pose.position.x = east
-        odom.pose.pose.position.y = north
-        odom.pose.pose.position.z = up
+        odom.pose.pose.position.x = state['east']
+        odom.pose.pose.position.y = state['north']
+        odom.pose.pose.position.z = state['up']
         odom.pose.pose.orientation = quat
         odom.pose.covariance[0] = 0.25
         odom.pose.covariance[7] = 0.25
         odom.pose.covariance[14] = 0.25
         odom.pose.covariance[35] = 0.05
-        odom.twist.twist.linear.x = self._u
-        odom.twist.twist.linear.y = self._v
-        odom.twist.twist.angular.z = self._r
+        odom.twist.twist.linear.x = state['u']
+        odom.twist.twist.linear.y = state['v']
+        odom.twist.twist.angular.z = state['r']
         self._odom_pub.publish(odom)
 
+    def _publish_viz(self) -> None:
+        state = self._snapshot()
+        if state is None:
+            return
+
+        stamp = self.get_clock().now().to_msg()
+        quat = yaw_to_quaternion(state['yaw'])
+        self._publish_recent_path(stamp, state['points'])
         if not self._publish_tf:
             return
 
@@ -189,14 +222,14 @@ class GpsMapOdomNode(Node):
         tf_msg.header.stamp = stamp
         tf_msg.header.frame_id = self._map_frame
         tf_msg.child_frame_id = self._base_frame
-        tf_msg.transform.translation.x = east
-        tf_msg.transform.translation.y = north
-        tf_msg.transform.translation.z = up
+        tf_msg.transform.translation.x = state['east']
+        tf_msg.transform.translation.y = state['north']
+        tf_msg.transform.translation.z = state['up']
         tf_msg.transform.rotation = quat
         self._tf_broadcaster.sendTransform(tf_msg)
 
-    def _publish_recent_path(self, stamp) -> None:
-        if len(self._recent_points) < 2:
+    def _publish_recent_path(self, stamp, points: list[tuple[float, float]]) -> None:
+        if len(points) < 2:
             return
 
         marker = Marker()
@@ -210,7 +243,7 @@ class GpsMapOdomNode(Node):
         marker.color = ColorRGBA(r=1.0, g=0.65, b=0.1, a=0.9)
         marker.pose.orientation.w = 1.0
 
-        for x, y in self._recent_points:
+        for x, y in points:
             point = Point()
             point.x = x
             point.y = y
@@ -223,11 +256,14 @@ class GpsMapOdomNode(Node):
 def main(args=None) -> None:
     rclpy.init(args=args)
     node = GpsMapOdomNode()
+    executor = MultiThreadedExecutor(num_threads=2)
+    executor.add_node(node)
     try:
-        rclpy.spin(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     finally:
+        executor.shutdown()
         node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()

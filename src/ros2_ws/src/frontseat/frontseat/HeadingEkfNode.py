@@ -15,7 +15,7 @@ from frontseat.heading.angles import normalize_angle, yaw_from_quaternion
 from frontseat.heading.filter_config import load_heading_filter_config
 from frontseat.heading.filters import HeadingEkf
 from frontseat.heading.ros_msgs import build_heading_marker, build_imu_msg
-from frontseat.qos_profiles import best_effort_volatile_qos, reliable_volatile_qos
+from frontseat.qos_profiles import best_effort_volatile_qos
 
 
 class HeadingEkfNode(Node):
@@ -54,10 +54,10 @@ class HeadingEkfNode(Node):
             Imu, ekf_config.output_imu_topic, best_effort_volatile_qos
         )
         self._deg_pub = self.create_publisher(
-            Float32, ekf_config.output_deg_topic, reliable_volatile_qos
+            Float32, ekf_config.output_deg_topic, best_effort_volatile_qos
         )
         self._marker_pub = self.create_publisher(
-            Marker, ekf_config.output_marker_topic, 10
+            Marker, ekf_config.output_marker_topic, best_effort_volatile_qos
         )
 
         if not self._enabled:
@@ -70,11 +70,13 @@ class HeadingEkfNode(Node):
             self._gps_heading_cb,
             best_effort_volatile_qos,
         )
+        # ZED publishes IMU as best-effort sensor data. A reliable subscription
+        # never connects, so the filter was running without gyro.
         self.create_subscription(
             Imu,
             ekf_config.imu_topic,
             self._zed_imu_cb,
-            reliable_volatile_qos,
+            best_effort_volatile_qos,
         )
         self.create_timer(1.0 / ekf_config.publish_rate_hz, self._publish_timer_cb)
 

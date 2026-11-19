@@ -18,29 +18,23 @@ class WtpFollowerNode(Node):
         super().__init__(node_name)
         self.initialize_ros_params()
 
-        # For high-rate sensor data
+        # Latest sample only. A reliable reader would wait on old fixes and commands.
         qos_best_effort_volatile = QoSProfile(
-            reliability=QoSReliabilityPolicy.BEST_EFFORT,   # Send ony once without retry
-            durability=QoSDurabilityPolicy.VOLATILE,        # Do not store old messages
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,
+            durability=QoSDurabilityPolicy.VOLATILE,
             depth=1
         )
-        # For critical real-time commands, reliable but no stored history
-        qos_reliable_volatile = QoSProfile(
-            reliability=QoSReliabilityPolicy.RELIABLE,  # Rety until success
-            durability=QoSDurabilityPolicy.VOLATILE,    # Do not store old messages
-            depth=5
-        )
-        
-        self.create_subscription(NavSatFix, '/wamv/sensors/gps/gps/fix', self.gps_cbk, qos_reliable_volatile)
+
+        self.create_subscription(NavSatFix, '/wamv/sensors/gps/gps/fix', self.gps_cbk, qos_best_effort_volatile)
         self.imu_pub = self.create_subscription(Imu, '/wamv/sensors/imu/imu/data/estimated', self.imu_cbk, qos_best_effort_volatile)
         self.goal_sub = self.create_subscription(PoseStamped, '/goal_pose', self.goal_callback, qos_best_effort_volatile)
         
         if self.sim_enable:
-            self.left_pub = self.create_publisher(Float64, '/wamv/thrusters/left/thrust', qos_reliable_volatile)
-            self.right_pub = self.create_publisher(Float64, '/wamv/thrusters/right/thrust', qos_reliable_volatile)
+            self.left_pub = self.create_publisher(Float64, '/wamv/thrusters/left/thrust', qos_best_effort_volatile)
+            self.right_pub = self.create_publisher(Float64, '/wamv/thrusters/right/thrust', qos_best_effort_volatile)
         else:
-            self.left_pub = self.create_publisher(Float32, '/wamv/thrusters/left_thrust_cmd', qos_reliable_volatile)
-            self.right_pub = self.create_publisher(Float32, '/wamv/thrusters/right_thrust_cmd', qos_reliable_volatile)
+            self.left_pub = self.create_publisher(Float32, '/wamv/thrusters/left_thrust_cmd', qos_best_effort_volatile)
+            self.right_pub = self.create_publisher(Float32, '/wamv/thrusters/right_thrust_cmd', qos_best_effort_volatile)
 
         self.timer = self.create_timer(1.0 / 19.0, self.runner)  # 19 Hz
 

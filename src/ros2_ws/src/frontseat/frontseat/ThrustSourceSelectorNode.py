@@ -2,7 +2,7 @@
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float32, Float64, Bool
-from frontseat.qos_profiles import reliable_volatile_qos, best_effort_volatile_qos
+from frontseat.qos_profiles import best_effort_volatile_qos
 
 class ThrustSourceSelectorNode(Node):
     """ 
@@ -31,8 +31,8 @@ class ThrustSourceSelectorNode(Node):
         self.create_subscription(Bool, '/radio/on_ctrl', self.__radio_on_ctrl_cbk, best_effort_volatile_qos)
 
         # Publishers
-        self.pwm_right_thrust_pub = self.create_publisher(Float32, '/pwm/right_thrust_cmd', reliable_volatile_qos)
-        self.pwm_left_thrust_pub = self.create_publisher(Float32, '/pwm/left_thrust_cmd', reliable_volatile_qos)
+        self.pwm_right_thrust_pub = self.create_publisher(Float32, '/pwm/right_thrust_cmd', best_effort_volatile_qos)
+        self.pwm_left_thrust_pub = self.create_publisher(Float32, '/pwm/left_thrust_cmd', best_effort_volatile_qos)
 
         # Publish at 10 Hz
         self.timer = self.create_timer(0.1, self.__publish_thrust)

@@ -73,7 +73,7 @@ run_docker_integration() {
   log "Waiting for cross-track error (follower active)..."
   docker exec "${AUTONOMY_CONTAINER}" bash -lc \
     "set +u && source /opt/ros/humble/setup.bash && set -u && \
-     timeout 60 ros2 topic echo /molo_mpc/cross_track_error --once" \
+     timeout 60 ros2 topic echo /molo_mpc/cross_track_error --qos-reliability best_effort --once" \
     | grep -q data || die "follower did not publish cross_track_error"
 
   log "Docker integration passed."

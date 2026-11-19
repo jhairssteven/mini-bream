@@ -6,6 +6,8 @@ from __future__ import annotations
 import math
 
 import rclpy
+from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
+from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from sensor_msgs.msg import Imu, NavSatFix
 from std_msgs.msg import Float32
@@ -72,16 +74,20 @@ class RelPosHeadingNode(Node):
         self._rover_fix: NavSatFix | None = None
         self._base_fix: NavSatFix | None = None
 
+        # Viz outputs are best-effort so a slow RViz/recorder cannot block this node.
+        # The averaged-fix timer has its own callback group so it keeps publishing
+        # while the heading callback is busy.
         self._raw_imu_pub = self.create_publisher(Imu, raw_imu_topic, best_effort_volatile_qos)
         self._lfp_imu_pub = self.create_publisher(Imu, lfp_imu_topic, best_effort_volatile_qos)
         self._imu_pub = self.create_publisher(Imu, imu_topic, best_effort_volatile_qos)
-        self._deg_pub = self.create_publisher(Float32, heading_deg_topic, reliable_volatile_qos)
-        self._raw_deg_pub = self.create_publisher(Float32, raw_heading_deg_topic, reliable_volatile_qos)
-        self._marker_pub = self.create_publisher(Marker, marker_topic, 10)
-        self._raw_marker_pub = self.create_publisher(Marker, raw_marker_topic, 10)
-        self._lfp_marker_pub = self.create_publisher(Marker, lfp_marker_topic, 10)
+        self._deg_pub = self.create_publisher(Float32, heading_deg_topic, best_effort_volatile_qos)
+        self._raw_deg_pub = self.create_publisher(Float32, raw_heading_deg_topic, best_effort_volatile_qos)
+        self._marker_pub = self.create_publisher(Marker, marker_topic, best_effort_volatile_qos)
+        self._raw_marker_pub = self.create_publisher(Marker, raw_marker_topic, best_effort_volatile_qos)
+        self._lfp_marker_pub = self.create_publisher(Marker, lfp_marker_topic, best_effort_volatile_qos)
         self._center_fix_pub = self.create_publisher(NavSatFix, center_fix_topic, best_effort_volatile_qos)
 
+        self._gps_group = MutuallyExclusiveCallbackGroup()
         self.create_subscription(
             NavRELPOSNED9, navrelposned_topic, self._relpos_cb, reliable_volatile_qos
         )
@@ -91,7 +97,11 @@ class RelPosHeadingNode(Node):
         self.create_subscription(
             NavSatFix, base_fix_topic, self._base_fix_cb, reliable_volatile_qos
         )
-        self.create_timer(1.0 / gps_publish_rate_hz, self._publish_center_fix)
+        self.create_timer(
+            1.0 / gps_publish_rate_hz,
+            self._publish_center_fix,
+            callback_group=self._gps_group,
+        )
 
         mode = 'ekf' if self._ekf_enabled else (
             'low_pass' if self._lpf_enabled else 'raw'
@@ -195,11 +205,14 @@ class RelPosHeadingNode(Node):
 def main(args=None) -> None:
     rclpy.init(args=args)
     node = RelPosHeadingNode()
+    executor = MultiThreadedExecutor(num_threads=2)
+    executor.add_node(node)
     try:
-        rclpy.spin(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     finally:
+        executor.shutdown()
         node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()

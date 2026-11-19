@@ -139,7 +139,7 @@ def save_ref_path(cfg: dict, path: Path, origin_xy: tuple[float, float] = (0.0, 
 def wait_for_xte(timeout_s: float, cfg: Optional[dict] = None) -> bool:
     cmd = (
         "bash -c "
-        "'until ros2 topic echo /molo_mpc/cross_track_error --once 2>/dev/null | grep -q data; do sleep 0.5; done'"
+        "'until ros2 topic echo /molo_mpc/cross_track_error --qos-reliability best_effort --once 2>/dev/null | grep -q data; do sleep 0.5; done'"
     )
     proc = subprocess.Popen(
         bash_cmd(cmd, cfg),
