@@ -192,12 +192,17 @@ GATEWAY="$1"
 DNS_CSV="$2"
 SUDO_PASS="$3"
 
-# Authenticate once; never pipe secrets into commands that also read stdin
-# (e.g. `echo pass | sudo -S tee file` writes the password when sudo is cached).
+# Authenticate once; never pipe file contents into `sudo tee` — on some hosts
+# (Jetson) a non-tty stdin makes sudo re-prompt and fail without a terminal.
 if [[ -n "${SUDO_PASS}" ]]; then
-  echo "${SUDO_PASS}" | sudo -S -v >/dev/null 2>&1
+  if ! echo "${SUDO_PASS}" | sudo -S -v >/dev/null 2>&1; then
+    echo "sudo authentication failed" >&2
+    exit 1
+  fi
+  run_sudo() { sudo -n "$@"; }
+else
+  run_sudo() { sudo "$@"; }
 fi
-run_sudo() { sudo "$@"; }
 
 run_sudo ip route replace default via "${GATEWAY}"
 
@@ -207,7 +212,10 @@ for ns in "${dns_arr[@]}"; do
   [[ -n "${ns}" ]] || continue
   resolv+="nameserver ${ns}"$'\n'
 done
-printf '%s' "${resolv}" | run_sudo tee /etc/resolv.conf >/dev/null
+tmp="$(mktemp)"
+printf '%s' "${resolv}" > "${tmp}"
+run_sudo cp "${tmp}" /etc/resolv.conf
+rm -f "${tmp}"
 EOF
   then
     log "  FAIL: could not set gateway/DNS"
