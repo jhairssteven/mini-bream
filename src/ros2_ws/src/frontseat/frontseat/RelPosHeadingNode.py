@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import math
+import sys
 
 import rclpy
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
@@ -73,10 +74,12 @@ class RelPosHeadingNode(Node):
 
         self._rover_fix: NavSatFix | None = None
         self._base_fix: NavSatFix | None = None
+        self._heading_valid: bool | None = None
 
-        # Viz outputs are best-effort so a slow RViz/recorder cannot block this node.
-        # The averaged-fix timer has its own callback group so it keeps publishing
-        # while the heading callback is busy.
+        # Viz outputs are best-effort so a slow reader cannot block this node.
+        # Rover/base updates and the averaged-fix timer share a callback group
+        # separate from heading. Validity changes go to stderr, not /rosout:
+        # a ROS log holds the Python lock and stalls the averaged fix.
         self._raw_imu_pub = self.create_publisher(Imu, raw_imu_topic, best_effort_volatile_qos)
         self._lfp_imu_pub = self.create_publisher(Imu, lfp_imu_topic, best_effort_volatile_qos)
         self._imu_pub = self.create_publisher(Imu, imu_topic, best_effort_volatile_qos)
@@ -92,10 +95,18 @@ class RelPosHeadingNode(Node):
             NavRELPOSNED9, navrelposned_topic, self._relpos_cb, reliable_volatile_qos
         )
         self.create_subscription(
-            NavSatFix, rover_fix_topic, self._rover_fix_cb, reliable_volatile_qos
+            NavSatFix,
+            rover_fix_topic,
+            self._rover_fix_cb,
+            reliable_volatile_qos,
+            callback_group=self._gps_group,
         )
         self.create_subscription(
-            NavSatFix, base_fix_topic, self._base_fix_cb, reliable_volatile_qos
+            NavSatFix,
+            base_fix_topic,
+            self._base_fix_cb,
+            reliable_volatile_qos,
+            callback_group=self._gps_group,
         )
         self.create_timer(
             1.0 / gps_publish_rate_hz,
@@ -149,10 +160,18 @@ class RelPosHeadingNode(Node):
             )
         )
 
+    def _note_heading_validity(self, valid: bool) -> None:
+        if valid == self._heading_valid:
+            return
+        self._heading_valid = valid
+        state = 'valid' if valid else 'invalid'
+        sys.stderr.write(f'[rel_pos_heading] NAV-RELPOSNED heading {state}\n')
+        sys.stderr.flush()
+
     def _relpos_cb(self, msg: NavRELPOSNED9) -> None:
         measurement = parse_nav_relposned9(msg)
+        self._note_heading_validity(measurement.heading_valid)
         if not measurement.heading_valid:
-            self.get_logger().warning('NAV-RELPOSNED heading invalid; skipping update')
             return
 
         stamp = self.get_clock().now().to_msg()

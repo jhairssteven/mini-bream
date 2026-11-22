@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!-- Cyclone DDS static peers on 192.168.0.0/24 (robot LAN).
-     .100 Pi (frontseat)  .101 spare  .102 Jetson (perception)  .103 ground station (RViz) -->
+     .101 Pi (wlan0)  .102 Jetson  .104 c2
+     Only list hosts that answer ARP. A missing peer blocks the shared
+     UDP socket for the ARP timeout and stalls every publisher in the process. -->
 <CycloneDDS xmlns="https://cdds.io/config">
   <Domain>
     <General>
@@ -14,13 +16,9 @@
       <ParticipantIndex>auto</ParticipantIndex>
       <MaxAutoParticipantIndex>120</MaxAutoParticipantIndex>
       <Peers>
-        <!-- Unicast to every robot-LAN host -->
-        <Peer address="192.168.0.100"/> <!-- Pi -->
-        <Peer address="192.168.0.101"/>
+        <Peer address="192.168.0.101"/> <!-- Pi wlan0 -->
         <Peer address="192.168.0.102"/> <!-- Jetson -->
-        <Peer address="192.168.0.103"/> <!-- ground station -->
         <Peer address="192.168.0.104"/> <!-- c2 -->
-        <Peer address="192.168.0.105"/> <!-- c2 ethernet -->
       </Peers>
     </Discovery>
   </Domain>

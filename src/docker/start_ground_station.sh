@@ -30,13 +30,9 @@ write_cyclonedds_config() {
       <ParticipantIndex>auto</ParticipantIndex>
       <MaxAutoParticipantIndex>120</MaxAutoParticipantIndex>
       <Peers>
-        <!-- Unicast to every robot-LAN host. The GL-AR300M16 drops multicast. -->
-        <Peer address="192.168.0.100"/> <!-- Pi -->
-        <Peer address="192.168.0.101"/>
+        <!-- Hosts that answer ARP. A missing peer blocks the UDP socket. -->
+        <Peer address="192.168.0.101"/> <!-- Pi wlan0 -->
         <Peer address="192.168.0.102"/> <!-- Jetson -->
-        <Peer address="192.168.0.103"/> <!-- ground station -->
-        <Peer address="192.168.0.104"/> <!-- c2 -->
-        <Peer address="192.168.0.105"/> <!-- c2 ethernet -->
       </Peers>
     </Discovery>
   </Domain>
