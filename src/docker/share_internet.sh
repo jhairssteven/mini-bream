@@ -3,12 +3,15 @@
 #
 # Use when the GS has internet on Wi‑Fi and Ethernet is on an offline LAN
 # (192.168.0.0/24). Sets NAT on this host and points remotes at this host as
-# gateway + public DNS. Changes are temporary (lost on reboot / DHCP renew).
+# gateway + public DNS. Also sets the Ethernet NM profile to
+# ipv4.never-default=yes so this host keeps using Wi‑Fi for its own internet.
 #
 #   cd src/docker
-#   ./share_internet.sh
+#   ./share_internet.sh          # enable sharing
+#   ./share_internet.sh --undo   # remove NAT + restore Ethernet default route
 #
 # Options:
+#   --undo          Remove NAT rules; set Ethernet never-default=no (desk internet)
 #   --pi-only       Only configure the Pi
 #   --jetson-only   Only configure the Jetson
 #   --nat-only      Only enable NAT on this host (skip remotes)
@@ -24,11 +27,12 @@
 #   SUDO_PASS_LOCAL / SSHPASS_GROUND Local sudo for iptables (optional)
 #   WAN_IFACE=...                    Internet iface (default: default-route iface)
 #   LAN_IFACE=...                    Robot LAN iface (default: iface with GROUND_LAN_IP)
+#   NM_LAN_CONNECTION=...            NM profile for LAN (default: active on LAN_IFACE)
 #   GROUND_LAN_IP=192.168.0.104      Gateway IP remotes should use
 #   DNS_SERVERS="8.8.8.8 1.1.1.1"    Written to remote /etc/resolv.conf
 #   FAIL_ON_ERROR=0                  Exit 1 if any target fails (default: 0)
 #
-# Requires: iptables, sudo on this host; ssh(+sshpass) to remotes.
+# Requires: iptables, sudo on this host; ssh(+sshpass) to remotes; nmcli optional.
 
 set -euo pipefail
 
@@ -51,13 +55,14 @@ JETSON_SSH="${JETSON_SSH_USER}@${JETSON_IP}"
 
 DRY_RUN=0
 VERIFY_ONLY=0
+UNDO=0
 DO_NAT=1
 DO_PI=1
 DO_JETSON=1
 FAILURES=0
 
 usage() {
-  sed -n '2,31p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,34p' "$0" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
@@ -66,6 +71,7 @@ die() { echo "[share-internet] ERROR: $*" >&2; exit 1; }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --undo) UNDO=1; DO_NAT=0; DO_PI=0; DO_JETSON=0 ;;
     --pi-only) DO_JETSON=0 ;;
     --jetson-only) DO_PI=0 ;;
     --nat-only) DO_PI=0; DO_JETSON=0 ;;
@@ -86,6 +92,17 @@ detect_lan_iface() {
   ip -o -4 addr show 2>/dev/null | awk -v ip="${ip}/" '$0 ~ ip {print $2; exit}'
 }
 
+detect_ethernet_iface() {
+  nmcli -t -f DEVICE,TYPE,STATE device status 2>/dev/null \
+    | awk -F: '$2=="ethernet" && $3 ~ /connected/ {print $1; exit}'
+}
+
+detect_nm_connection_for_iface() {
+  local iface="$1"
+  nmcli -t -f NAME,DEVICE connection show --active 2>/dev/null \
+    | awk -F: -v d="${iface}" '$2==d {print $1; exit}'
+}
+
 WAN_IFACE="${WAN_IFACE:-${GROUND_IFACE:-}}"
 if [[ -z "${WAN_IFACE}" ]]; then
   WAN_IFACE="$(detect_wan_iface || true)"
@@ -94,9 +111,20 @@ LAN_IFACE="${LAN_IFACE:-}"
 if [[ -z "${LAN_IFACE}" ]]; then
   LAN_IFACE="$(detect_lan_iface "${GROUND_LAN_IP}" || true)"
 fi
+if [[ -z "${LAN_IFACE}" ]]; then
+  LAN_IFACE="$(detect_ethernet_iface || true)"
+fi
 
-[[ -n "${WAN_IFACE}" ]] || die "could not detect WAN_IFACE (set WAN_IFACE= or GROUND_IFACE=)"
-[[ -n "${LAN_IFACE}" ]] || die "could not detect LAN_IFACE for ${GROUND_LAN_IP} (set LAN_IFACE=)"
+NM_LAN_CONNECTION="${NM_LAN_CONNECTION:-}"
+if [[ -z "${NM_LAN_CONNECTION}" && -n "${LAN_IFACE}" ]]; then
+  NM_LAN_CONNECTION="$(detect_nm_connection_for_iface "${LAN_IFACE}" || true)"
+fi
+NM_LAN_CONNECTION="${NM_LAN_CONNECTION:-Wired connection 1}"
+
+if [[ "${UNDO}" -eq 0 && "${VERIFY_ONLY}" -eq 0 ]]; then
+  [[ -n "${WAN_IFACE}" ]] || die "could not detect WAN_IFACE (set WAN_IFACE= or GROUND_IFACE=)"
+  [[ -n "${LAN_IFACE}" ]] || die "could not detect LAN_IFACE for ${GROUND_LAN_IP} (set LAN_IFACE=)"
+fi
 
 local_sudo() {
   local pass="${SUDO_PASS_LOCAL:-${SSHPASS_GROUND:-}}"
@@ -129,13 +157,57 @@ iptables_has() {
   fi
 }
 
+iptables_delete_all() {
+  local table="$1"
+  shift
+  while iptables_has "${table}" "$@"; do
+    if [[ "${table}" == "filter" ]]; then
+      local_sudo iptables -D "$@" || break
+    else
+      local_sudo iptables -t "${table}" -D "$@" || break
+    fi
+  done
+}
+
+set_lan_never_default() {
+  local value="$1" # yes|no
+  if ! command -v nmcli >/dev/null 2>&1; then
+    log "  WARN: nmcli missing; skip ipv4.never-default=${value}"
+    return 0
+  fi
+  if [[ -z "${NM_LAN_CONNECTION}" ]]; then
+    log "  WARN: no NM LAN connection; skip ipv4.never-default=${value}"
+    return 0
+  fi
+
+  local current
+  current="$(nmcli -g ipv4.never-default connection show "${NM_LAN_CONNECTION}" 2>/dev/null || true)"
+  if [[ "${current}" == "${value}" ]]; then
+    log "  ${NM_LAN_CONNECTION}: ipv4.never-default already ${value}"
+    return 0
+  fi
+
+  if [[ "${DRY_RUN}" -eq 1 ]]; then
+    log "  DRY-RUN: would set '${NM_LAN_CONNECTION}' ipv4.never-default=${value}"
+    return 0
+  fi
+
+  nmcli connection modify "${NM_LAN_CONNECTION}" ipv4.never-default "${value}"
+  nmcli connection up "${NM_LAN_CONNECTION}" >/dev/null
+  log "  ${NM_LAN_CONNECTION}: ipv4.never-default=${value} (persisted)"
+}
+
 enable_nat() {
   log "=== NAT on this host (${LAN_IFACE} → ${WAN_IFACE}) ==="
 
   if [[ "${DRY_RUN}" -eq 1 ]]; then
     log "  DRY-RUN: would enable ip_forward and MASQUERADE ${LAN_IFACE}→${WAN_IFACE}"
+    set_lan_never_default yes
     return 0
   fi
+
+  # Keep this host on Wi‑Fi for its own internet while Ethernet is robot-LAN only.
+  set_lan_never_default yes
 
   local_sudo sysctl -w net.ipv4.ip_forward=1 >/dev/null
 
@@ -159,6 +231,36 @@ enable_nat() {
   else
     log "  FORWARD ${WAN_IFACE}→${LAN_IFACE} already present"
   fi
+}
+
+undo_share() {
+  log "=== undo share on this host ==="
+
+  WAN_IFACE="${WAN_IFACE:-${GROUND_IFACE:-}}"
+  if [[ -z "${WAN_IFACE}" ]]; then
+    WAN_IFACE="$(detect_wan_iface || true)"
+  fi
+  LAN_IFACE="${LAN_IFACE:-$(detect_ethernet_iface || true)}"
+
+  if [[ "${DRY_RUN}" -eq 1 ]]; then
+    log "  DRY-RUN: would remove NAT ${LAN_IFACE:-?}→${WAN_IFACE:-?} and set never-default=no"
+    set_lan_never_default no
+    return 0
+  fi
+
+  if [[ -n "${WAN_IFACE}" ]]; then
+    iptables_delete_all nat POSTROUTING -o "${WAN_IFACE}" -j MASQUERADE
+    log "  removed MASQUERADE -o ${WAN_IFACE} (if any)"
+  fi
+  if [[ -n "${WAN_IFACE}" && -n "${LAN_IFACE}" ]]; then
+    iptables_delete_all filter FORWARD -i "${LAN_IFACE}" -o "${WAN_IFACE}" -j ACCEPT
+    iptables_delete_all filter FORWARD -i "${WAN_IFACE}" -o "${LAN_IFACE}" -m state --state RELATED,ESTABLISHED -j ACCEPT
+    log "  removed FORWARD ${LAN_IFACE}↔${WAN_IFACE} (if any)"
+  fi
+
+  # Desk / normal Ethernet: allow DHCP default gateway again (persists in NM).
+  set_lan_never_default no
+  log "  Ethernet may use DHCP default route again. Remotes keep old gateway until reboot/DHCP."
 }
 
 configure_remote() {
@@ -255,7 +357,15 @@ EOF
   return 1
 }
 
-log "WAN=${WAN_IFACE}  LAN=${LAN_IFACE}  gateway_for_remotes=${GROUND_LAN_IP}"
+if [[ "${UNDO}" -eq 1 ]]; then
+  log "NM_LAN_CONNECTION=${NM_LAN_CONNECTION}  WAN=${WAN_IFACE:-?}  LAN=${LAN_IFACE:-?}"
+  echo
+  undo_share
+  log "Done. Ethernet internet restored (never-default=no persisted)."
+  exit 0
+fi
+
+log "WAN=${WAN_IFACE}  LAN=${LAN_IFACE}  NM=${NM_LAN_CONNECTION}  gateway_for_remotes=${GROUND_LAN_IP}"
 echo
 
 if [[ "${DO_NAT}" -eq 1 ]]; then
@@ -297,4 +407,4 @@ if [[ "${FAILURES}" -gt 0 ]]; then
   exit 0
 fi
 
-log "Done. Temporary until reboot / DHCP renew."
+log "Done. When finished sharing, run: ./share_internet.sh --undo"
