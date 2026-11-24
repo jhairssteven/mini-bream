@@ -190,8 +190,14 @@ class GsMpcIlosFollowerNode(Node):
 
         traj_cfg = config.get("trajectory", {})
         self.viz = MpcVisualizer(self, self.frame_id, topics)
-        self._traj_step = float(traj_cfg.get("min_distance_m", 0.25))
+        # 0 records every new pose. A positive value thins the RViz trail.
+        self._traj_step = float(traj_cfg.get("min_distance_m", 0.0))
+        self._odom_seq = 0
+        self._traj_odom_seq = -1
         self._viz_lock = threading.Lock()
+        # SLSQP reads and writes the local path and ILOS state. The thrust
+        # loop takes this lock only around that copy, never around the solve.
+        self._plan_lock = threading.Lock()
         self._viz_snap: Optional[Tuple[float, float, float, float]] = None
         self._viz_pred = None
         self._viz_display: Optional[List] = None
@@ -213,7 +219,7 @@ class GsMpcIlosFollowerNode(Node):
         self._u_mpc = float(config.get("path", {}).get("cruise_speed_mps", 0.25))
         self._p_loc: List[Tuple[float, float]] = []
         self._obstacles: List[Obstacle] = []
-        self._last_mpc_t = -1e9
+        self._mpc_committed = False
 
         self._path_activation = PathActivationManager(
             self,
@@ -225,7 +231,11 @@ class GsMpcIlosFollowerNode(Node):
 
         self._rate = float(config.get("control_rate_hz", 10.0))
         self._dt = 1.0 / self._rate
+        self._mpc_group = MutuallyExclusiveCallbackGroup()
         self.create_timer(self._dt, self._control_loop)
+        # SLSQP stays off the thrust timer. A 0.28 s solve must not hold the
+        # next PI/PD command.
+        self.create_timer(self._mpc_period, self._run_mpc, callback_group=self._mpc_group)
         # Paths and pose markers go out on another thread so a stalled subscriber
         # cannot delay the next thrust command.
         self.create_timer(0.1, self._publish_viz, callback_group=self._viz_group)
@@ -247,6 +257,7 @@ class GsMpcIlosFollowerNode(Node):
         xd = self._u * math.cos(self._psi) - self._v * math.sin(self._psi)
         yd = self._u * math.sin(self._psi) + self._v * math.cos(self._psi)
         self._chi = math.atan2(yd, xd) if self._u_g > 0.05 else self._psi
+        self._odom_seq += 1
         if self._path_activation.pending:
             self._path_activation.notify_pose(self._x, self._y, self._psi)
 
@@ -273,9 +284,12 @@ class GsMpcIlosFollowerNode(Node):
             idx0 = closest_index(self._path, self._x, self._y)
         self._path_idx = idx0
         if not soft:
-            self._surge.reset()
-            self._ilos.reset()
-            self._mpc.reset()
+            with self._plan_lock:
+                self._surge.reset()
+                self._ilos.reset()
+                self._mpc.reset()
+                self._p_loc = []
+                self._mpc_committed = False
         stamp = self._path_activation._last_path_stamp
         with self._viz_lock:
             self._viz_display = display_samples
@@ -287,45 +301,44 @@ class GsMpcIlosFollowerNode(Node):
         )
 
     def _run_mpc(self) -> None:
-        assert self._x is not None and self._psi is not None
-        ref = window_reference(
-            self._path_xy, self._x, self._y, ahead=self._mpc_ref_ahead
-        )
-        if self._path_closed and len(ref) < 4:
-            # wrap a bit more of the loop
+        with self._plan_lock:
+            if self._x is None or self._psi is None or not self._path_ready:
+                return
+            x, y, psi = self._x, self._y, self._psi
+            path_xy = self._path_xy
+            closed = self._path_closed
+            obstacles = list(self._obstacles)
+            committed = self._mpc_committed
+        ref = window_reference(path_xy, x, y, ahead=self._mpc_ref_ahead)
+        if closed and len(ref) < 4:
             ref = window_reference(
-                self._path_xy + self._path_xy[: self._mpc_ref_ahead],
-                self._x,
-                self._y,
+                path_xy + path_xy[: self._mpc_ref_ahead],
+                x,
+                y,
                 ahead=self._mpc_ref_ahead,
             )
         cruise = float(self.cfg.get("path", {}).get("cruise_speed_mps", self._u_mpc))
-        sol = self._mpc.solve(
-            self._x,
-            self._y,
-            self._psi,
-            ref,
-            obstacles=self._obstacles,
-            u_nom=cruise,
-        )
-        if sol.success or self._last_mpc_t < 0:
-            # ILOS tracks a local window of the global mission path (stable).
-            # MPC prediction is published for RViz / obstacle-aware replans;
-            # when obstacles are present, prefer the MPC polyline.
-            if self._obstacles:
-                self._p_loc = [(float(p[0]), float(p[1])) for p in sol.path_xy]
-            else:
-                self._p_loc = window_reference(
-                    self._path_xy, self._x, self._y, ahead=self._mpc_ref_ahead
-                )
-                if len(self._p_loc) < 2:
-                    self._p_loc = [(float(p[0]), float(p[1])) for p in sol.path_xy]
-            self._u_mpc = float(np.clip(sol.u_mpc, self._u_min, self._u_max))
-            self._ilos.set_path(self._p_loc, soft=True, pose_xy=(self._x, self._y))
-            states = np.column_stack([sol.path_xy, sol.path_psi])
-            with self._viz_lock:
-                self._viz_pred = states
-        # else keep last P_loc / U_MPC
+        sol = self._mpc.solve(x, y, psi, ref, obstacles=obstacles, u_nom=cruise)
+        if not (sol.success or not committed):
+            return
+        # ILOS tracks a local window of the global mission path (stable).
+        # MPC prediction is published for RViz / obstacle-aware replans;
+        # when obstacles are present, prefer the MPC polyline.
+        if obstacles:
+            p_loc = [(float(p[0]), float(p[1])) for p in sol.path_xy]
+        else:
+            p_loc = window_reference(path_xy, x, y, ahead=self._mpc_ref_ahead)
+            if len(p_loc) < 2:
+                p_loc = [(float(p[0]), float(p[1])) for p in sol.path_xy]
+        u_mpc = float(np.clip(sol.u_mpc, self._u_min, self._u_max))
+        states = np.column_stack([sol.path_xy, sol.path_psi])
+        with self._plan_lock:
+            self._p_loc = p_loc
+            self._u_mpc = u_mpc
+            self._mpc_committed = True
+            self._ilos.set_path(p_loc, soft=True, pose_xy=(x, y))
+        with self._viz_lock:
+            self._viz_pred = states
 
     def _publish_thrust(self, left_n: float, right_n: float) -> Tuple[float, float]:
         """Publish thruster cmds; return allocated forces [N] for logging."""
@@ -345,29 +358,23 @@ class GsMpcIlosFollowerNode(Node):
         if self._t0 is None:
             self._t0 = now
 
-        if now - self._last_mpc_t >= self._mpc_period:
-            self._run_mpc()
-            self._last_mpc_t = now
+        with self._plan_lock:
+            if len(self._p_loc) < 2:
+                # First tick before MPC: seed from global segment
+                ref = window_reference(self._path_xy, self._x, self._y, ahead=12)
+                self._p_loc = ref if len(ref) >= 2 else self._path_xy[:12]
+                self._ilos.set_path(self._p_loc, soft=False)
+            u_mpc = float(self._u_mpc)
+            if self._speed_feedback == "ground_mag":
+                u_g_meas = self._u_g
+            elif self._speed_feedback == "ground_long":
+                u_g_meas = self._u_g * math.cos(self._chi - self._psi)
+            else:
+                u_g_meas = self._u
+            cruise = float(self.cfg.get("path", {}).get("cruise_speed_mps", 0.3))
+            u_hint = max(u_mpc, cruise * self._u_d_floor_frac)
+            psi_d, _ = self._ilos.update(self._x, self._y, self._dt, u_hint)
 
-        if len(self._p_loc) < 2:
-            # First tick before MPC: seed from global segment
-            ref = window_reference(self._path_xy, self._x, self._y, ahead=12)
-            self._p_loc = ref if len(ref) >= 2 else self._path_xy[:12]
-            self._ilos.set_path(self._p_loc, soft=False)
-
-        if self._speed_feedback == "ground_mag":
-            u_g_meas = self._u_g
-        elif self._speed_feedback == "ground_long":
-            u_g_meas = self._u_g * math.cos(self._chi - self._psi)
-        else:
-            # body-x surge (signed) — preferred with odometry
-            u_g_meas = self._u
-
-        cruise = float(self.cfg.get("path", {}).get("cruise_speed_mps", 0.3))
-        # Speed hint: floor U_MPC near cruise so we never hold crawl speed with a
-        # high-gain PI (that pattern reverses the boat and chatters).
-        u_hint = max(float(self._u_mpc), cruise * self._u_d_floor_frac)
-        psi_d, _ = self._ilos.update(self._x, self._y, self._dt, u_hint)
         head_err = angdiff(psi_d, self._psi)
         # Heading scale reduces speed in large turns, but keep a real cruise
         # floor (not crawl) so the surge loop does not chatter around ~0.
@@ -433,7 +440,9 @@ class GsMpcIlosFollowerNode(Node):
             x, y, psi, xte = snap
             self.viz.publish_pose(x, y, psi)
             self.viz.publish_xte(xte)
-            self.viz.publish_traversed(x, y, psi, self._traj_step)
+            if self._odom_seq != self._traj_odom_seq:
+                self.viz.publish_traversed(x, y, psi, self._traj_step)
+                self._traj_odom_seq = self._odom_seq
         if pred is not None:
             self.viz.publish_pred(pred)
         now = self.get_clock().now().nanoseconds * 1e-9
@@ -453,7 +462,7 @@ def main() -> None:
     config = load_config(args.config)
     rclpy.init()
     node = GsMpcIlosFollowerNode(config)
-    executor = MultiThreadedExecutor(num_threads=2)
+    executor = MultiThreadedExecutor(num_threads=3)
     executor.add_node(node)
     try:
         executor.spin()

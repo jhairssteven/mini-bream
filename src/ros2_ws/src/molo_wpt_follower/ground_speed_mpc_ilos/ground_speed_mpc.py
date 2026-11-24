@@ -128,10 +128,8 @@ class GroundSpeedMPC:
             return xs, ys, ps
 
         def path_cost(xs: np.ndarray, ys: np.ndarray) -> float:
-            c = 0.0
-            for k in range(n + 1):
-                c += _dist_to_polyline(xs[k], ys[k], ref) ** 2
-            return c
+            d = _distances_to_polyline(xs, ys, ref)
+            return float(np.dot(d, d))
 
         def obstacle_cost(xs: np.ndarray, ys: np.ndarray) -> float:
             if not obstacles:
@@ -224,14 +222,32 @@ class GroundSpeedMPC:
 
 
 def _dist_to_polyline(px: float, py: float, ref: np.ndarray) -> float:
-    best = float("inf")
-    for i in range(len(ref) - 1):
-        d = _point_to_segment_distance(
-            px, py, float(ref[i, 0]), float(ref[i, 1]), float(ref[i + 1, 0]), float(ref[i + 1, 1])
-        )
-        if d < best:
-            best = d
-    return best
+    d = _distances_to_polyline(np.asarray([px]), np.asarray([py]), ref)
+    return float(d[0]) if d.size else float("inf")
+
+
+def _distances_to_polyline(xs: np.ndarray, ys: np.ndarray, ref: np.ndarray) -> np.ndarray:
+    """Min distance from each query point to a polyline. Shape (len(xs),)."""
+    xs = np.asarray(xs, dtype=float)
+    ys = np.asarray(ys, dtype=float)
+    ref = np.asarray(ref, dtype=float)
+    if ref.shape[0] < 2:
+        if ref.shape[0] == 1:
+            return np.hypot(xs - ref[0, 0], ys - ref[0, 1])
+        return np.full(xs.shape, np.inf)
+    ax = ref[:-1, 0]
+    ay = ref[:-1, 1]
+    dx = ref[1:, 0] - ax
+    dy = ref[1:, 1] - ay
+    len_sq = dx * dx + dy * dy
+    px = xs[:, None] - ax
+    py = ys[:, None] - ay
+    t = (px * dx + py * dy) / np.maximum(len_sq, 1e-9)
+    t = np.clip(t, 0.0, 1.0)
+    t = np.where(len_sq < 1e-9, 0.0, t)
+    cx = ax + t * dx
+    cy = ay + t * dy
+    return np.hypot(xs[:, None] - cx, ys[:, None] - cy).min(axis=1)
 
 
 def window_reference(
