@@ -2,8 +2,9 @@
 # Fail if this host clock looks unset (near Unix epoch).
 #
 # Pi/Jetson clocks that boot at 1970 break ROS TF: GPS/odom on the Pi use wall
-# time while LiDAR on the Jetson uses host time. Run sync_field_time.sh from the
-# ground station before starting stacks.
+# time while LiDAR on the Jetson uses host time. sync_field_time.sh installs
+# chrony so the Jetson follows the ground station and the Pi follows the Jetson.
+# Run it from the ground station before starting stacks.
 #
 # Usage:
 #   ./preflight_host_clock.sh

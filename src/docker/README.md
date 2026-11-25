@@ -67,11 +67,14 @@ All stacks mount the host `/etc/localtime` and pass `TZ` so container clocks mat
 `mini_bream_env.sh` auto-exports `TZ` from the host; set `TZ` in `.env` for manual compose.
 
 **Host wall clock** still matters: Pi GPS/odom and Jetson LiDAR stamp with each host’s time.
-Before field stacks, push GS time to both robots:
+chrony keeps the three clocks together. The ground station serves NTP; the Jetson
+follows it and keeps serving if the ground station leaves Wi-Fi range, and the Pi
+follows the Jetson over Ethernet. Before field stacks:
 
 ```bash
 cd src/docker
 ./sync_field_time.sh
+./sync_field_time.sh --check
 ```
 
 `start pi|jetson|autonomy` runs `preflight_host_clock.sh` and aborts if the host
